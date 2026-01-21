@@ -1,0 +1,429 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * YAM - YACHT ARCHITECTURAL MANAGEMENT DESIGN SYSTEM
+ * Based on Digital Logbook maritime-tech design language
+ *
+ * DESIGN PHILOSOPHY:
+ * - Deep ocean blues convey trust, professionalism, and maritime heritage
+ * - Teal accents represent technology and innovation
+ * - Clean, minimal aesthetic inspired by modern navigation instruments
+ * - High contrast for outdoor/marine environment readability
+ * - Subtle gradients evoke water and horizon
+ */
+
+@layer base {
+  :root {
+    /*
+     * PRIMARY PALETTE - Ocean-inspired blues
+     * These colors anchor the brand identity
+     */
+    --background: 210 20% 99%;
+    --foreground: 215 25% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 215 25% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 25% 12%;
+
+    /* Deep Navy - Primary brand color */
+    --primary: 215 50% 23%;
+    --primary-foreground: 210 40% 98%;
+
+    /* Soft blue-gray for secondary elements */
+    --secondary: 210 25% 95%;
+    --secondary-foreground: 215 25% 25%;
+
+    /* Muted tones for backgrounds and disabled states */
+    --muted: 210 20% 96%;
+    --muted-foreground: 215 15% 45%;
+
+    /* Teal accent for CTAs and highlights */
+    --accent: 185 60% 40%;
+    --accent-foreground: 0 0% 100%;
+
+    /* Error/destructive states */
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Success state */
+    --success: 158 64% 40%;
+    --success-foreground: 0 0% 100%;
+
+    /* Warning state */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 10%;
+
+    /* Borders and inputs */
+    --border: 214 20% 88%;
+    --input: 214 20% 88%;
+    --ring: 215 50% 23%;
+
+    --radius: 0.625rem;
+
+    /* Sidebar colors */
+    --sidebar-background: 215 30% 15%;
+    --sidebar-foreground: 210 20% 90%;
+    --sidebar-primary: 185 60% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 215 30% 20%;
+    --sidebar-accent-foreground: 210 20% 95%;
+    --sidebar-border: 215 25% 22%;
+    --sidebar-ring: 185 60% 45%;
+
+    /* Gradient tokens */
+    --gradient-ocean: linear-gradient(135deg, hsl(215 50% 23%) 0%, hsl(200 60% 30%) 100%);
+    --gradient-surface: linear-gradient(180deg, hsl(210 20% 99%) 0%, hsl(210 25% 96%) 100%);
+    --gradient-card-hover: linear-gradient(135deg, hsl(210 25% 97%) 0%, hsl(210 30% 94%) 100%);
+  }
+
+  .dark {
+    --background: 220 25% 8%;
+    --foreground: 210 25% 95%;
+
+    --card: 220 25% 11%;
+    --card-foreground: 210 25% 95%;
+
+    --popover: 220 25% 11%;
+    --popover-foreground: 210 25% 95%;
+
+    /* Lighter navy for dark mode */
+    --primary: 210 50% 70%;
+    --primary-foreground: 220 25% 8%;
+
+    --secondary: 220 20% 18%;
+    --secondary-foreground: 210 25% 90%;
+
+    --muted: 220 20% 15%;
+    --muted-foreground: 215 15% 60%;
+
+    /* Brighter teal for dark mode */
+    --accent: 185 55% 50%;
+    --accent-foreground: 220 25% 8%;
+
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 210 40% 98%;
+
+    --success: 158 55% 45%;
+    --success-foreground: 220 25% 8%;
+
+    --warning: 38 80% 55%;
+    --warning-foreground: 0 0% 10%;
+
+    --border: 220 20% 18%;
+    --input: 220 20% 18%;
+    --ring: 210 50% 70%;
+
+    --sidebar-background: 220 25% 6%;
+    --sidebar-foreground: 210 20% 90%;
+    --sidebar-primary: 185 55% 50%;
+    --sidebar-primary-foreground: 220 25% 8%;
+    --sidebar-accent: 220 20% 12%;
+    --sidebar-accent-foreground: 210 20% 95%;
+    --sidebar-border: 220 20% 15%;
+    --sidebar-ring: 185 55% 50%;
+
+    --gradient-ocean: linear-gradient(135deg, hsl(210 50% 70%) 0%, hsl(185 55% 50%) 100%);
+    --gradient-surface: linear-gradient(180deg, hsl(220 25% 8%) 0%, hsl(220 25% 11%) 100%);
+    --gradient-card-hover: linear-gradient(135deg, hsl(220 25% 13%) 0%, hsl(220 20% 16%) 100%);
+  }
+}
+
+@layer base {
+  /* Smooth transitions for theme changes */
+  * {
+    @apply border-border;
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.15s ease;
+  }
+
+  /* Global body styles */
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Improved heading styles */
+  h1, h2, h3, h4, h5, h6 {
+    @apply tracking-tight;
+    text-wrap: balance;
+  }
+
+  h1 {
+    @apply text-4xl font-bold md:text-5xl lg:text-6xl;
+    letter-spacing: -0.02em;
+  }
+
+  h2 {
+    @apply text-3xl font-bold md:text-4xl;
+    letter-spacing: -0.015em;
+  }
+
+  h3 {
+    @apply text-2xl font-semibold md:text-3xl;
+  }
+
+  /* Better paragraph readability */
+  p {
+    text-wrap: pretty;
+  }
+}
+
+@layer components {
+  /* Professional card styling */
+  .card-elevated {
+    @apply bg-card rounded-xl border border-border shadow-sm;
+    @apply hover:shadow-md hover:border-primary/20 transition-all duration-300;
+  }
+
+  /* Feature card with icon */
+  .feature-card {
+    @apply p-6 rounded-xl border border-border bg-card;
+    @apply hover:shadow-lg hover:border-primary/30 hover:-translate-y-1;
+    @apply transition-all duration-300 ease-out;
+  }
+
+  /* Stat card styling */
+  .stat-card {
+    @apply p-4 rounded-xl border border-border bg-card text-center;
+    @apply hover:border-primary/20 transition-colors duration-200;
+  }
+
+  /* Hero section styling */
+  .hero-gradient {
+    background: linear-gradient(
+      135deg,
+      hsl(215 50% 23%) 0%,
+      hsl(200 55% 28%) 50%,
+      hsl(185 50% 30%) 100%
+    );
+  }
+
+  /* Ocean wave decoration */
+  .wave-decoration {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 120px;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320'%3E%3Cpath fill='%23f8fafc' fill-opacity='0.5' d='M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,122.7C672,117,768,139,864,154.7C960,171,1056,181,1152,165.3C1248,149,1344,107,1392,85.3L1440,64L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z'%3E%3C/path%3E%3C/svg%3E") no-repeat bottom;
+    background-size: cover;
+    pointer-events: none;
+  }
+
+  /* Section backgrounds */
+  .section-muted {
+    @apply bg-muted/30;
+    background-image: linear-gradient(180deg, transparent 0%, hsl(var(--muted) / 0.3) 100%);
+  }
+
+  /* Navigation link styling */
+  .nav-link {
+    @apply text-muted-foreground hover:text-foreground;
+    @apply relative transition-colors duration-200;
+  }
+
+  .nav-link::after {
+    content: '';
+    @apply absolute bottom-0 left-0 right-0 h-0.5 bg-primary;
+    @apply scale-x-0 origin-center transition-transform duration-200;
+  }
+
+  .nav-link:hover::after {
+    @apply scale-x-100;
+  }
+
+  /* Icon container */
+  .icon-container {
+    @apply w-12 h-12 rounded-xl flex items-center justify-center;
+    @apply bg-primary/10 text-primary;
+    @apply transition-all duration-200;
+  }
+
+  .icon-container-lg {
+    @apply w-14 h-14 rounded-xl flex items-center justify-center;
+    @apply bg-primary/10 text-primary;
+  }
+
+  /* CTA section background */
+  .cta-gradient {
+    background: linear-gradient(
+      135deg,
+      hsl(215 50% 23%) 0%,
+      hsl(200 55% 28%) 50%,
+      hsl(185 50% 30%) 100%
+    );
+  }
+
+  /* Glass effect for overlays */
+  .glass {
+    @apply bg-background/80 backdrop-blur-lg border border-border/50;
+  }
+
+  /* Glow effect for featured elements */
+  .glow-primary {
+    box-shadow: 0 0 40px -10px hsl(var(--primary) / 0.3);
+  }
+
+  .glow-accent {
+    box-shadow: 0 0 40px -10px hsl(var(--accent) / 0.3);
+  }
+}
+
+@layer utilities {
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Text gradient utility */
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: var(--gradient-ocean);
+  }
+
+  /* Balanced text wrapping */
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .text-pretty {
+    text-wrap: pretty;
+  }
+
+  /* Scroll animations */
+  .animate-fade-up {
+    animation: fadeUp 0.6s ease-out forwards;
+    opacity: 0;
+  }
+
+  .animate-fade-up-delay-1 {
+    animation: fadeUp 0.6s ease-out 0.1s forwards;
+    opacity: 0;
+  }
+
+  .animate-fade-up-delay-2 {
+    animation: fadeUp 0.6s ease-out 0.2s forwards;
+    opacity: 0;
+  }
+
+  .animate-fade-up-delay-3 {
+    animation: fadeUp 0.6s ease-out 0.3s forwards;
+    opacity: 0;
+  }
+
+  /* Animation delay utilities */
+  .animation-delay-100 {
+    animation-delay: 100ms;
+  }
+
+  .animation-delay-200 {
+    animation-delay: 200ms;
+  }
+
+  .animation-delay-300 {
+    animation-delay: 300ms;
+  }
+
+  .animation-delay-500 {
+    animation-delay: 500ms;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Custom animations */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes pulse-soft {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Boat wave animation - sine wave movement with rotation */
+@keyframes boat-wave {
+  0% {
+    transform: translateX(-30px) translateY(0) rotate(-3deg);
+  }
+  25% {
+    transform: translateX(0) translateY(-8px) rotate(3deg);
+  }
+  50% {
+    transform: translateX(30px) translateY(0) rotate(-3deg);
+  }
+  75% {
+    transform: translateX(0) translateY(-8px) rotate(3deg);
+  }
+  100% {
+    transform: translateX(-30px) translateY(0) rotate(-3deg);
+  }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  animation: shimmer 2s linear infinite;
+  background: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.1), transparent);
+  background-size: 200% 100%;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+.animate-boat-wave {
+  animation: boat-wave 2s ease-in-out infinite;
+}
