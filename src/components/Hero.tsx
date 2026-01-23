@@ -19,7 +19,7 @@ const Hero = () => {
       });
     }
   };
-  return <section className="relative min-h-screen flex items-center justify-center hero-gradient overflow-hidden">
+  return <section className="relative min-h-screen flex flex-col hero-gradient overflow-hidden">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-20">
         <div className="absolute top-20 left-10 w-72 h-72 bg-accent/30 rounded-full blur-3xl" />
@@ -30,24 +30,27 @@ const Hero = () => {
       {/* Wave decoration at bottom */}
       <div className="wave-decoration" />
 
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="max-w-4xl mx-auto text-center">
-          {/* Logo with ASCII Video Background */}
-          <div className="animate-fade-up mb-10">
-            <div className="relative inline-flex items-center justify-center w-[85vw] h-[60vh] sm:w-[80vw] sm:h-[65vh] lg:w-[70vw] lg:h-[70vh] max-w-5xl">
-              {/* ASCII Video Background */}
-              <div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-lg bg-slate-900/90 backdrop-blur-sm">
-                <AsciiVideo className="text-cyan-400/80" fps={24} />
-              </div>
-              {/* Logo Overlay */}
-              <img
-                src={Logo}
-                alt="YAM Logo"
-                className="relative z-10 w-32 h-32 sm:w-40 sm:h-40 lg:w-48 lg:h-48 object-contain drop-shadow-lg [&_*]:stroke-white [&_.cls-1]:stroke-white [&_.cls-2]:stroke-white [&_path]:fill-white"
-                style={{ filter: 'drop-shadow(0 0 20px rgba(255,255,255,0.4))' }}
-              />
-            </div>
+      {/* ASCII Video - Full width below navbar */}
+      <div className="relative z-10 w-full mt-16 px-2 sm:px-4">
+        <div className="relative w-full aspect-[16/10] sm:aspect-[16/9] max-h-[70vh] mx-auto overflow-hidden rounded-lg bg-slate-900/95">
+          {/* ASCII Video Background */}
+          <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
+            <AsciiVideo className="text-cyan-400/90" fps={24} />
           </div>
+          {/* Logo Overlay - centered */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <img
+              src={Logo}
+              alt="YAM Logo"
+              className="w-20 h-20 sm:w-28 sm:h-28 md:w-36 md:h-36 lg:w-44 lg:h-44 object-contain [&_*]:stroke-white [&_.cls-1]:stroke-white [&_.cls-2]:stroke-white [&_path]:fill-white"
+              style={{ filter: 'drop-shadow(0 0 15px rgba(255,255,255,0.5))' }}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10 flex-1 flex items-center">
+        <div className="max-w-4xl mx-auto text-center w-full py-8">
 
           {/* Main Headline */}
           
