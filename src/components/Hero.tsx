@@ -1,6 +1,7 @@
 import { ChevronDown, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Logo from "@/assets/logo.svg";
+import AsciiVideo from "@/components/AsciiVideo";
 const Hero = () => {
   const scrollToServices = () => {
     const element = document.querySelector("#services");
@@ -31,10 +32,20 @@ const Hero = () => {
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="max-w-4xl mx-auto text-center">
-          {/* Logo */}
+          {/* Logo with ASCII Video Background */}
           <div className="animate-fade-up mb-10">
-            <div className="inline-flex items-center justify-center w-40 h-40 sm:w-48 sm:h-48 lg:w-56 lg:h-56 rounded-full bg-card/95 backdrop-blur-sm shadow-2xl ring-4 ring-accent/30 glow-accent">
-              <img src={Logo} alt="YAM Logo" className="w-32 h-32 sm:w-40 sm:h-40 lg:w-48 lg:h-48 object-contain drop-shadow-lg" />
+            <div className="relative inline-flex items-center justify-center w-[85vw] h-[60vh] sm:w-[80vw] sm:h-[65vh] lg:w-[70vw] lg:h-[70vh] max-w-5xl">
+              {/* ASCII Video Background */}
+              <div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-lg bg-slate-900/90 backdrop-blur-sm">
+                <AsciiVideo className="text-cyan-400/80" fps={24} />
+              </div>
+              {/* Logo Overlay */}
+              <img
+                src={Logo}
+                alt="YAM Logo"
+                className="relative z-10 w-32 h-32 sm:w-40 sm:h-40 lg:w-48 lg:h-48 object-contain drop-shadow-lg [&_*]:stroke-white [&_.cls-1]:stroke-white [&_.cls-2]:stroke-white [&_path]:fill-white"
+                style={{ filter: 'drop-shadow(0 0 20px rgba(255,255,255,0.4))' }}
+              />
             </div>
           </div>
 
