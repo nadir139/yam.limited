@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Menu } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -18,6 +19,9 @@ const navLinks = [
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isOntologyPage = location.pathname === "/ontology";
 
   useEffect(() => {
     const handleScroll = () => {
@@ -29,6 +33,17 @@ const Navbar = () => {
   }, []);
 
   const scrollToSection = (href: string) => {
+    if (isOntologyPage) {
+      // Navigate home first, then scroll
+      navigate("/");
+      setTimeout(() => {
+        const element = document.querySelector(href);
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth" });
+        }
+      }, 100);
+      return;
+    }
     const element = document.querySelector(href);
     if (element) {
       element.scrollIntoView({ behavior: "smooth" });
@@ -47,10 +62,14 @@ const Navbar = () => {
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
           <a
-            href="#"
+            href={isOntologyPage ? "/" : "#"}
             onClick={(e) => {
               e.preventDefault();
-              window.scrollTo({ top: 0, behavior: "smooth" });
+              if (isOntologyPage) {
+                navigate("/");
+              } else {
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }
             }}
             className="flex items-center gap-3"
           >
@@ -74,6 +93,12 @@ const Navbar = () => {
                 {link.label}
               </button>
             ))}
+            <button
+              onClick={() => navigate("/ontology")}
+              className={`nav-link font-medium ${isScrolled ? 'text-foreground/80 hover:text-primary' : 'text-primary-foreground/80 hover:text-primary-foreground'}`}
+            >
+              Ontology
+            </button>
             <Button
               onClick={() => scrollToSection("#contact")}
               className="bg-accent hover:bg-accent/90 text-accent-foreground"
@@ -110,6 +135,14 @@ const Navbar = () => {
                       </button>
                     </SheetClose>
                   ))}
+                  <SheetClose asChild>
+                    <button
+                      onClick={() => navigate("/ontology")}
+                      className="text-lg font-medium text-foreground/80 hover:text-primary transition-colors text-left py-2"
+                    >
+                      Ontology
+                    </button>
+                  </SheetClose>
                   <SheetClose asChild>
                     <Button
                       onClick={() => scrollToSection("#contact")}
