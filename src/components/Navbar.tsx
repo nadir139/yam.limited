@@ -14,6 +14,7 @@ import { ThemeToggle } from "./ThemeToggle";
 const navLinks = [
   { href: "#services", label: "Services" },
   { href: "#about", label: "About" },
+  { href: "#refit-intelligence", label: "Refit Intelligence" },
   { href: "#contact", label: "Contact" },
 ];
 
