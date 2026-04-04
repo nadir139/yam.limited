@@ -74,8 +74,8 @@ const DigitalLogbook = () => {
 
           {/* Description */}
           <p className="text-muted-foreground mb-8 max-w-2xl">
-            Purpose-built tools for maritime operations. Simple enough for daily use, 
-            comprehensive enough for audits. Document every passage, track crew hours, 
+            Purpose-built tools for maritime operations. Simple enough for daily use,
+            comprehensive enough for audits. Document every passage, track crew hours,
             and maintain compliance with international regulations.
           </p>
 
