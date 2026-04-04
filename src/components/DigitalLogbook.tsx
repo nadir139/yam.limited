@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   BookOpen,
   Users,
@@ -8,7 +9,6 @@ import {
   Download,
   Search,
   Globe,
-  ExternalLink,
 } from "lucide-react";
 
 const features = [
@@ -61,22 +61,25 @@ const DigitalLogbook = () => {
                 Digital Logbook
               </h3>
             </div>
-            <a
-              href="https://digital-logbook.com"
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              to="/app/dashboard"
               className="inline-flex items-center gap-2 text-sm text-accent hover:text-accent/80 transition-colors"
             >
-              Visit App
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
+              Open Dashboard →
+            </Link>
           </div>
 
           {/* Description */}
-          <p className="text-muted-foreground mb-8 max-w-2xl">
-            Purpose-built tools for maritime operations. Simple enough for daily use, 
-            comprehensive enough for audits. Document every passage, track crew hours, 
+          <p className="text-muted-foreground mb-4 max-w-2xl">
+            Purpose-built tools for maritime operations. Simple enough for daily use,
+            comprehensive enough for audits. Document every passage, track crew hours,
             and maintain compliance with international regulations.
+          </p>
+
+          {/* Live project indicator */}
+          <p className="text-sm text-muted-foreground mb-8 flex items-center gap-2">
+            <span style={{ color: '#22c55e', fontSize: '16px', lineHeight: 1 }}>●</span>
+            Currently tracking: Project ZERO — 55m Ketch, 5-Year Survey 2026
           </p>
 
           {/* Features Grid */}

@@ -22,6 +22,7 @@ const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const isOntologyPage = location.pathname === "/ontology";
+  const isAppPage = location.pathname.startsWith("/app");
 
   useEffect(() => {
     const handleScroll = () => {
@@ -62,10 +63,12 @@ const Navbar = () => {
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
           <a
-            href={isOntologyPage ? "/" : "#"}
+            href={isAppPage ? "/app/dashboard" : isOntologyPage ? "/" : "#"}
             onClick={(e) => {
               e.preventDefault();
-              if (isOntologyPage) {
+              if (isAppPage) {
+                navigate("/app/dashboard");
+              } else if (isOntologyPage) {
                 navigate("/");
               } else {
                 window.scrollTo({ top: 0, behavior: "smooth" });
@@ -99,6 +102,13 @@ const Navbar = () => {
             >
               Ontology
             </button>
+            <Button
+              variant="outline"
+              onClick={() => navigate("/login")}
+              className={`border ${isScrolled ? 'border-foreground/30 text-foreground hover:bg-muted' : 'border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10'}`}
+            >
+              Sign In
+            </Button>
             <Button
               onClick={() => scrollToSection("#contact")}
               className="bg-accent hover:bg-accent/90 text-accent-foreground"
@@ -145,8 +155,17 @@ const Navbar = () => {
                   </SheetClose>
                   <SheetClose asChild>
                     <Button
+                      variant="outline"
+                      onClick={() => navigate("/login")}
+                      className="mt-2 border-foreground/30 text-foreground"
+                    >
+                      Sign In
+                    </Button>
+                  </SheetClose>
+                  <SheetClose asChild>
+                    <Button
                       onClick={() => scrollToSection("#contact")}
-                      className="mt-4 bg-accent hover:bg-accent/90 text-accent-foreground"
+                      className="mt-2 bg-accent hover:bg-accent/90 text-accent-foreground"
                     >
                       Get in Touch
                     </Button>
