@@ -5,7 +5,7 @@ import { ArrowLeft, ArrowRight, GitBranch } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { MOCK_DEFECTS, MOCK_CHANGE_ORDERS, MOCK_APPROVALS } from '@/lib/mock-data'
+import { useDefect, useChangeOrders, useApprovals } from '@/lib/query-hooks'
 import type { DefectSeverity } from '@/lib/types'
 
 const SEVERITY_STYLES: Record<DefectSeverity, { bg: string; text: string }> = {
@@ -72,13 +72,21 @@ export default function DefectDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
-  const defect = MOCK_DEFECTS.find((d) => d.id === id)
+  const { data: defect, isLoading: defectLoading } = useDefect(id ?? '')
+  const { data: changeOrders = [], isLoading: coLoading } = useChangeOrders()
+  const { data: approvals = [], isLoading: approvalsLoading } = useApprovals()
+
+  const isLoading = defectLoading || coLoading || approvalsLoading
+
+  if (isLoading) {
+    return <div style={{ padding: '2rem', color: 'hsl(var(--muted-foreground))' }}>Loading...</div>
+  }
 
   if (!defect) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <p className="text-lg font-medium">Defect not found</p>
-        <Button variant="outline" className="mt-4" onClick={() => navigate('/defects')}>
+        <Button variant="outline" className="mt-4" onClick={() => navigate('/app/defects')}>
           Back to Defects
         </Button>
       </div>
@@ -89,16 +97,16 @@ export default function DefectDetail() {
   const st = STATUS_STYLES[defect.status]
 
   const linkedCO = defect.change_order_id
-    ? MOCK_CHANGE_ORDERS.find((co) => co.id === defect.change_order_id)
+    ? changeOrders.find((co) => co.id === defect.change_order_id)
     : null
   const linkedApproval = linkedCO?.approval_id
-    ? MOCK_APPROVALS.find((a) => a.id === linkedCO.approval_id)
+    ? approvals.find((a) => a.id === linkedCO.approval_id)
     : null
 
   return (
     <div className="flex flex-col gap-6 max-w-4xl mx-auto">
       <div className="flex items-center gap-3">
-        <Button variant="outline" size="sm" onClick={() => navigate('/defects')}>
+        <Button variant="outline" size="sm" onClick={() => navigate('/app/defects')}>
           <ArrowLeft size={14} className="mr-1" /> Back
         </Button>
         <div className="flex-1">
@@ -239,7 +247,7 @@ export default function DefectDetail() {
               <Button
                 size="sm"
                 style={{ backgroundColor: 'hsl(var(--accent))', color: 'white' }}
-                onClick={() => navigate('/change-orders')}
+                onClick={() => navigate('/app/change-orders')}
               >
                 <GitBranch size={14} className="mr-2" />
                 Raise Change Order

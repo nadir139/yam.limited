@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table'
-import { MOCK_WORK_PACKAGES } from '@/lib/mock-data'
+import { useWorkPackages } from '@/lib/query-hooks'
 import type { Discipline, WorkPackageStatus } from '@/lib/types'
 
 const eur = (amount: number) =>
@@ -42,7 +42,13 @@ export default function WorkPackageList() {
   const [disciplineFilter, setDisciplineFilter] = useState<string>('ALL')
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
 
-  const filtered = MOCK_WORK_PACKAGES.filter((wp) => {
+  const { data: workPackages = [], isLoading } = useWorkPackages()
+
+  if (isLoading) {
+    return <div style={{ padding: '2rem', color: 'hsl(var(--muted-foreground))' }}>Loading...</div>
+  }
+
+  const filtered = workPackages.filter((wp) => {
     const matchesSearch =
       search === '' ||
       wp.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -68,7 +74,7 @@ export default function WorkPackageList() {
       <div>
         <h1 className="text-2xl font-bold">Work Packages</h1>
         <p className="text-sm mt-1" style={{ color: 'hsl(var(--muted-foreground))' }}>
-          {MOCK_WORK_PACKAGES.length} packages across {new Set(MOCK_WORK_PACKAGES.map((w) => w.discipline)).size} disciplines
+          {workPackages.length} packages across {new Set(workPackages.map((w) => w.discipline)).size} disciplines
         </p>
       </div>
 

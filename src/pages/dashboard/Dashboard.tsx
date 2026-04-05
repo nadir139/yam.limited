@@ -6,12 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import {
-  MOCK_PROJECT,
-  MOCK_DEFECTS,
-  MOCK_APPROVALS,
-  MOCK_WORK_PACKAGES,
-  MOCK_EVENTS,
-} from '@/lib/mock-data'
+  useProject,
+  useDefects,
+  useApprovals,
+  useWorkPackages,
+  useEvents,
+} from '@/lib/query-hooks'
 import type { ProjectPhase, WorldModelEvent } from '@/lib/types'
 
 const PHASES: ProjectPhase[] = [
@@ -64,24 +64,58 @@ function getEventDescription(event: WorldModelEvent): string {
   }
 }
 
-const currentPhaseIndex = PHASES.indexOf(MOCK_PROJECT.phase)
-const completedPhases = currentPhaseIndex
-const budgetPct = Math.round((MOCK_PROJECT.budget_spent / MOCK_PROJECT.budget_locked) * 100)
-const openDefects = MOCK_DEFECTS.filter((d) => d.status !== 'CLOSED')
-const pendingApprovals = MOCK_APPROVALS.filter((a) => a.status === 'PENDING')
-const onHoldWPs = MOCK_WORK_PACKAGES.filter((wp) => wp.status === 'ON_HOLD')
-const highestSeverity = openDefects.length > 0
-  ? openDefects.sort((a, b) => {
-      const order = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
-      return order.indexOf(a.severity) - order.indexOf(b.severity)
-    })[0].severity
-  : null
-
 const eur = (amount: number) =>
   new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(amount)
 
 export default function Dashboard() {
   const navigate = useNavigate()
+
+  const projectQ = useProject()
+  const defectsQ = useDefects()
+  const approvalsQ = useApprovals()
+  const workPackagesQ = useWorkPackages()
+  const eventsQ = useEvents()
+
+  const isLoading =
+    projectQ.isLoading ||
+    defectsQ.isLoading ||
+    approvalsQ.isLoading ||
+    workPackagesQ.isLoading ||
+    eventsQ.isLoading
+
+  if (isLoading) {
+    return (
+      <div style={{ padding: '2rem', color: 'hsl(var(--muted-foreground))' }}>Loading...</div>
+    )
+  }
+
+  const project = projectQ.data
+  const defects = defectsQ.data ?? []
+  const approvals = approvalsQ.data ?? []
+  const workPackages = workPackagesQ.data ?? []
+  const events = eventsQ.data ?? []
+
+  if (!project) {
+    return (
+      <div style={{ padding: '2rem', color: 'hsl(var(--muted-foreground))' }}>
+        Project not found.
+      </div>
+    )
+  }
+
+  const currentPhaseIndex = PHASES.indexOf(project.phase)
+  const completedPhases = currentPhaseIndex
+  const budgetPct = Math.round((project.budget_spent / project.budget_locked) * 100)
+  const openDefects = defects.filter((d) => d.status !== 'CLOSED')
+  const pendingApprovals = approvals.filter((a) => a.status === 'PENDING')
+  const onHoldWPs = workPackages.filter((wp) => wp.status === 'ON_HOLD')
+  const highestSeverity =
+    openDefects.length > 0
+      ? openDefects.sort((a, b) => {
+          const order = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
+          return order.indexOf(a.severity) - order.indexOf(b.severity)
+        })[0].severity
+      : null
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto">
@@ -104,7 +138,7 @@ export default function Dashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-bold mb-2">{PHASE_LABELS[MOCK_PROJECT.phase]}</div>
+            <div className="text-xl font-bold mb-2">{PHASE_LABELS[project.phase]}</div>
             <Progress value={(completedPhases / (PHASES.length - 1)) * 100} className="h-1.5" />
             <div className="text-xs mt-1" style={{ color: 'hsl(var(--muted-foreground))' }}>
               Phase {currentPhaseIndex + 1} of {PHASES.length}
@@ -122,7 +156,7 @@ export default function Dashboard() {
           <CardContent>
             <div className="text-xl font-bold mb-1">{budgetPct}% used</div>
             <div className="text-xs mb-2" style={{ color: 'hsl(var(--muted-foreground))' }}>
-              {eur(MOCK_PROJECT.budget_spent)} / {eur(MOCK_PROJECT.budget_locked)}
+              {eur(project.budget_spent)} / {eur(project.budget_locked)}
             </div>
             <Progress value={budgetPct} className="h-1.5" />
           </CardContent>
@@ -187,7 +221,7 @@ export default function Dashboard() {
             {openDefects.map((d) => (
               <button
                 key={d.id}
-                onClick={() => navigate(`/defects/${d.id}`)}
+                onClick={() => navigate(`/app/defects/${d.id}`)}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-md text-left w-full transition-colors hover:bg-[hsl(var(--muted))]"
               >
                 <AlertTriangle
@@ -217,7 +251,7 @@ export default function Dashboard() {
             {pendingApprovals.map((a) => (
               <button
                 key={a.id}
-                onClick={() => navigate('/approvals')}
+                onClick={() => navigate('/app/approvals')}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-md text-left w-full transition-colors hover:bg-[hsl(var(--muted))]"
               >
                 <CheckCircle2 size={16} style={{ color: 'hsl(var(--warning))', flexShrink: 0 }} />
@@ -237,7 +271,7 @@ export default function Dashboard() {
             {onHoldWPs.map((wp) => (
               <button
                 key={wp.id}
-                onClick={() => navigate(`/work-packages/${wp.id}`)}
+                onClick={() => navigate(`/app/work-packages/${wp.id}`)}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-md text-left w-full transition-colors hover:bg-[hsl(var(--muted))]"
               >
                 <div
@@ -271,12 +305,12 @@ export default function Dashboard() {
             <CardTitle className="text-base">Recent Activity</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-0 p-4 pt-0">
-            {[...MOCK_EVENTS]
+            {[...events]
               .sort((a, b) => new Date(b.triggered_at).getTime() - new Date(a.triggered_at).getTime())
               .map((event, idx) => (
                 <div key={event.id} className="flex gap-3 relative">
                   {/* Timeline line */}
-                  {idx < MOCK_EVENTS.length - 1 && (
+                  {idx < events.length - 1 && (
                     <div
                       className="absolute left-2 top-5 bottom-0 w-px"
                       style={{ backgroundColor: 'hsl(var(--border))' }}

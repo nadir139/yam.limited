@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/contexts/AuthContext'
-import { MOCK_DEFECTS, MOCK_APPROVALS } from '@/lib/mock-data'
+import { useDefects, useApprovals } from '@/lib/query-hooks'
 
 interface SidebarProps {
   onClose?: () => void
@@ -33,9 +33,6 @@ const NAV_ITEMS = [
   { icon: Users, label: 'Team', path: '/app/team' },
 ]
 
-const openDefectCount = MOCK_DEFECTS.filter((d) => d.status !== 'CLOSED').length
-const pendingApprovalCount = MOCK_APPROVALS.filter((a) => a.status === 'PENDING').length
-
 const ROLE_LABELS: Record<string, string> = {
   OWNERS_REP: "Owner's Rep",
   OWNER: 'Owner',
@@ -50,8 +47,14 @@ export default function Sidebar({ onClose }: SidebarProps) {
   const { user, logout } = useAuth()
   const [hoveredPath, setHoveredPath] = useState<string | null>(null)
 
-  const handleLogout = () => {
-    logout()
+  const { data: defects = [] } = useDefects()
+  const { data: approvals = [] } = useApprovals()
+
+  const openDefectCount = defects.filter((d) => d.status !== 'CLOSED').length
+  const pendingApprovalCount = approvals.filter((a) => a.status === 'PENDING').length
+
+  const handleLogout = async () => {
+    await logout()
     navigate('/login')
   }
 

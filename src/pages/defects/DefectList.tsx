@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table'
-import { MOCK_DEFECTS } from '@/lib/mock-data'
+import { useDefects } from '@/lib/query-hooks'
 import type { DefectSeverity, DefectStatus, Discipline } from '@/lib/types'
 
 const SEVERITY_STYLES: Record<DefectSeverity, { bg: string; text: string }> = {
@@ -38,7 +38,13 @@ export default function DefectList() {
   const [severityFilter, setSeverityFilter] = useState<string>('ALL')
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
 
-  const filtered = MOCK_DEFECTS.filter((d) => {
+  const { data: defects = [], isLoading } = useDefects()
+
+  if (isLoading) {
+    return <div style={{ padding: '2rem', color: 'hsl(var(--muted-foreground))' }}>Loading...</div>
+  }
+
+  const filtered = defects.filter((d) => {
     const matchesSearch =
       search === '' ||
       d.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -64,7 +70,7 @@ export default function DefectList() {
       <div>
         <h1 className="text-2xl font-bold">Defect Records</h1>
         <p className="text-sm mt-1" style={{ color: 'hsl(var(--muted-foreground))' }}>
-          {MOCK_DEFECTS.filter((d) => d.status !== 'CLOSED').length} open NCRs
+          {defects.filter((d) => d.status !== 'CLOSED').length} open NCRs
         </p>
       </div>
 

@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { format, formatDistanceToNow, isPast } from 'date-fns'
 import { CheckCircle, XCircle } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -14,8 +14,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table'
-import { MOCK_APPROVALS, MOCK_CHANGE_ORDERS } from '@/lib/mock-data'
-import type { OwnerApproval, ApprovalStatus } from '@/lib/types'
+import { useApprovals, useChangeOrders, useUpdateApproval } from '@/lib/query-hooks'
 
 const TIER_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   TIER_1: { bg: 'hsl(158 64% 40% / 0.15)', text: 'hsl(var(--success))', label: 'Tier 1 (<€10k)' },
@@ -25,15 +24,6 @@ const TIER_STYLES: Record<string, { bg: string; text: string; label: string }> =
 
 const eur = (n: number) =>
   new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
-
-interface ApprovalState {
-  status: ApprovalStatus
-  decision_date: string | null
-  decision_notes: string | null
-  approver_name: string | null
-}
-
-type ApprovalStateMap = Record<string, ApprovalState>
 
 function DeadlineDisplay({ deadline }: { deadline: string | null }) {
   if (!deadline) return null
@@ -50,18 +40,9 @@ function DeadlineDisplay({ deadline }: { deadline: string | null }) {
 }
 
 export default function ApprovalQueue() {
-  const [approvalStates, setApprovalStates] = useState<ApprovalStateMap>(() => {
-    const map: ApprovalStateMap = {}
-    for (const a of MOCK_APPROVALS) {
-      map[a.id] = {
-        status: a.status,
-        decision_date: a.decision_date,
-        decision_notes: a.decision_notes,
-        approver_name: a.approver_name,
-      }
-    }
-    return map
-  })
+  const { data: approvals = [], isLoading: approvalsLoading } = useApprovals()
+  const { data: changeOrders = [], isLoading: coLoading } = useChangeOrders()
+  const updateApproval = useUpdateApproval()
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dialogAction, setDialogAction] = useState<'APPROVED' | 'REJECTED'>('APPROVED')
@@ -69,15 +50,21 @@ export default function ApprovalQueue() {
   const [notes, setNotes] = useState('')
   const [toast, setToast] = useState<string | null>(null)
 
-  const pending = MOCK_APPROVALS.filter((a) => approvalStates[a.id]?.status === 'PENDING').sort(
-    (a, b) => {
+  const isLoading = approvalsLoading || coLoading
+
+  if (isLoading) {
+    return <div style={{ padding: '2rem', color: 'hsl(var(--muted-foreground))' }}>Loading...</div>
+  }
+
+  const pending = approvals
+    .filter((a) => a.status === 'PENDING')
+    .sort((a, b) => {
       if (!a.deadline) return 1
       if (!b.deadline) return -1
       return new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
-    },
-  )
+    })
 
-  const decided = MOCK_APPROVALS.filter((a) => approvalStates[a.id]?.status !== 'PENDING')
+  const decided = approvals.filter((a) => a.status !== 'PENDING')
 
   const openDialog = (id: string, action: 'APPROVED' | 'REJECTED') => {
     setDialogApprovalId(id)
@@ -88,23 +75,28 @@ export default function ApprovalQueue() {
 
   const handleDecision = () => {
     if (!dialogApprovalId) return
-    setApprovalStates((prev) => ({
-      ...prev,
-      [dialogApprovalId]: {
-        status: dialogAction,
-        decision_date: new Date().toISOString(),
-        decision_notes: notes || null,
-        approver_name: 'Nadir',
+    updateApproval.mutate(
+      {
+        id: dialogApprovalId,
+        updates: {
+          status: dialogAction,
+          decision_date: new Date().toISOString().split('T')[0],
+          decision_notes: notes || null,
+          approver_name: 'Nadir',
+        },
       },
-    }))
-    setDialogOpen(false)
-    const msg = dialogAction === 'APPROVED' ? 'Approval confirmed.' : 'Approval rejected.'
-    setToast(msg)
-    setTimeout(() => setToast(null), 3000)
+      {
+        onSuccess: () => {
+          setDialogOpen(false)
+          const msg = dialogAction === 'APPROVED' ? 'Approval confirmed.' : 'Approval rejected.'
+          setToast(msg)
+          setTimeout(() => setToast(null), 3000)
+        },
+      },
+    )
   }
 
-  const getApproval = (id: string): OwnerApproval | undefined =>
-    MOCK_APPROVALS.find((a) => a.id === id)
+  const getApproval = (id: string) => approvals.find((a) => a.id === id)
 
   return (
     <div className="flex flex-col gap-6 max-w-4xl mx-auto">
@@ -152,7 +144,7 @@ export default function ApprovalQueue() {
           {pending.map((approval) => {
             const tier = TIER_STYLES[approval.tier]
             const linkedCO = approval.change_order_id
-              ? MOCK_CHANGE_ORDERS.find((co) => co.id === approval.change_order_id)
+              ? changeOrders.find((co) => co.id === approval.change_order_id)
               : null
 
             return (
@@ -230,41 +222,38 @@ export default function ApprovalQueue() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {decided.map((approval) => {
-                  const state = approvalStates[approval.id]
-                  return (
-                    <TableRow key={approval.id}>
-                      <TableCell className="font-mono text-xs">{approval.approval_number}</TableCell>
-                      <TableCell className="text-sm max-w-xs truncate">{approval.title}</TableCell>
-                      <TableCell>
-                        <Badge
-                          style={{
-                            backgroundColor:
-                              state.status === 'APPROVED'
-                                ? 'hsl(158 64% 40% / 0.15)'
-                                : 'hsl(0 72% 51% / 0.1)',
-                            color:
-                              state.status === 'APPROVED'
-                                ? 'hsl(var(--success))'
-                                : 'hsl(var(--destructive))',
-                            border: 'none',
-                            fontSize: '11px',
-                          }}
-                        >
-                          {state.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {state.decision_date
-                          ? format(new Date(state.decision_date), 'd MMM yyyy')
-                          : '—'}
-                      </TableCell>
-                      <TableCell className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                        {state.decision_notes || '—'}
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
+                {decided.map((approval) => (
+                  <TableRow key={approval.id}>
+                    <TableCell className="font-mono text-xs">{approval.approval_number}</TableCell>
+                    <TableCell className="text-sm max-w-xs truncate">{approval.title}</TableCell>
+                    <TableCell>
+                      <Badge
+                        style={{
+                          backgroundColor:
+                            approval.status === 'APPROVED'
+                              ? 'hsl(158 64% 40% / 0.15)'
+                              : 'hsl(0 72% 51% / 0.1)',
+                          color:
+                            approval.status === 'APPROVED'
+                              ? 'hsl(var(--success))'
+                              : 'hsl(var(--destructive))',
+                          border: 'none',
+                          fontSize: '11px',
+                        }}
+                      >
+                        {approval.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {approval.decision_date
+                        ? format(new Date(approval.decision_date), 'd MMM yyyy')
+                        : '—'}
+                    </TableCell>
+                    <TableCell className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                      {approval.decision_notes || '—'}
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </Card>
@@ -302,6 +291,7 @@ export default function ApprovalQueue() {
             </Button>
             <Button
               onClick={handleDecision}
+              disabled={updateApproval.isPending}
               style={{
                 backgroundColor:
                   dialogAction === 'APPROVED' ? 'hsl(var(--success))' : 'hsl(var(--destructive))',

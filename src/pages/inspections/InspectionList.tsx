@@ -3,7 +3,7 @@ import { format } from 'date-fns'
 import { CheckCircle2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { MOCK_INSPECTIONS, MOCK_WORK_PACKAGES } from '@/lib/mock-data'
+import { useInspections, useWorkPackages } from '@/lib/query-hooks'
 import type { InspectionResult } from '@/lib/types'
 
 const RESULT_STYLES: Record<InspectionResult, { bg: string; text: string }> = {
@@ -21,20 +21,29 @@ const ROLE_LABELS: Record<string, string> = {
 }
 
 export default function InspectionList() {
+  const { data: inspections = [], isLoading: inspLoading } = useInspections()
+  const { data: workPackages = [], isLoading: wpLoading } = useWorkPackages()
+
+  const isLoading = inspLoading || wpLoading
+
+  if (isLoading) {
+    return <div style={{ padding: '2rem', color: 'hsl(var(--muted-foreground))' }}>Loading...</div>
+  }
+
   return (
     <div className="flex flex-col gap-6 max-w-5xl mx-auto">
       <div>
         <h1 className="text-2xl font-bold">Inspections</h1>
         <p className="text-sm mt-1" style={{ color: 'hsl(var(--muted-foreground))' }}>
-          {MOCK_INSPECTIONS.length} inspection events scheduled
+          {inspections.length} inspection events scheduled
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {MOCK_INSPECTIONS.map((insp) => {
+        {inspections.map((insp) => {
           const rs = RESULT_STYLES[insp.result]
           const linkedWP = insp.work_package_id
-            ? MOCK_WORK_PACKAGES.find((w) => w.id === insp.work_package_id)
+            ? workPackages.find((w) => w.id === insp.work_package_id)
             : null
 
           return (

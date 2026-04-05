@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table'
-import { MOCK_MEMBERS } from '@/lib/mock-data'
+import { useTeam } from '@/lib/query-hooks'
 import type { UserRole } from '@/lib/types'
 
 const ROLE_STYLES: Record<UserRole, { bg: string; text: string; label: string }> = {
@@ -54,18 +54,24 @@ const PERMISSIONS: { role: UserRole; view: string[]; edit: string[] }[] = [
 ]
 
 export default function TeamView() {
+  const { data: members = [], isLoading } = useTeam()
+
+  if (isLoading) {
+    return <div style={{ padding: '2rem', color: 'hsl(var(--muted-foreground))' }}>Loading...</div>
+  }
+
   return (
     <div className="flex flex-col gap-8 max-w-5xl mx-auto">
       <div>
         <h1 className="text-2xl font-bold">Team</h1>
         <p className="text-sm mt-1" style={{ color: 'hsl(var(--muted-foreground))' }}>
-          {MOCK_MEMBERS.length} project members
+          {members.length} project members
         </p>
       </div>
 
       {/* Member cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {MOCK_MEMBERS.map((member) => {
+        {members.map((member) => {
           const rs = ROLE_STYLES[member.role]
           return (
             <Card key={member.id}>

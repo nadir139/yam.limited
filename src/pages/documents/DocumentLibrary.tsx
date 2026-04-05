@@ -14,7 +14,10 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table'
-import { MOCK_DOCUMENTS } from '@/lib/mock-data'
+import { useDocuments } from '@/lib/query-hooks'
+import * as db from '@/lib/db'
+import { useQueryClient } from '@tanstack/react-query'
+import { QUERY_KEYS } from '@/lib/query-hooks'
 import type { Document } from '@/lib/types'
 
 const DOC_TYPE_STYLES: Record<string, { bg: string; text: string }> = {
@@ -51,12 +54,19 @@ export default function DocumentLibrary() {
   const [typeFilter, setTypeFilter] = useState<string>('ALL')
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
   const [uploadOpen, setUploadOpen] = useState(false)
-  const [docs, setDocs] = useState<Document[]>(MOCK_DOCUMENTS)
+  const [isUploading, setIsUploading] = useState(false)
 
   // Upload form state
   const [newTitle, setNewTitle] = useState('')
   const [newType, setNewType] = useState<string>('SPECIFICATION')
   const [newRevision, setNewRevision] = useState('Rev.0')
+
+  const { data: docs = [], isLoading } = useDocuments()
+  const qc = useQueryClient()
+
+  if (isLoading) {
+    return <div style={{ padding: '2rem', color: 'hsl(var(--muted-foreground))' }}>Loading...</div>
+  }
 
   const filtered = docs.filter((d) => {
     const matchesSearch =
@@ -68,29 +78,33 @@ export default function DocumentLibrary() {
     return matchesSearch && matchesType && matchesStatus
   })
 
-  const handleUpload = () => {
-    const newDoc: Document = {
-      id: `doc-${Date.now()}`,
-      project_id: 'project-001',
-      doc_number: `DOC-2026-${String(docs.length + 1).padStart(3, '0')}`,
-      title: newTitle || 'Untitled Document',
-      doc_type: newType as Document['doc_type'],
-      revision: newRevision,
-      status: 'DRAFT',
-      file_url: null,
-      file_size: null,
-      mime_type: null,
-      uploaded_by: 'Nadir',
-      uploaded_date: new Date().toISOString().split('T')[0],
-      linked_object_type: null,
-      linked_object_id: null,
-      is_class_document: false,
-      created_at: new Date().toISOString(),
+  const handleUpload = async () => {
+    setIsUploading(true)
+    try {
+      const newDoc: Omit<Document, 'id' | 'created_at'> = {
+        project_id: db.PROJECT_ID,
+        doc_number: `DOC-2026-${String(docs.length + 1).padStart(3, '0')}`,
+        title: newTitle || 'Untitled Document',
+        doc_type: newType as Document['doc_type'],
+        revision: newRevision,
+        status: 'DRAFT',
+        file_url: null,
+        file_size: null,
+        mime_type: null,
+        uploaded_by: 'Nadir',
+        uploaded_date: new Date().toISOString().split('T')[0],
+        linked_object_type: null,
+        linked_object_id: null,
+        is_class_document: false,
+      }
+      await db.createDocument(newDoc)
+      await qc.invalidateQueries({ queryKey: QUERY_KEYS.documents })
+      setUploadOpen(false)
+      setNewTitle('')
+      setNewRevision('Rev.0')
+    } finally {
+      setIsUploading(false)
     }
-    setDocs((prev) => [newDoc, ...prev])
-    setUploadOpen(false)
-    setNewTitle('')
-    setNewRevision('Rev.0')
   }
 
   const selectStyle: React.CSSProperties = {
@@ -247,9 +261,10 @@ export default function DocumentLibrary() {
             <Button variant="outline" onClick={() => setUploadOpen(false)}>Cancel</Button>
             <Button
               onClick={handleUpload}
+              disabled={isUploading}
               style={{ backgroundColor: 'hsl(var(--accent))', color: 'white' }}
             >
-              Create Record
+              {isUploading ? 'Creating...' : 'Create Record'}
             </Button>
           </DialogFooter>
         </DialogContent>

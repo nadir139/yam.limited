@@ -2,7 +2,7 @@ import { Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ThemeToggle } from '@/components/ThemeToggle'
-import { MOCK_PROJECT } from '@/lib/mock-data'
+import { useProject } from '@/lib/query-hooks'
 
 interface TopbarProps {
   onMenuClick: () => void
@@ -19,7 +19,9 @@ const PHASE_DISPLAY: Record<string, string> = {
 }
 
 export default function Topbar({ onMenuClick }: TopbarProps) {
-  const phaseLabel = PHASE_DISPLAY[MOCK_PROJECT.phase] ?? MOCK_PROJECT.phase.replace(/_/g, ' ')
+  const { data: project } = useProject()
+  const phase = project?.phase ?? ''
+  const phaseLabel = PHASE_DISPLAY[phase] ?? phase.replace(/_/g, ' ')
 
   return (
     <div
@@ -73,19 +75,21 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
 
       {/* Right: phase badge + theme toggle */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-        <Badge
-          style={{
-            backgroundColor: 'hsl(185 60% 40% / 0.12)',
-            color: 'hsl(185 60% 35%)',
-            border: '1px solid hsl(185 60% 40% / 0.3)',
-            fontSize: '10px',
-            fontWeight: 600,
-            letterSpacing: '0.05em',
-            padding: '3px 8px',
-          }}
-        >
-          {phaseLabel}
-        </Badge>
+        {phaseLabel && (
+          <Badge
+            style={{
+              backgroundColor: 'hsl(185 60% 40% / 0.12)',
+              color: 'hsl(185 60% 35%)',
+              border: '1px solid hsl(185 60% 40% / 0.3)',
+              fontSize: '10px',
+              fontWeight: 600,
+              letterSpacing: '0.05em',
+              padding: '3px 8px',
+            }}
+          >
+            {phaseLabel}
+          </Badge>
+        )}
         <ThemeToggle />
       </div>
     </div>

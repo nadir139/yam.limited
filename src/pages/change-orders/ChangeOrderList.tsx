@@ -4,7 +4,7 @@ import { format } from 'date-fns'
 import { GitBranch } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { MOCK_CHANGE_ORDERS, MOCK_DEFECTS, MOCK_APPROVALS } from '@/lib/mock-data'
+import { useChangeOrders, useDefects, useApprovals } from '@/lib/query-hooks'
 
 const TRIGGER_COLORS: Record<string, { bg: string; text: string }> = {
   CLASS_REQUIREMENT: { bg: 'hsl(215 50% 23% / 0.1)', text: 'hsl(var(--primary))' },
@@ -25,31 +25,41 @@ const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
 export default function ChangeOrderList() {
   const navigate = useNavigate()
 
+  const { data: changeOrders = [], isLoading: coLoading } = useChangeOrders()
+  const { data: defects = [], isLoading: defectsLoading } = useDefects()
+  const { data: approvals = [], isLoading: approvalsLoading } = useApprovals()
+
+  const isLoading = coLoading || defectsLoading || approvalsLoading
+
+  if (isLoading) {
+    return <div style={{ padding: '2rem', color: 'hsl(var(--muted-foreground))' }}>Loading...</div>
+  }
+
   return (
     <div className="flex flex-col gap-6 max-w-4xl mx-auto">
       <div>
         <h1 className="text-2xl font-bold">Change Orders</h1>
         <p className="text-sm mt-1" style={{ color: 'hsl(var(--muted-foreground))' }}>
-          {MOCK_CHANGE_ORDERS.length} change order{MOCK_CHANGE_ORDERS.length !== 1 ? 's' : ''}
+          {changeOrders.length} change order{changeOrders.length !== 1 ? 's' : ''}
         </p>
       </div>
 
       <div className="flex flex-col gap-4">
-        {MOCK_CHANGE_ORDERS.map((co) => {
+        {changeOrders.map((co) => {
           const tc = TRIGGER_COLORS[co.trigger_type]
           const sc = STATUS_STYLES[co.status]
           const linkedDefect = co.defect_record_id
-            ? MOCK_DEFECTS.find((d) => d.id === co.defect_record_id)
+            ? defects.find((d) => d.id === co.defect_record_id)
             : null
           const linkedApproval = co.approval_id
-            ? MOCK_APPROVALS.find((a) => a.id === co.approval_id)
+            ? approvals.find((a) => a.id === co.approval_id)
             : null
 
           return (
             <Card
               key={co.id}
               className="cursor-pointer transition-shadow hover:shadow-md"
-              onClick={() => navigate(`/change-orders/${co.id}`)}
+              onClick={() => navigate(`/app/change-orders/${co.id}`)}
             >
               <CardContent className="p-5">
                 <div className="flex items-start justify-between mb-3">
@@ -110,7 +120,7 @@ export default function ChangeOrderList() {
           )
         })}
 
-        {MOCK_CHANGE_ORDERS.length === 0 && (
+        {changeOrders.length === 0 && (
           <div className="text-center py-12" style={{ color: 'hsl(var(--muted-foreground))' }}>
             No change orders yet.
           </div>

@@ -9,11 +9,11 @@ import { Progress } from '@/components/ui/progress'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table'
 import {
-  MOCK_WORK_PACKAGES,
-  MOCK_INSPECTIONS,
-  MOCK_DEFECTS,
-  MOCK_DOCUMENTS,
-} from '@/lib/mock-data'
+  useWorkPackage,
+  useInspections,
+  useDefects,
+  useDocuments,
+} from '@/lib/query-hooks'
 
 const eur = (n: number) =>
   new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
@@ -45,22 +45,31 @@ export default function WorkPackageDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
-  const wp = MOCK_WORK_PACKAGES.find((w) => w.id === id)
+  const { data: wp, isLoading: wpLoading } = useWorkPackage(id ?? '')
+  const { data: allInspections = [], isLoading: inspLoading } = useInspections()
+  const { data: allDefects = [], isLoading: defectsLoading } = useDefects()
+  const { data: allDocuments = [], isLoading: docsLoading } = useDocuments()
+
+  const isLoading = wpLoading || inspLoading || defectsLoading || docsLoading
+
+  if (isLoading) {
+    return <div style={{ padding: '2rem', color: 'hsl(var(--muted-foreground))' }}>Loading...</div>
+  }
 
   if (!wp) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <p className="text-lg font-medium">Work package not found</p>
-        <Button variant="outline" className="mt-4" onClick={() => navigate('/work-packages')}>
+        <Button variant="outline" className="mt-4" onClick={() => navigate('/app/work-packages')}>
           Back to Work Packages
         </Button>
       </div>
     )
   }
 
-  const inspections = MOCK_INSPECTIONS.filter((i) => i.work_package_id === wp.id)
-  const defects = MOCK_DEFECTS.filter((d) => d.work_package_id === wp.id)
-  const documents = MOCK_DOCUMENTS.filter(
+  const inspections = allInspections.filter((i) => i.work_package_id === wp.id)
+  const defects = allDefects.filter((d) => d.work_package_id === wp.id)
+  const documents = allDocuments.filter(
     (d) => d.linked_object_type === 'WORK_PACKAGE' && d.linked_object_id === wp.id,
   )
 
@@ -70,7 +79,7 @@ export default function WorkPackageDetail() {
   return (
     <div className="flex flex-col gap-6 max-w-5xl mx-auto">
       <div className="flex items-center gap-3">
-        <Button variant="outline" size="sm" onClick={() => navigate('/work-packages')}>
+        <Button variant="outline" size="sm" onClick={() => navigate('/app/work-packages')}>
           <ArrowLeft size={14} className="mr-1" /> Back
         </Button>
         <div>
