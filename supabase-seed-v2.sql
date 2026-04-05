@@ -547,7 +547,72 @@ INSERT INTO inspection_events (
   0, '2026-04-05T00:00:00Z' );
 
 -- =============================================================================
+-- CHANGE ORDERS  (inserted FIRST to break circular FK with defect_records)
+-- defect_record_id and approval_id set to NULL here; back-filled via UPDATE
+-- at the end after both defect_records and owner_approvals are inserted.
+-- =============================================================================
+
+INSERT INTO change_orders (
+  id, project_id,
+  co_number, title, description,
+  trigger_type, status,
+  cost_delta, schedule_delta_days,
+  raised_by, raised_date,
+  defect_record_id, approval_id,
+  created_at
+) VALUES
+
+-- CO-2026-001: Portside bilge frame replacement
+( 'a1b2c3d4-0006-0000-0000-000000000001',
+  'a1b2c3d4-0002-0000-0000-000000000001',
+  'CO-2026-001',
+  'NCR-001 Portside bilge frame replacement — stations 47-49',
+  'Change order to cover full structural replacement of frames 47, 48 and 49 portside bilge following discovery of severe corrosion (NCR-2026-001). Scope includes: removal of existing corroded frames, fabrication and installation of new steel frames to original scantlings, blast and coat new steelwork, bilge system reinstatement, class witness by RINA. Scope of Work document attached.',
+  'DEFECT_DISCOVERY', 'PENDING_APPROVAL',
+  47200, 12,
+  'Nadir Balena (YAM)', '2026-05-11',
+  NULL, NULL,
+  '2026-05-11T16:00:00Z' ),
+
+-- CO-2026-002: Hull plate renewal frame 22
+( 'a1b2c3d4-0006-0000-0000-000000000002',
+  'a1b2c3d4-0002-0000-0000-000000000001',
+  'CO-2026-002',
+  'NCR-003 Hull plate renewal — frame 22 starboard',
+  'Change order for renewal of hull plating at frame 22 starboard as required by RINA following thickness gauging findings (NCR-2026-003). Plate thickness below class minimum. Scope: cut out affected plate section (approx 0.8m x 0.6m with margins), fit new plate to original specification, full-penetration weld, weld test, blast and coat, class witness and sign-off.',
+  'DEFECT_DISCOVERY', 'PENDING_APPROVAL',
+  31600, 8,
+  'Nadir Balena (YAM)', '2026-05-08',
+  NULL, NULL,
+  '2026-05-08T10:00:00Z' ),
+
+-- CO-2026-003: Running backstay renewal (APPROVED)
+( 'a1b2c3d4-0006-0000-0000-000000000003',
+  'a1b2c3d4-0002-0000-0000-000000000001',
+  'CO-2026-003',
+  'NCR-005 Running backstay renewal + associated rigging',
+  'Emergency change order for immediate replacement of starboard running backstay following swage failure (NCR-2026-005). As the vessel cannot sail safely, backstay replacement has been pre-approved. Scope expanded to include both running backstays (port and starboard) and associated blocks and turning points given age and condition of original equipment. Cornish Rigging Co. mobilising immediately.',
+  'DEFECT_DISCOVERY', 'APPROVED',
+  18900, 5,
+  'Nadir Balena (YAM)', '2026-05-05',
+  NULL, NULL,
+  '2026-05-05T12:00:00Z' ),
+
+-- CO-2026-004: Lithium battery upgrade owner request
+( 'a1b2c3d4-0006-0000-0000-000000000004',
+  'a1b2c3d4-0002-0000-0000-000000000001',
+  'CO-2026-004',
+  'Owner request — lithium battery upgrade 800Ah to 1200Ah',
+  'Owner has requested upgrade of planned lithium battery installation from 800Ah to 1200Ah capacity to support extended offshore passages without engine running. Additional scope: larger BMS, additional cell modules, upgraded inverter/charger from 3kW to 5kW, additional DC distribution panel. Subject to owner approval — draft for review.',
+  'OWNER_REQUEST', 'DRAFT',
+  52000, 0,
+  'Alessandro Ferraro (Owner)', '2026-05-03',
+  NULL, NULL,
+  '2026-05-03T18:00:00Z' );
+
+-- =============================================================================
 -- DEFECT RECORDS  (8 total — UUIDs ...0005-...000001 through ...000008)
+-- change_orders rows now exist, so change_order_id FK is satisfied.
 -- =============================================================================
 
 INSERT INTO defect_records (
@@ -690,71 +755,6 @@ INSERT INTO defect_records (
   '2026-04-28T15:00:00Z' );
 
 -- =============================================================================
--- CHANGE ORDERS  (4 total — UUIDs ...0006-...000001 through ...000004)
--- =============================================================================
-
-INSERT INTO change_orders (
-  id, project_id,
-  co_number, title, description,
-  trigger_type, status,
-  cost_delta, schedule_delta_days,
-  raised_by, raised_date,
-  defect_record_id, approval_id,
-  created_at
-) VALUES
-
--- CO-2026-001: Portside bilge frame replacement
-( 'a1b2c3d4-0006-0000-0000-000000000001',
-  'a1b2c3d4-0002-0000-0000-000000000001',
-  'CO-2026-001',
-  'NCR-001 Portside bilge frame replacement — stations 47-49',
-  'Change order to cover full structural replacement of frames 47, 48 and 49 portside bilge following discovery of severe corrosion (NCR-2026-001). Scope includes: removal of existing corroded frames, fabrication and installation of new steel frames to original scantlings, blast and coat new steelwork, bilge system reinstatement, class witness by RINA. Scope of Work document attached.',
-  'DEFECT_DISCOVERY', 'PENDING_APPROVAL',
-  47200, 12,
-  'Nadir Balena (YAM)', '2026-05-11',
-  'a1b2c3d4-0005-0000-0000-000000000001',
-  'a1b2c3d4-0007-0000-0000-000000000001',
-  '2026-05-11T16:00:00Z' ),
-
--- CO-2026-002: Hull plate renewal frame 22
-( 'a1b2c3d4-0006-0000-0000-000000000002',
-  'a1b2c3d4-0002-0000-0000-000000000001',
-  'CO-2026-002',
-  'NCR-003 Hull plate renewal — frame 22 starboard',
-  'Change order for renewal of hull plating at frame 22 starboard as required by RINA following thickness gauging findings (NCR-2026-003). Plate thickness below class minimum. Scope: cut out affected plate section (approx 0.8m x 0.6m with margins), fit new plate to original specification, full-penetration weld, weld test, blast and coat, class witness and sign-off.',
-  'DEFECT_DISCOVERY', 'PENDING_APPROVAL',
-  31600, 8,
-  'Nadir Balena (YAM)', '2026-05-08',
-  'a1b2c3d4-0005-0000-0000-000000000003',
-  'a1b2c3d4-0007-0000-0000-000000000002',
-  '2026-05-08T10:00:00Z' ),
-
--- CO-2026-003: Running backstay renewal (APPROVED)
-( 'a1b2c3d4-0006-0000-0000-000000000003',
-  'a1b2c3d4-0002-0000-0000-000000000001',
-  'CO-2026-003',
-  'NCR-005 Running backstay renewal + associated rigging',
-  'Emergency change order for immediate replacement of starboard running backstay following swage failure (NCR-2026-005). As the vessel cannot sail safely, backstay replacement has been pre-approved. Scope expanded to include both running backstays (port and starboard) and associated blocks and turning points given age and condition of original equipment. Cornish Rigging Co. mobilising immediately.',
-  'DEFECT_DISCOVERY', 'APPROVED',
-  18900, 5,
-  'Nadir Balena (YAM)', '2026-05-05',
-  'a1b2c3d4-0005-0000-0000-000000000005',
-  'a1b2c3d4-0007-0000-0000-000000000003',
-  '2026-05-05T12:00:00Z' ),
-
--- CO-2026-004: Lithium battery upgrade owner request
-( 'a1b2c3d4-0006-0000-0000-000000000004',
-  'a1b2c3d4-0002-0000-0000-000000000001',
-  'CO-2026-004',
-  'Owner request — lithium battery upgrade 800Ah to 1200Ah',
-  'Owner has requested upgrade of planned lithium battery installation from 800Ah to 1200Ah capacity to support extended offshore passages without engine running. Additional scope: larger BMS, additional cell modules, upgraded inverter/charger from 3kW to 5kW, additional DC distribution panel. Subject to owner approval — draft for review.',
-  'OWNER_REQUEST', 'DRAFT',
-  52000, 0,
-  'Alessandro Ferraro (Owner)', '2026-05-03',
-  NULL, NULL,
-  '2026-05-03T18:00:00Z' );
-
--- =============================================================================
 -- OWNER APPROVALS  (3 total — UUIDs ...0007-...000001 through ...000003)
 -- =============================================================================
 
@@ -807,6 +807,27 @@ INSERT INTO owner_approvals (
   'a1b2c3d4-0006-0000-0000-000000000003',
   18900, '2026-05-06',
   '2026-05-05T13:00:00Z' );
+
+-- =============================================================================
+-- BACK-FILL change_orders circular FK references
+-- Now that both defect_records and owner_approvals exist, we can set the
+-- back-references that could not be set during the initial INSERT.
+-- =============================================================================
+
+UPDATE change_orders SET
+  defect_record_id = 'a1b2c3d4-0005-0000-0000-000000000001',
+  approval_id      = 'a1b2c3d4-0007-0000-0000-000000000001'
+WHERE id = 'a1b2c3d4-0006-0000-0000-000000000001';
+
+UPDATE change_orders SET
+  defect_record_id = 'a1b2c3d4-0005-0000-0000-000000000003',
+  approval_id      = 'a1b2c3d4-0007-0000-0000-000000000002'
+WHERE id = 'a1b2c3d4-0006-0000-0000-000000000002';
+
+UPDATE change_orders SET
+  defect_record_id = 'a1b2c3d4-0005-0000-0000-000000000005',
+  approval_id      = 'a1b2c3d4-0007-0000-0000-000000000003'
+WHERE id = 'a1b2c3d4-0006-0000-0000-000000000003';
 
 -- =============================================================================
 -- DOCUMENTS  (12 total — UUIDs ...0008-...000001 through ...000012)
