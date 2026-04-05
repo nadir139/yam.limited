@@ -150,6 +150,20 @@ export async function fetchEvents(): Promise<WorldModelEvent[]> {
 
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
+export async function updateInspection(
+  id: string,
+  updates: Partial<InspectionEvent>,
+): Promise<InspectionEvent> {
+  const { data, error } = await supabase
+    .from('inspection_events')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
 export async function createDefect(
   defect: Omit<DefectRecord, 'id' | 'created_at'>,
 ): Promise<DefectRecord> {
@@ -214,6 +228,67 @@ export async function createDocument(
   return data
 }
 
+export interface UploadProgress {
+  loaded: number
+  total: number
+}
+
+/**
+ * Uploads a file to Supabase Storage and creates a Document record.
+ * Returns the created Document.
+ */
+export async function uploadDocument(
+  file: File,
+  meta: {
+    title: string
+    docType: Document['doc_type']
+    linkedObjectType: Document['linked_object_type']
+    linkedObjectId: string | null
+    uploadedBy: string
+    isClassDocument: boolean
+  },
+): Promise<Document> {
+  // Build a sanitised storage path
+  const ext = file.name.split('.').pop() ?? 'bin'
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+  const path = `${PROJECT_ID}/${meta.linkedObjectType ?? 'general'}/${Date.now()}_${safeName}`
+
+  const { error: storageError } = await supabase.storage
+    .from('project-documents')
+    .upload(path, file, { upsert: false })
+
+  if (storageError) throw new Error(`Storage upload failed: ${storageError.message}`)
+
+  // Get a signed URL valid for 1 year (used as the file_url)
+  const { data: signedData, error: signedError } = await supabase.storage
+    .from('project-documents')
+    .createSignedUrl(path, 60 * 60 * 24 * 365)
+
+  if (signedError) throw new Error(`Could not get signed URL: ${signedError.message}`)
+
+  // Get next doc number
+  const docNumber = await nextNumber('documents' as Parameters<typeof nextNumber>[0], 'DOC' as Parameters<typeof nextNumber>[1])
+
+  const doc = await createDocument({
+    project_id: PROJECT_ID,
+    doc_number: docNumber,
+    title: meta.title,
+    doc_type: meta.docType,
+    revision: 'Rev.0',
+    status: 'APPROVED',
+    file_url: signedData.signedUrl,
+    file_size: file.size,
+    mime_type: file.type,
+    uploaded_by: meta.uploadedBy,
+    uploaded_date: new Date().toISOString().split('T')[0],
+    linked_object_type: meta.linkedObjectType,
+    linked_object_id: meta.linkedObjectId,
+    is_class_document: meta.isClassDocument,
+  })
+
+  return doc
+}
+
 export async function logEvent(
   event: Omit<WorldModelEvent, 'id' | 'triggered_at'>,
 ): Promise<WorldModelEvent> {
@@ -268,8 +343,8 @@ export async function updateProject(
 
 /** Returns the next sequential number for a given table, formatted as PREFIX-YYYY-NNN */
 export async function nextNumber(
-  table: 'defect_records' | 'change_orders' | 'owner_approvals',
-  prefix: 'NCR' | 'CO' | 'APPR',
+  table: 'defect_records' | 'change_orders' | 'owner_approvals' | 'documents',
+  prefix: 'NCR' | 'CO' | 'APPR' | 'DOC',
 ): Promise<string> {
   const { count } = await supabase
     .from(table)

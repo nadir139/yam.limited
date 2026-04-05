@@ -15,6 +15,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { useDefect, useChangeOrders, useApprovals, useUpdateDefect, useDocuments } from '@/lib/query-hooks'
+import UploadDocumentForm from '@/components/actions/UploadDocumentForm'
 import type { DefectSeverity } from '@/lib/types'
 import UploadDocumentForm from '@/components/actions/UploadDocumentForm'
 
@@ -351,6 +352,64 @@ export default function DefectDetail() {
                           Open
                         </a>
                       ) : null}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )
+      })()}
+
+      {/* Evidence / Documents section */}
+      {(() => {
+        const linkedDocs = allDocs.filter(
+          (d) => d.linked_object_type === 'DEFECT_RECORD' && d.linked_object_id === defect.id,
+        )
+        return (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">Evidence & Documents</CardTitle>
+                <UploadDocumentForm
+                  linkedObjectType="DEFECT_RECORD"
+                  linkedObjectId={defect.id}
+                  defaultDocType="PHOTO"
+                  label="Attach File"
+                />
+              </div>
+            </CardHeader>
+            <CardContent className="p-5 pt-0">
+              {linkedDocs.length === 0 ? (
+                <p className="text-sm text-center py-4" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                  No documents attached yet. Upload photos, reports, or evidence files.
+                </p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {linkedDocs.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="flex items-center gap-3 rounded-md p-2.5"
+                      style={{ backgroundColor: 'hsl(var(--muted))' }}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{doc.title}</div>
+                        <div className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                          {doc.doc_number} · {doc.doc_type.replace(/_/g, ' ')} ·{' '}
+                          {doc.file_size ? `${Math.round(doc.file_size / 1024)} KB` : 'No file'}
+                        </div>
+                      </div>
+                      {doc.file_url && (
+                        <a
+                          href={doc.file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs font-medium hover:underline shrink-0"
+                          style={{ color: 'hsl(var(--accent))' }}
+                        >
+                          Open
+                        </a>
+                      )}
                     </div>
                   ))}
                 </div>

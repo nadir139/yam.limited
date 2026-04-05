@@ -64,6 +64,18 @@ export const useEvents = () =>
   useQuery({ queryKey: QUERY_KEYS.events, queryFn: db.fetchEvents })
 
 // Mutations
+export function useUpdateInspection() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<import('./types').InspectionEvent> }) =>
+      db.updateInspection(id, updates),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.inspections })
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.events })
+    },
+  })
+}
+
 export function useUpdateApproval() {
   const qc = useQueryClient()
   return useMutation({
@@ -92,6 +104,34 @@ export function useUpdateInspection() {
       db.updateInspection(id, updates),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.inspections })
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.events })
+    },
+  })
+}
+
+export function useUploadDocument() {
+  const qc = useQueryClient()
+  const { user } = useAuth()
+
+  return useMutation({
+    mutationFn: (params: {
+      file: File
+      title: string
+      docType: import('./types').Document['doc_type']
+      linkedObjectType: import('./types').Document['linked_object_type']
+      linkedObjectId: string | null
+      isClassDocument: boolean
+    }) =>
+      db.uploadDocument(params.file, {
+        title: params.title,
+        docType: params.docType,
+        linkedObjectType: params.linkedObjectType,
+        linkedObjectId: params.linkedObjectId,
+        uploadedBy: user?.name || user?.email || 'Unknown',
+        isClassDocument: params.isClassDocument,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.documents })
       qc.invalidateQueries({ queryKey: QUERY_KEYS.events })
     },
   })
