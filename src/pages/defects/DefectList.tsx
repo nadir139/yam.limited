@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table'
 import { useDefects } from '@/lib/query-hooks'
-import type { DefectSeverity, DefectStatus, Discipline } from '@/lib/types'
+import type { DefectSeverity, DefectStatus } from '@/lib/types'
+import RaiseDefectForm from '@/components/actions/RaiseDefectForm'
 
 const SEVERITY_STYLES: Record<DefectSeverity, { bg: string; text: string }> = {
   CRITICAL: { bg: 'hsl(0 72% 51% / 0.12)', text: 'hsl(var(--destructive))' },
@@ -89,7 +90,8 @@ export default function DefectList() {
           onChange={(e) => setSearch(e.target.value)}
           className="w-64"
         />
-        <div className="ml-auto flex gap-1">
+        <div className="ml-auto flex gap-2">
+          <RaiseDefectForm />
           <Button
             variant={view === 'table' ? 'default' : 'outline'}
             size="sm"
@@ -129,7 +131,7 @@ export default function DefectList() {
                   <TableRow
                     key={d.id}
                     className="cursor-pointer"
-                    onClick={() => navigate(`/defects/${d.id}`)}
+                    onClick={() => navigate(`/app/defects/${d.id}`)}
                   >
                     <TableCell className="font-mono text-xs font-medium">{d.ncr_number}</TableCell>
                     <TableCell className="text-sm max-w-xs">
@@ -176,7 +178,7 @@ export default function DefectList() {
               <Card
                 key={d.id}
                 className="cursor-pointer transition-shadow hover:shadow-md"
-                onClick={() => navigate(`/defects/${d.id}`)}
+                onClick={() => navigate(`/app/defects/${d.id}`)}
               >
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-2">

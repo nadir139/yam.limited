@@ -216,6 +216,65 @@ export async function createDocument(
 
 export async function logEvent(
   event: Omit<WorldModelEvent, 'id' | 'triggered_at'>,
-): Promise<void> {
-  await supabase.from('world_model_events').insert(event)
+): Promise<WorldModelEvent> {
+  const { data, error } = await supabase
+    .from('world_model_events')
+    .insert(event)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function createApproval(
+  approval: Omit<OwnerApproval, 'id' | 'created_at'>,
+): Promise<OwnerApproval> {
+  const { data, error } = await supabase
+    .from('owner_approvals')
+    .insert(approval)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateChangeOrder(
+  id: string,
+  updates: Partial<ChangeOrder>,
+): Promise<ChangeOrder> {
+  const { data, error } = await supabase
+    .from('change_orders')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateProject(
+  id: string,
+  updates: Partial<Project>,
+): Promise<Project> {
+  const { data, error } = await supabase
+    .from('projects')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+/** Returns the next sequential number for a given table, formatted as PREFIX-YYYY-NNN */
+export async function nextNumber(
+  table: 'defect_records' | 'change_orders' | 'owner_approvals',
+  prefix: 'NCR' | 'CO' | 'APPR',
+): Promise<string> {
+  const { count } = await supabase
+    .from(table)
+    .select('*', { count: 'exact', head: true })
+    .eq('project_id', PROJECT_ID)
+  const n = (count ?? 0) + 1
+  return `${prefix}-2026-${String(n).padStart(3, '0')}`
 }

@@ -1,16 +1,25 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { formatDistanceToNow } from 'date-fns'
-import { AlertTriangle, CheckCircle2, ChevronRight } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, ChevronRight, ArrowRight, Lock } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import {
   useProject,
   useDefects,
   useApprovals,
   useWorkPackages,
   useEvents,
+  useAdvancePhase,
 } from '@/lib/query-hooks'
 import type { ProjectPhase, WorldModelEvent } from '@/lib/types'
 
@@ -69,12 +78,15 @@ const eur = (amount: number) =>
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const [advanceDialogOpen, setAdvanceDialogOpen] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
 
   const projectQ = useProject()
   const defectsQ = useDefects()
   const approvalsQ = useApprovals()
   const workPackagesQ = useWorkPackages()
   const eventsQ = useEvents()
+  const advancePhase = useAdvancePhase()
 
   const isLoading =
     projectQ.isLoading ||
@@ -117,15 +129,75 @@ export default function Dashboard() {
         })[0].severity
       : null
 
+  // Phase advance gates
+  const criticalOpenNCRs = openDefects.filter((d) => d.severity === 'CRITICAL')
+  const blockedApprovals = pendingApprovals.filter((a) => a.tier !== 'TIER_1')
+  const phaseGates = [
+    {
+      label: 'No critical open NCRs',
+      passed: criticalOpenNCRs.length === 0,
+      detail: criticalOpenNCRs.length > 0 ? `${criticalOpenNCRs.length} open` : undefined,
+    },
+    {
+      label: 'No pending Tier 2+ approvals',
+      passed: blockedApprovals.length === 0,
+      detail: blockedApprovals.length > 0 ? `${blockedApprovals.length} pending` : undefined,
+    },
+    {
+      label: 'No work packages on hold',
+      passed: onHoldWPs.length === 0,
+      detail: onHoldWPs.length > 0 ? `${onHoldWPs.length} on hold` : undefined,
+    },
+  ]
+  const canAdvancePhase = phaseGates.every((g) => g.passed) && currentPhaseIndex < PHASES.length - 1
+  const isLastPhase = currentPhaseIndex >= PHASES.length - 1
+
+  const showToast = (msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(null), 3000)
+  }
+
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto">
-      <div>
-        <h1 className="text-2xl font-bold" style={{ color: 'hsl(var(--foreground))' }}>
-          Dashboard
-        </h1>
-        <p className="text-sm mt-1" style={{ color: 'hsl(var(--muted-foreground))' }}>
-          Project ZERO — World Model Overview
-        </p>
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-md shadow-lg text-sm font-medium text-white" style={{ backgroundColor: 'hsl(var(--success))' }}>
+          {toast}
+        </div>
+      )}
+
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold" style={{ color: 'hsl(var(--foreground))' }}>
+            Dashboard
+          </h1>
+          <p className="text-sm mt-1" style={{ color: 'hsl(var(--muted-foreground))' }}>
+            Project ZERO — World Model Overview
+          </p>
+        </div>
+        {!isLastPhase && (
+          <Button
+            size="sm"
+            onClick={() => setAdvanceDialogOpen(true)}
+            disabled={!canAdvancePhase}
+            style={canAdvancePhase
+              ? { backgroundColor: 'hsl(var(--primary))', color: 'white' }
+              : { opacity: 0.6 }
+            }
+          >
+            {canAdvancePhase ? (
+              <>
+                <ArrowRight size={14} className="mr-1.5" />
+                Advance to {PHASE_LABELS[PHASES[currentPhaseIndex + 1]]}
+              </>
+            ) : (
+              <>
+                <Lock size={14} className="mr-1.5" />
+                Phase Locked
+              </>
+            )}
+          </Button>
+        )}
       </div>
 
       {/* Stat cards */}
@@ -378,6 +450,54 @@ export default function Dashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Advance phase dialog */}
+      <Dialog open={advanceDialogOpen} onOpenChange={setAdvanceDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Advance to {PHASE_LABELS[PHASES[currentPhaseIndex + 1] ?? project.phase]}</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 my-2">
+            <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
+              Phase gate checks — all must pass before advancing.
+            </p>
+            {phaseGates.map((gate, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <div
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-white shrink-0"
+                  style={{ backgroundColor: gate.passed ? 'hsl(var(--success))' : 'hsl(var(--destructive))' }}
+                >
+                  {gate.passed ? '✓' : '✗'}
+                </div>
+                <div className="flex-1 text-sm">{gate.label}</div>
+                {gate.detail && (
+                  <span className="text-xs" style={{ color: 'hsl(var(--destructive))' }}>{gate.detail}</span>
+                )}
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAdvanceDialogOpen(false)}>Cancel</Button>
+            <Button
+              disabled={!canAdvancePhase || advancePhase.isPending}
+              onClick={() =>
+                advancePhase.mutate(
+                  { currentPhase: project.phase },
+                  {
+                    onSuccess: () => {
+                      setAdvanceDialogOpen(false)
+                      showToast(`Phase advanced to ${PHASE_LABELS[PHASES[currentPhaseIndex + 1]]}`)
+                    },
+                  },
+                )
+              }
+              style={{ backgroundColor: 'hsl(var(--primary))', color: 'white' }}
+            >
+              {advancePhase.isPending ? 'Advancing…' : 'Confirm Advance'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

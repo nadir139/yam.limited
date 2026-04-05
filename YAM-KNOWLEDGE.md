@@ -217,6 +217,29 @@ YAM is not selling software — it's demonstrating what a domain-expert-led inte
 
 ## 9. Completed Work (Session Log)
 
+### Session 5 — Actions Layer + Intelligence Layer
+- **Auth callback fixed**: Added `/auth/callback` route + `vercel.json` SPA rewrites — magic link now lands correctly in the app
+- **RaiseDefectForm** (`src/components/actions/RaiseDefectForm.tsx`):
+  - Modal form with full NCR fields
+  - Cascade preview: shows warning when HIGH/CRITICAL + cost impact → "will auto-create CO + Approval"
+  - On save: creates DefectRecord, evaluates cascade rules, auto-creates ChangeOrder + OwnerApproval if triggered
+  - Result screen shows the full cascade chain (NCR → CO → Approval) with real data
+  - Wired into DefectList toolbar and WorkPackageDetail defects tab
+- **DefectDetail status actions**:
+  - "Mark In Progress" button (OPEN → IN_PROGRESS)
+  - "Close NCR" button with dialog + closure notes (→ CLOSED, sets closed_date)
+- **Dashboard Advance Phase button**:
+  - 3 gate checks: no critical NCRs, no Tier-2+ pending approvals, no WPs on hold
+  - Button shows locked state when gates fail; unlocked when all pass
+  - Advances project.phase in DB, logs WorldModelEvent
+- **Supabase Realtime** (`src/hooks/useRealtimeSync.ts`):
+  - Subscribes to postgres_changes on 6 tables
+  - Invalidates React Query cache on any remote change
+  - All browser sessions see live badge updates without polling
+  - Wired into AppShell — active whenever user is authenticated
+- **db.ts additions**: `createApproval`, `updateChangeOrder`, `updateProject`, `nextNumber` (sequential NCR/CO/APPR numbering)
+- **query-hooks.ts additions**: `useCreateDefectWithCascade` (full cascade in one mutation), `useAdvancePhase`
+
 ### Session 1 — Strategy
 - Full Yam.Limited growth strategy document (Naval Domain Expert → Defense/Maritime Tech)
 - Tier 1/2 service lines, approach strategies for Palantir/Fincantieri/Leonardo
@@ -250,44 +273,28 @@ YAM is not selling software — it's demonstrating what a domain-expert-led inte
 
 ## 10. Active To-Do List (Next Session)
 
-### Immediate (next session)
-- [ ] **Run `supabase-migration-001-permissions.sql`** in Supabase SQL editor (open RLS)
-- [ ] **Run `supabase-seed.sql`** in Supabase SQL editor (insert Project ZERO data)
-- [ ] **Verify app end-to-end** with real Supabase data (login → dashboard → defect detail)
+### Immediate
 - [ ] **Enter real Project ZERO data** — replace seed data with actual survey scope from real documents
-
-### Actions layer (Dorsey: the intelligence performs, humans decide at the edge)
-- [ ] **RaiseDefectForm** — modal form on WorkPackageDetail + InspectionDetail pages, saves to Supabase, writes WorldModelEvent, triggers cascade evaluation
-- [ ] **CreateChangeOrderForm** — pre-fills from linked DefectRecord, auto-sets approval tier
-- [ ] **CloseNCRForm** — requires disposition + evidence document, checks all fields before allowing close
-- [ ] **AdvancePhaseAction** — button on Dashboard, gates on: zero open Tier-2+ approvals, zero CRITICAL NCRs, all class items PASS
-
-### Intelligence layer (Dorsey: system routes context without hierarchy)
-- [ ] **Computed "Needs Attention"** — replace hardcoded list with live query: any NCR open >7 days without CO, any approval past deadline, any WP on hold blocking a phase gate
-- [ ] **Cascade auto-trigger** — when DefectRecord is created with costImpact > threshold, auto-create ChangeOrder + OwnerApproval (currently rules exist in intelligence.ts but not wired to DB writes)
-- [ ] **Realtime updates** — wire Supabase Realtime so sidebar badge counts update live across all browser sessions
+- [ ] **InspectionList action** — "Record Inspection Result" form (set result to PASS/FAIL/CONDITIONAL_PASS)
 
 ### Document management
-- [ ] **File upload** — wire Supabase Storage for actual PDF/image uploads (currently UI mock only)
-- [ ] **Document link to object** — ensure every uploaded doc is linked to its object (NCR, CO, WP)
-- [ ] **Class document flag** — class-required documents show distinct indicator
+- [ ] **File upload** — wire Supabase Storage for actual PDF/image uploads (currently UI placeholder only)
+- [ ] **Document link to object** — ensure every uploaded doc is linked to its NCR/CO/WP
 
 ### Multi-stakeholder
-- [ ] **Role-based view restrictions** — Owner sees only Dashboard + Approvals + Documents (no WP detail, no NCR edit)
-- [ ] **Invite flow** — Owner's Rep can add a stakeholder by email, auto-creates project_member record with role
-- [ ] **Per-role RLS** — tighten `supabase-migration-002-role-rls.sql` using project_members table
+- [ ] **Role-based view restrictions** — Owner sees only Dashboard + Approvals + Documents
+- [ ] **Invite flow** — Owner's Rep adds stakeholder by email, creates project_member record
+- [ ] **Per-role RLS** — `supabase-migration-002-role-rls.sql`
 
 ### Demo preparation (Pendennis / Damen)
-- [ ] **Pendennis demo script** — 10-minute walkthrough: login as Owner's Rep → dashboard → raise NCR → watch cascade → show owner approval queue → approve → phase impact
-- [ ] **Damen demo variant** — newbuild framing (same objects, different phase context)
-- [ ] **Export report** — "Survey Status Report" PDF export (class society format: RINA/BV/Lloyd's)
-- [ ] **Mobile test** — verify sidebar drawer works on iPad (common in yard environments)
+- [ ] **Demo script** — 10-min walkthrough: login → dashboard → raise NCR → cascade fires → approve in queue → phase advances
+- [ ] **Export report** — "Survey Status Report" PDF (RINA/BV/Lloyd's format)
+- [ ] **Mobile test** — sidebar drawer on iPad
 
 ### Phase 2 features (after demo)
-- [ ] **Claude API integration** — wire `actions.ts` to Claude claude-sonnet-4-6 for: NCR root cause suggestion, CO scope description drafting, risk assessment summary
-- [ ] **Multi-project support** — project selector in Topbar, fetch by project_id parameter
-- [ ] **Newbuild template** — different work package taxonomy for new construction vs survey
-- [ ] **Notification system** — email/WhatsApp when OwnerApproval is created (Supabase Edge Function → Resend/Twilio)
+- [ ] **Claude API integration** — NCR root cause suggestion, CO scope drafting, risk summary
+- [ ] **Multi-project support** — project selector in Topbar
+- [ ] **Notification system** — email when OwnerApproval created (Supabase Edge Function → Resend)
 
 ---
 

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
+import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 
 interface AppShellProps {
   children: React.ReactNode
@@ -9,6 +10,7 @@ interface AppShellProps {
 export default function AppShell({ children }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  useRealtimeSync()
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768)

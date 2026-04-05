@@ -1,11 +1,20 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { ArrowLeft, ArrowRight, GitBranch } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { useDefect, useChangeOrders, useApprovals } from '@/lib/query-hooks'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { useDefect, useChangeOrders, useApprovals, useUpdateDefect } from '@/lib/query-hooks'
 import type { DefectSeverity } from '@/lib/types'
 
 const SEVERITY_STYLES: Record<DefectSeverity, { bg: string; text: string }> = {
@@ -75,6 +84,16 @@ export default function DefectDetail() {
   const { data: defect, isLoading: defectLoading } = useDefect(id ?? '')
   const { data: changeOrders = [], isLoading: coLoading } = useChangeOrders()
   const { data: approvals = [], isLoading: approvalsLoading } = useApprovals()
+  const updateDefect = useUpdateDefect()
+
+  const [closeDialogOpen, setCloseDialogOpen] = useState(false)
+  const [closeNotes, setCloseNotes] = useState('')
+  const [toast, setToast] = useState<string | null>(null)
+
+  const showToast = (msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(null), 3000)
+  }
 
   const isLoading = defectLoading || coLoading || approvalsLoading
 
@@ -105,12 +124,19 @@ export default function DefectDetail() {
 
   return (
     <div className="flex flex-col gap-6 max-w-4xl mx-auto">
-      <div className="flex items-center gap-3">
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-md shadow-lg text-sm font-medium text-white" style={{ backgroundColor: 'hsl(var(--success))' }}>
+          {toast}
+        </div>
+      )}
+
+      <div className="flex items-start gap-3">
         <Button variant="outline" size="sm" onClick={() => navigate('/app/defects')}>
           <ArrowLeft size={14} className="mr-1" /> Back
         </Button>
         <div className="flex-1">
-          <div className="flex items-center gap-2 mb-0.5">
+          <div className="flex items-center gap-2 mb-0.5 flex-wrap">
             <span className="font-mono text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
               {defect.ncr_number}
             </span>
@@ -123,6 +149,31 @@ export default function DefectDetail() {
           </div>
           <h1 className="text-xl font-bold">{defect.title}</h1>
         </div>
+        {/* Status action buttons */}
+        {defect.status === 'OPEN' && (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={updateDefect.isPending}
+            onClick={() =>
+              updateDefect.mutate(
+                { id: defect.id, updates: { status: 'IN_PROGRESS' } },
+                { onSuccess: () => showToast('NCR marked In Progress.') },
+              )
+            }
+          >
+            Mark In Progress
+          </Button>
+        )}
+        {(defect.status === 'IN_PROGRESS' || defect.status === 'OPEN') && (
+          <Button
+            size="sm"
+            onClick={() => setCloseDialogOpen(true)}
+            style={{ backgroundColor: 'hsl(var(--success))', color: 'white' }}
+          >
+            Close NCR
+          </Button>
+        )}
       </div>
 
       {/* Description */}
@@ -256,6 +307,54 @@ export default function DefectDetail() {
           )}
         </CardContent>
       </Card>
+
+      {/* Close NCR dialog */}
+      <Dialog open={closeDialogOpen} onOpenChange={setCloseDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Close NCR — {defect.ncr_number}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm mb-4" style={{ color: 'hsl(var(--muted-foreground))' }}>
+            Closing this NCR marks it as resolved. Provide closure notes or reference the corrective action taken.
+          </p>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="close-notes">Closure Notes</Label>
+            <Textarea
+              id="close-notes"
+              value={closeNotes}
+              onChange={(e) => setCloseNotes(e.target.value)}
+              placeholder="Describe how this defect was resolved..."
+              rows={3}
+            />
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setCloseDialogOpen(false)}>Cancel</Button>
+            <Button
+              disabled={updateDefect.isPending}
+              onClick={() =>
+                updateDefect.mutate(
+                  {
+                    id: defect.id,
+                    updates: {
+                      status: 'CLOSED',
+                      closed_date: new Date().toISOString().split('T')[0],
+                    },
+                  },
+                  {
+                    onSuccess: () => {
+                      setCloseDialogOpen(false)
+                      showToast('NCR closed successfully.')
+                    },
+                  },
+                )
+              }
+              style={{ backgroundColor: 'hsl(var(--success))', color: 'white' }}
+            >
+              {updateDefect.isPending ? 'Closing…' : 'Confirm Close'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

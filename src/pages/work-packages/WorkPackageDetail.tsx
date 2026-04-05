@@ -14,6 +14,7 @@ import {
   useDefects,
   useDocuments,
 } from '@/lib/query-hooks'
+import RaiseDefectForm from '@/components/actions/RaiseDefectForm'
 
 const eur = (n: number) =>
   new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
@@ -205,6 +206,9 @@ export default function WorkPackageDetail() {
         </TabsContent>
 
         <TabsContent value="defects">
+          <div className="flex justify-end mb-3">
+            <RaiseDefectForm workPackageId={wp.id} />
+          </div>
           <Card>
             <Table>
               <TableHeader>
