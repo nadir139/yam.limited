@@ -11,6 +11,7 @@ import Index from "./pages/Index";
 import Ontology from "./pages/Ontology";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/auth/Login";
+import AuthCallback from "./pages/auth/AuthCallback";
 import Dashboard from "./pages/dashboard/Dashboard";
 import ProjectOverview from "./pages/project/ProjectOverview";
 import WorkPackageList from "./pages/work-packages/WorkPackageList";
@@ -44,6 +45,7 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/ontology" element={<Ontology />} />
               <Route path="/login" element={<Login />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/app" element={<Navigate to="/app/dashboard" replace />} />
               <Route path="/app/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/app/project" element={<ProtectedRoute><ProjectOverview /></ProtectedRoute>} />
