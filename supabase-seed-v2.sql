@@ -1112,7 +1112,7 @@ INSERT INTO world_model_events (
   'CHANGE_ORDER_APPROVED', 'CHANGE_ORDER', 'a1b2c3d4-0006-0000-0000-000000000003',
   '{"status": "PENDING_APPROVAL"}'::jsonb,
   '{"status": "APPROVED", "approval_id": "a1b2c3d4-0007-0000-0000-000000000003"}'::jsonb,
-  'system',
+  '00000000-0000-0000-0000-000000000000',
   '2026-05-05T14:16:00Z',
   'a1b2c3d4-000a-0000-0000-000000000006' ),
 
@@ -1172,7 +1172,7 @@ INSERT INTO world_model_events (
   'WORK_PACKAGE_STATUS_CHANGED', 'WORK_PACKAGE', 'a1b2c3d4-0003-0000-0000-000000000003',
   '{"status": "ACTIVE", "planned_cost": 42000}'::jsonb,
   '{"status": "ACTIVE", "planned_cost": 42000, "note": "Scope expanded — corrosion at stations 47-49 confirmed. CO-001 raised."}'::jsonb,
-  'system',
+  '00000000-0000-0000-0000-000000000000',
   '2026-05-11T16:00:00Z',
   'a1b2c3d4-000a-0000-0000-000000000012' ),
 
