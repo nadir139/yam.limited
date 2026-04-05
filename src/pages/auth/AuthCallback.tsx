@@ -20,25 +20,33 @@ export default function AuthCallback() {
       return
     }
 
-    // Let Supabase process the access_token from the hash
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // onAuthStateChange processes the hash fragment automatically (detectSessionInUrl: true)
+    // This fires with SIGNED_IN as soon as Supabase validates the access_token
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) {
+        subscription.unsubscribe()
         navigate('/app/dashboard', { replace: true })
-      } else {
-        // Fallback: wait for onAuthStateChange
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-          if (session) {
-            subscription.unsubscribe()
-            navigate('/app/dashboard', { replace: true })
-          }
-        })
-        // Timeout fallback — if nothing fires in 3s, go to login
-        setTimeout(() => {
-          subscription.unsubscribe()
-          navigate('/login', { replace: true })
-        }, 3000)
       }
     })
+
+    // Also check for an existing session (e.g. already logged in)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        subscription.unsubscribe()
+        navigate('/app/dashboard', { replace: true })
+      }
+    })
+
+    // Timeout fallback — if nothing fires in 5s, go to login
+    const timeout = setTimeout(() => {
+      subscription.unsubscribe()
+      navigate('/login', { replace: true })
+    }, 5000)
+
+    return () => {
+      subscription.unsubscribe()
+      clearTimeout(timeout)
+    }
   }, [navigate])
 
   if (error) {
