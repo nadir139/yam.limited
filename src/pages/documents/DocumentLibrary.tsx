@@ -1,46 +1,37 @@
 import React, { useState } from 'react'
 import { format } from 'date-fns'
-import { Upload } from 'lucide-react'
+import { Download, ExternalLink, CheckCircle2 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog'
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table'
 import { useDocuments } from '@/lib/query-hooks'
-import * as db from '@/lib/db'
-import { useQueryClient } from '@tanstack/react-query'
-import { QUERY_KEYS } from '@/lib/query-hooks'
-import type { Document } from '@/lib/types'
+import UploadDocumentForm from '@/components/actions/UploadDocumentForm'
 
 const DOC_TYPE_STYLES: Record<string, { bg: string; text: string }> = {
-  SURVEY_REPORT: { bg: 'hsl(215 50% 23% / 0.1)', text: 'hsl(var(--primary))' },
-  CLASS_CERTIFICATE: { bg: 'hsl(185 60% 40% / 0.12)', text: 'hsl(var(--accent))' },
-  DRAWING: { bg: 'hsl(260 60% 50% / 0.1)', text: 'hsl(260 60% 45%)' },
-  SPECIFICATION: { bg: 'hsl(158 64% 40% / 0.12)', text: 'hsl(var(--success))' },
-  NCR: { bg: 'hsl(0 72% 51% / 0.1)', text: 'hsl(var(--destructive))' },
-  CHANGE_ORDER: { bg: 'hsl(38 92% 50% / 0.12)', text: 'hsl(38 80% 38%)' },
-  APPROVAL: { bg: 'hsl(38 92% 50% / 0.08)', text: 'hsl(38 80% 38%)' },
-  CORRESPONDENCE: { bg: 'hsl(var(--muted))', text: 'hsl(var(--muted-foreground))' },
-  PHOTO: { bg: 'hsl(330 60% 50% / 0.1)', text: 'hsl(330 60% 45%)' },
-  OTHER: { bg: 'hsl(var(--muted))', text: 'hsl(var(--muted-foreground))' },
+  SURVEY_REPORT:    { bg: 'hsl(215 50% 23% / 0.1)',  text: 'hsl(var(--primary))' },
+  CLASS_CERTIFICATE:{ bg: 'hsl(185 60% 40% / 0.12)', text: 'hsl(var(--accent))' },
+  DRAWING:          { bg: 'hsl(260 60% 50% / 0.1)',  text: 'hsl(260 60% 45%)' },
+  SPECIFICATION:    { bg: 'hsl(158 64% 40% / 0.12)', text: 'hsl(var(--success))' },
+  NCR:              { bg: 'hsl(0 72% 51% / 0.1)',    text: 'hsl(var(--destructive))' },
+  CHANGE_ORDER:     { bg: 'hsl(38 92% 50% / 0.12)',  text: 'hsl(38 80% 38%)' },
+  APPROVAL:         { bg: 'hsl(38 92% 50% / 0.08)',  text: 'hsl(38 80% 38%)' },
+  CORRESPONDENCE:   { bg: 'hsl(var(--muted))',        text: 'hsl(var(--muted-foreground))' },
+  PHOTO:            { bg: 'hsl(330 60% 50% / 0.1)',  text: 'hsl(330 60% 45%)' },
+  OTHER:            { bg: 'hsl(var(--muted))',        text: 'hsl(var(--muted-foreground))' },
 }
 
 const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
-  DRAFT: { bg: 'hsl(var(--muted))', text: 'hsl(var(--muted-foreground))' },
-  UNDER_REVIEW: { bg: 'hsl(38 92% 50% / 0.12)', text: 'hsl(38 80% 38%)' },
-  APPROVED: { bg: 'hsl(158 64% 40% / 0.15)', text: 'hsl(var(--success))' },
-  SUPERSEDED: { bg: 'hsl(var(--muted))', text: 'hsl(var(--muted-foreground))' },
+  DRAFT:        { bg: 'hsl(var(--muted))',        text: 'hsl(var(--muted-foreground))' },
+  UNDER_REVIEW: { bg: 'hsl(38 92% 50% / 0.12)',  text: 'hsl(38 80% 38%)' },
+  APPROVED:     { bg: 'hsl(158 64% 40% / 0.15)', text: 'hsl(var(--success))' },
+  SUPERSEDED:   { bg: 'hsl(var(--muted))',        text: 'hsl(var(--muted-foreground))' },
 }
 
-const DOC_TYPES = ['SURVEY_REPORT', 'CLASS_CERTIFICATE', 'DRAWING', 'SPECIFICATION', 'NCR', 'CHANGE_ORDER', 'APPROVAL', 'CORRESPONDENCE', 'PHOTO', 'OTHER'] as const
+const DOC_TYPES = [
+  'SURVEY_REPORT', 'CLASS_CERTIFICATE', 'DRAWING', 'SPECIFICATION',
+  'NCR', 'CHANGE_ORDER', 'APPROVAL', 'CORRESPONDENCE', 'PHOTO', 'OTHER',
+] as const
 
 function formatBytes(bytes: number | null): string {
   if (bytes == null) return '—'
@@ -53,16 +44,8 @@ export default function DocumentLibrary() {
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('ALL')
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
-  const [uploadOpen, setUploadOpen] = useState(false)
-  const [isUploading, setIsUploading] = useState(false)
-
-  // Upload form state
-  const [newTitle, setNewTitle] = useState('')
-  const [newType, setNewType] = useState<string>('SPECIFICATION')
-  const [newRevision, setNewRevision] = useState('Rev.0')
 
   const { data: docs = [], isLoading } = useDocuments()
-  const qc = useQueryClient()
 
   if (isLoading) {
     return <div style={{ padding: '2rem', color: 'hsl(var(--muted-foreground))' }}>Loading...</div>
@@ -78,34 +61,7 @@ export default function DocumentLibrary() {
     return matchesSearch && matchesType && matchesStatus
   })
 
-  const handleUpload = async () => {
-    setIsUploading(true)
-    try {
-      const newDoc: Omit<Document, 'id' | 'created_at'> = {
-        project_id: db.PROJECT_ID,
-        doc_number: `DOC-2026-${String(docs.length + 1).padStart(3, '0')}`,
-        title: newTitle || 'Untitled Document',
-        doc_type: newType as Document['doc_type'],
-        revision: newRevision,
-        status: 'DRAFT',
-        file_url: null,
-        file_size: null,
-        mime_type: null,
-        uploaded_by: 'Nadir',
-        uploaded_date: new Date().toISOString().split('T')[0],
-        linked_object_type: null,
-        linked_object_id: null,
-        is_class_document: false,
-      }
-      await db.createDocument(newDoc)
-      await qc.invalidateQueries({ queryKey: QUERY_KEYS.documents })
-      setUploadOpen(false)
-      setNewTitle('')
-      setNewRevision('Rev.0')
-    } finally {
-      setIsUploading(false)
-    }
-  }
+  const classCount = docs.filter((d) => d.is_class_document).length
 
   const selectStyle: React.CSSProperties = {
     borderColor: 'hsl(var(--border))',
@@ -120,20 +76,17 @@ export default function DocumentLibrary() {
 
   return (
     <div className="flex flex-col gap-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Document Library</h1>
           <p className="text-sm mt-1" style={{ color: 'hsl(var(--muted-foreground))' }}>
-            {docs.length} documents
+            {docs.length} documents · {classCount} class-required
           </p>
         </div>
-        <Button onClick={() => setUploadOpen(true)} style={{ backgroundColor: 'hsl(var(--accent))', color: 'white' }}>
-          <Upload size={14} className="mr-2" />
-          Upload Document
-        </Button>
+        <UploadDocumentForm />
       </div>
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-3 items-center">
         <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} style={selectStyle}>
           <option value="ALL">All Types</option>
           {DOC_TYPES.map((t) => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
@@ -151,6 +104,9 @@ export default function DocumentLibrary() {
           onChange={(e) => setSearch(e.target.value)}
           className="w-64"
         />
+        <div className="ml-auto text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
+          {filtered.length} of {docs.length}
+        </div>
       </div>
 
       <Card>
@@ -165,6 +121,7 @@ export default function DocumentLibrary() {
               <TableHead>Linked To</TableHead>
               <TableHead>Uploaded</TableHead>
               <TableHead>Size</TableHead>
+              <TableHead></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -174,7 +131,14 @@ export default function DocumentLibrary() {
               return (
                 <TableRow key={doc.id}>
                   <TableCell className="font-mono text-xs font-medium">{doc.doc_number}</TableCell>
-                  <TableCell className="text-sm font-medium max-w-xs truncate">{doc.title}</TableCell>
+                  <TableCell className="text-sm font-medium max-w-[200px]">
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate">{doc.title}</span>
+                      {doc.is_class_document && (
+                        <CheckCircle2 size={12} style={{ color: 'hsl(var(--accent))', flexShrink: 0 }} />
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <Badge style={{ backgroundColor: dt.bg, color: dt.text, border: 'none', fontSize: '11px' }}>
                       {doc.doc_type.replace(/_/g, ' ')}
@@ -186,12 +150,10 @@ export default function DocumentLibrary() {
                       {doc.status.replace(/_/g, ' ')}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-xs">
-                    {doc.linked_object_type ? (
-                      <span style={{ color: 'hsl(var(--muted-foreground))' }}>
-                        {doc.linked_object_type.replace(/_/g, ' ')}
-                      </span>
-                    ) : '—'}
+                  <TableCell className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                    {doc.linked_object_type
+                      ? doc.linked_object_type.replace(/_/g, ' ')
+                      : '—'}
                   </TableCell>
                   <TableCell className="text-sm">
                     {format(new Date(doc.uploaded_date), 'd MMM yyyy')}
@@ -199,12 +161,29 @@ export default function DocumentLibrary() {
                   <TableCell className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
                     {formatBytes(doc.file_size)}
                   </TableCell>
+                  <TableCell>
+                    {doc.file_url ? (
+                      <a
+                        href={doc.file_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-xs hover:underline"
+                        style={{ color: 'hsl(var(--accent))' }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Download size={12} />
+                        Open
+                      </a>
+                    ) : (
+                      <span className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>—</span>
+                    )}
+                  </TableCell>
                 </TableRow>
               )
             })}
             {filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                <TableCell colSpan={9} className="text-center py-10" style={{ color: 'hsl(var(--muted-foreground))' }}>
                   No documents match the current filters.
                 </TableCell>
               </TableRow>
@@ -212,63 +191,6 @@ export default function DocumentLibrary() {
           </TableBody>
         </Table>
       </Card>
-
-      {/* Upload dialog */}
-      <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Upload Document</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="doc-title">Title</Label>
-              <Input
-                id="doc-title"
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-                placeholder="Document title"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="doc-type">Document Type</Label>
-              <select
-                id="doc-type"
-                value={newType}
-                onChange={(e) => setNewType(e.target.value)}
-                style={{ ...selectStyle, height: 'auto', padding: '0.5rem 0.75rem' }}
-              >
-                {DOC_TYPES.map((t) => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="doc-revision">Revision</Label>
-              <Input
-                id="doc-revision"
-                value={newRevision}
-                onChange={(e) => setNewRevision(e.target.value)}
-                placeholder="Rev.0"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="doc-file">File</Label>
-              <Input id="doc-file" type="file" disabled className="cursor-not-allowed opacity-50" />
-              <p className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                File upload coming soon — document record will be created.
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setUploadOpen(false)}>Cancel</Button>
-            <Button
-              onClick={handleUpload}
-              disabled={isUploading}
-              style={{ backgroundColor: 'hsl(var(--accent))', color: 'white' }}
-            >
-              {isUploading ? 'Creating...' : 'Create Record'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

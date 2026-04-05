@@ -14,8 +14,9 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { useDefect, useChangeOrders, useApprovals, useUpdateDefect } from '@/lib/query-hooks'
+import { useDefect, useChangeOrders, useApprovals, useUpdateDefect, useDocuments } from '@/lib/query-hooks'
 import type { DefectSeverity } from '@/lib/types'
+import UploadDocumentForm from '@/components/actions/UploadDocumentForm'
 
 const SEVERITY_STYLES: Record<DefectSeverity, { bg: string; text: string }> = {
   CRITICAL: { bg: 'hsl(0 72% 51% / 0.12)', text: 'hsl(var(--destructive))' },
@@ -84,6 +85,7 @@ export default function DefectDetail() {
   const { data: defect, isLoading: defectLoading } = useDefect(id ?? '')
   const { data: changeOrders = [], isLoading: coLoading } = useChangeOrders()
   const { data: approvals = [], isLoading: approvalsLoading } = useApprovals()
+  const { data: allDocs = [] } = useDocuments()
   const updateDefect = useUpdateDefect()
 
   const [closeDialogOpen, setCloseDialogOpen] = useState(false)
@@ -307,6 +309,56 @@ export default function DefectDetail() {
           )}
         </CardContent>
       </Card>
+
+      {/* Attachments */}
+      {(() => {
+        const attachments = allDocs.filter(
+          (d) => d.linked_object_type === 'DEFECT_RECORD' && d.linked_object_id === defect.id,
+        )
+        return (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">Attachments</CardTitle>
+                <UploadDocumentForm
+                  linkedObjectType="DEFECT_RECORD"
+                  linkedObjectId={defect.id}
+                  defaultDocType="PHOTO"
+                />
+              </div>
+            </CardHeader>
+            <CardContent className="p-5 pt-0">
+              {attachments.length === 0 ? (
+                <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                  No attachments yet. Upload photos or supporting documents.
+                </p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {attachments.map((doc) => (
+                    <div key={doc.id} className="flex items-center gap-3 text-sm">
+                      <span className="font-mono text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                        {doc.doc_number}
+                      </span>
+                      <span className="flex-1 truncate">{doc.title}</span>
+                      {doc.file_url ? (
+                        <a
+                          href={doc.file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs hover:underline"
+                          style={{ color: 'hsl(var(--accent))' }}
+                        >
+                          Open
+                        </a>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )
+      })()}
 
       {/* Close NCR dialog */}
       <Dialog open={closeDialogOpen} onOpenChange={setCloseDialogOpen}>

@@ -278,3 +278,65 @@ export async function nextNumber(
   const n = (count ?? 0) + 1
   return `${prefix}-2026-${String(n).padStart(3, '0')}`
 }
+
+export async function fetchInspection(id: string): Promise<InspectionEvent> {
+  const { data, error } = await supabase
+    .from('inspection_events')
+    .select('*')
+    .eq('id', id)
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateInspection(
+  id: string,
+  updates: Partial<InspectionEvent>,
+): Promise<InspectionEvent> {
+  const { data, error } = await supabase
+    .from('inspection_events')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+// ─── Supabase Storage ─────────────────────────────────────────────────────────
+
+export async function uploadFile(
+  file: File,
+  path: string,
+): Promise<{ url: string; size: number; mimeType: string }> {
+  const { error } = await supabase.storage
+    .from('project-documents')
+    .upload(path, file, { upsert: true, contentType: file.type })
+  if (error) throw error
+
+  const { data: urlData } = supabase.storage
+    .from('project-documents')
+    .getPublicUrl(path)
+
+  return {
+    url: urlData.publicUrl,
+    size: file.size,
+    mimeType: file.type,
+  }
+}
+
+export async function deleteFile(path: string): Promise<void> {
+  const { error } = await supabase.storage
+    .from('project-documents')
+    .remove([path])
+  if (error) throw error
+}
+
+export async function nextDocNumber(): Promise<string> {
+  const { count } = await supabase
+    .from('documents')
+    .select('*', { count: 'exact', head: true })
+    .eq('project_id', PROJECT_ID)
+  const n = (count ?? 0) + 1
+  return `DOC-2026-${String(n).padStart(3, '0')}`
+}

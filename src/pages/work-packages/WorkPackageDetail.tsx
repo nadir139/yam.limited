@@ -15,6 +15,7 @@ import {
   useDocuments,
 } from '@/lib/query-hooks'
 import RaiseDefectForm from '@/components/actions/RaiseDefectForm'
+import UploadDocumentForm from '@/components/actions/UploadDocumentForm'
 
 const eur = (n: number) =>
   new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
@@ -242,6 +243,13 @@ export default function WorkPackageDetail() {
         </TabsContent>
 
         <TabsContent value="documents">
+          <div className="flex justify-end mb-3">
+            <UploadDocumentForm
+              linkedObjectType="WORK_PACKAGE"
+              linkedObjectId={wp.id}
+              defaultDocType="SPECIFICATION"
+            />
+          </div>
           <Card>
             <Table>
               <TableHeader>
