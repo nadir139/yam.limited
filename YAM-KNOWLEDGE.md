@@ -1,7 +1,7 @@
 # YAM — Maritime Intelligence Platform
 ## Knowledge Base · Session Log · Development Roadmap
 
-> Last updated: April 2026  
+> Last updated: April 2026 (Session 6)  
 > Primary repo: `nadir139/yam.limited` (deployed via Vercel)  
 > Live URL: `yam.limited`  
 > App URL: `yam.limited/app/dashboard`  
@@ -87,10 +87,25 @@ src/
       AppShell.tsx    ← Desktop/mobile shell (JS-based responsive, not Tailwind)
       Sidebar.tsx     ← Navy sidebar, live badge counts from query hooks
       Topbar.tsx      ← Project name, phase badge, theme toggle
+    actions/
+      RaiseDefectForm.tsx          ← NCR creation with cascade preview
+      RecordInspectionResult.tsx   ← Set PASS/CONDITIONAL_PASS/FAIL + inline NCR prompt
+      UploadDocumentForm.tsx       ← Drag-and-drop file upload → Supabase Storage
   pages/
     auth/Login.tsx    ← Email + role selector → magic link flow
     dashboard/        ← World model overview
     [all other pages as above]
+```
+
+### SQL files in repo root
+```
+supabase-schema.sql                        ← Full schema (run first on new Supabase project)
+supabase-seed.sql                          ← Original minimal seed (superseded by v2)
+supabase-seed-v2.sql                       ← Full Project ZERO synthetic dataset (run this)
+supabase-migration-001-permissions.sql     ← Open RLS policies (auth_all)
+supabase-migration-002-storage.sql         ← project-documents bucket + 4 RLS policies
+supabase-migration-003-drop-members-fk.sql ← Drops project_members.user_id FK (allows synthetic team data)
+supabase-migration-004-drop-event-fk.sql   ← Drops world_model_events.triggered_by FK (allows synthetic events)
 ```
 
 ---
@@ -217,6 +232,58 @@ YAM is not selling software — it's demonstrating what a domain-expert-led inte
 
 ## 9. Completed Work (Session Log)
 
+### Session 6 — Seed Data v2 + Inspection Actions + File Upload
+
+#### Richer synthetic seed data (`supabase-seed-v2.sql`)
+- 24 work packages across disciplines: Hull, Structural, Mechanical, Electrical, Rigging, Interior, Paint, Safety, Class
+- 15 inspections with mixed results (PASS, CONDITIONAL_PASS, FAIL, PENDING)
+- 8 defects: NCR-001 (CRITICAL frame corrosion), NCR-002 (HIGH deck fitting), NCR-003 (HIGH hull thinning), NCR-004 (MEDIUM engine coolant), NCR-005 (HIGH backstay swage failure), NCR-006 (MEDIUM EPIRB expired), NCR-007 (CRITICAL shore power earthing), NCR-008 (LOW saloon leak)
+- 4 change orders: CO-001 (€47,200 frame replacement, PENDING), CO-002 (€31,600 hull plate, PENDING), CO-003 (€18,900 backstay, APPROVED), CO-004 (€52,000 battery upgrade, DRAFT)
+- 3 approvals: APPR-001 and APPR-002 (PENDING Tier 2), APPR-003 (APPROVED Tier 2)
+- 12 documents, 8 team members, 15 world model events
+- Circular FK fix: change_orders inserted first with NULL back-refs, defect_records second, then UPDATE change_orders to set correct IDs
+- System events use nil UUID `00000000-0000-0000-0000-000000000000` for triggered_by
+
+#### Supabase Storage (`supabase-migration-002-storage.sql`)
+- Private bucket `project-documents`, 50MB limit, allowed MIME types (PDF, images, office docs)
+- 4 RLS policies: auth_upload, auth_select, auth_update, auth_delete (authenticated users only)
+- Signed URLs with 1-year expiry stored as `file_url` in documents table
+
+#### FK constraint migrations
+- `supabase-migration-003-drop-members-fk.sql` — drops `project_members.user_id` FK so synthetic team members (RINA surveyors, Pendennis PMs) can be seeded without real Supabase auth accounts
+- `supabase-migration-004-drop-event-fk.sql` — drops `world_model_events.triggered_by` FK for same reason
+
+#### `RecordInspectionResult` (`src/components/actions/RecordInspectionResult.tsx`)
+- Props: `{ inspection: InspectionEvent, onSuccess?: () => void }`
+- Three toggle buttons: PASS (green), CONDITIONAL_PASS (amber), FAIL (red)
+- Actual date picker, notes textarea (required for non-PASS results)
+- After submit: shows result summary; if FAIL or CONDITIONAL_PASS, shows inline prompt to raise NCR via `RaiseDefectForm` pre-linked to the inspection
+- Wired into `InspectionList` — each row has a "Record Result" button (shown for PENDING inspections)
+- Uses `useUpdateInspection` mutation
+
+#### `UploadDocumentForm` (`src/components/actions/UploadDocumentForm.tsx`)
+- Props: `{ linkedObjectType?, linkedObjectId?, defaultDocType?, label? }`
+- Drag-and-drop zone + hidden file input fallback
+- Auto-fills document title from filename (strips extension, normalises separators)
+- Doc type selector (10 types), "Class Required Document" checkbox
+- Upload progress shown via mutation `isPending` state; success screen shows uploaded doc title
+- Wired into: DocumentLibrary header, WorkPackageDetail documents tab, DefectDetail evidence section
+
+#### `db.ts` additions
+- `updateInspection(id, updates)` — patches inspection_events, returns updated record
+- `uploadDocument(file, meta)` — uploads to `project-documents` bucket, gets 1-year signed URL, calls `createDocument`
+- `nextNumber` extended to support `documents` table / `DOC` prefix
+
+#### `query-hooks.ts` additions
+- `useUpdateInspection()` — invalidates `inspections` + `world_model_events` on success
+- `useUploadDocument()` — calls `db.uploadDocument`, invalidates `documents` + `world_model_events`
+
+#### `DefectDetail` additions
+- Evidence & Documents section: lists docs linked to the defect, file size, Open link
+- UploadDocumentForm scoped to `DEFECT_RECORD` / `PHOTO` default
+
+---
+
 ### Session 5 — Actions Layer + Intelligence Layer
 - **Auth callback fixed**: Added `/auth/callback` route + `vercel.json` SPA rewrites — magic link now lands correctly in the app
 - **RaiseDefectForm** (`src/components/actions/RaiseDefectForm.tsx`):
@@ -273,28 +340,24 @@ YAM is not selling software — it's demonstrating what a domain-expert-led inte
 
 ## 10. Active To-Do List (Next Session)
 
-### Immediate
-- [ ] **Enter real Project ZERO data** — replace seed data with actual survey scope from real documents
-- [ ] **InspectionList action** — "Record Inspection Result" form (set result to PASS/FAIL/CONDITIONAL_PASS)
-
-### Document management
-- [ ] **File upload** — wire Supabase Storage for actual PDF/image uploads (currently UI placeholder only)
-- [ ] **Document link to object** — ensure every uploaded doc is linked to its NCR/CO/WP
-
-### Multi-stakeholder
-- [ ] **Role-based view restrictions** — Owner sees only Dashboard + Approvals + Documents
-- [ ] **Invite flow** — Owner's Rep adds stakeholder by email, creates project_member record
-- [ ] **Per-role RLS** — `supabase-migration-002-role-rls.sql`
-
-### Demo preparation (Pendennis / Damen)
+### Priority 1 — Demo readiness
+- [ ] **Role-based view restrictions** — Owner sees only Dashboard + Approvals + Documents; Yard PM sees WPs + Inspections; Captain sees Dashboard + Documents. Gate on role stored in localStorage.
+- [ ] **Survey Status Report PDF export** — "Survey Status Report" one-click export in RINA/BV/Lloyd's format: vessel details, WP summary table, open NCR list, pending approvals, phase timeline. Use `react-pdf` or `jsPDF`.
 - [ ] **Demo script** — 10-min walkthrough: login → dashboard → raise NCR → cascade fires → approve in queue → phase advances
-- [ ] **Export report** — "Survey Status Report" PDF (RINA/BV/Lloyd's format)
-- [ ] **Mobile test** — sidebar drawer on iPad
 
-### Phase 2 features (after demo)
-- [ ] **Claude API integration** — NCR root cause suggestion, CO scope drafting, risk summary
-- [ ] **Multi-project support** — project selector in Topbar
+### Priority 2 — Intelligence layer
+- [ ] **Claude API on RaiseDefectForm** — when user types defect description, call Claude API to suggest: severity, root cause category, recommended disposition. Show as "AI Suggestion" inline badge that user can accept or override.
+- [ ] **Mobile / iPad test** — sidebar drawer on tablet (currently JS responsive but untested on real device)
+
+### Priority 3 — Multi-stakeholder
+- [ ] **Invite flow** — Owner's Rep adds stakeholder by email → creates project_member record → Supabase sends magic link
+- [ ] **Per-role RLS** — `supabase-migration-005-role-rls.sql` (after invite flow is proved)
+
+### Phase 2 (after demo)
+- [ ] **Multi-project support** — project selector in Topbar, project_id scoping on all queries
 - [ ] **Notification system** — email when OwnerApproval created (Supabase Edge Function → Resend)
+- [ ] **CO scope drafting** — Claude API on ChangeOrder form to suggest scope description from linked NCR text
+- [ ] **Enter real Project ZERO data** — replace synthetic seed with actual survey scope documents when available
 
 ---
 
