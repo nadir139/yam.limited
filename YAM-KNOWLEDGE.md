@@ -2,10 +2,10 @@
 ## Knowledge Base · Session Log · Development Roadmap
 
 > Last updated: April 2026  
-> Primary repo: `nadir139/yam.limited` (deployed via Vercel)  
+> Primary repo: `nadir139/yam.limited` (deployed via GitHub Pages -- see section 12)  
 > Live URL: `yam.limited`  
 > App URL: `yam.limited/app/dashboard`  
-> Supabase project: `ihippazqdkwssxnfzlwx.supabase.co`
+> Supabase project: none -- not yet provisioned (see section 12)
 
 ---
 
@@ -66,7 +66,8 @@ yam.limited/app/*         ← authenticated world model (all routes below)
 - **Data**: Supabase (PostgreSQL + Realtime + Storage + Auth)
 - **State**: React Query (@tanstack/react-query) for server state
 - **Auth**: Supabase magic link (OTP) — role stored in localStorage by email key
-- **Deployment**: Vercel (auto-deploy on push to main)
+- **Deployment**: GitHub Pages (auto-deploy on push to `main`); Vercel builds the
+  same repo but serves preview URLs only
 - **Design tokens**: Deep navy primary (`hsl(215 50% 23%)`), teal accent (`hsl(185 60% 40%)`)
 
 ### Key source files
@@ -78,8 +79,7 @@ src/
     query-hooks.ts    ← React Query hooks wrapping db.ts
     intelligence.ts   ← Cascade rules engine (pure functions)
     actions.ts        ← Typed action definitions
-    mock-data.ts      ← Seed data reference (kept for fallback)
-    supabase.ts       ← Supabase client
+    supabase.ts       ← Supabase client + `isSupabaseConfigured` guard
   contexts/
     AuthContext.tsx   ← Supabase auth context (magic link)
   components/
@@ -317,13 +317,25 @@ YAM is not selling software — it's demonstrating what a domain-expert-led inte
 
 | Item | Value |
 |------|-------|
-| Supabase URL | `https://ihippazqdkwssxnfzlwx.supabase.co` |
-| Vercel project | `project-0-coral.vercel.app` |
+| Supabase project | **none currently** — see warning below |
+| Production host | **GitHub Pages** via `.github/workflows/deploy.yml` |
+| Custom domain | `yam.limited`, from the `CNAME` file copied into `dist/` |
+| Vercel project | `project-0` — builds the same repo, **preview URLs only, no custom domain** |
 | GitHub repo | `nadir139/yam.limited` |
 | Dev branch convention | `claude/[description]-[hash]` |
-| Deploy branch | `main` (auto-deploy via Vercel) |
+| Deploy branch | `main` |
 
-> ⚠️ Supabase anon key is in `.env.local` (gitignored) and Vercel environment variables. Do not commit to git.
+> ⚠️ **The Supabase project `ihippazqdkwssxnfzlwx` referenced by earlier revisions
+> of this file does not exist.** It is not present on the account, and the anon key
+> was never set as a CI secret, so *every* production build since the Supabase
+> cutover (commit `5cdfbc0`) shipped without credentials. `createClient` throws on a
+> missing URL, which took down every route until commit `eecb204` made the client
+> degrade gracefully. `/app/*` cannot load data until a real project exists and
+> `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` are set as GitHub Actions secrets.
+
+> ⚠️ Both GitHub Pages and Vercel build this repo on every push to `main`. Only
+> Pages serves the custom domain — Vercel needs its own env vars if it is ever
+> promoted to production.
 
 ---
 
