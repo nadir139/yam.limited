@@ -16,6 +16,22 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@YAM" />
     <meta name="twitter:image" content="/logo.png" />
+
+    <script>
+      // GitHub Pages has no SPA rewrite: it serves 404.html for any deep link,
+      // which stashes the original path in ?redirect= and bounces here. Restore
+      // it before the router boots, otherwise every deep link (including the
+      // magic-link /auth/callback) silently lands on the homepage.
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var target = params.get("redirect");
+        if (!target) return;
+        // Only ever restore same-origin absolute paths — never "//host" or a
+        // full URL, which would turn this into an open redirect.
+        if (target.charAt(0) !== "/" || target.charAt(1) === "/") return;
+        history.replaceState(null, "", target);
+      })();
+    </script>
   </head>
 
   <body>

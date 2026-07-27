@@ -129,9 +129,6 @@ export default function Sidebar({ onClose }: SidebarProps) {
                 gap: '10px',
                 padding: '10px 16px',
                 cursor: 'pointer',
-                borderLeft: isActive
-                  ? '3px solid hsl(185 60% 40%)'
-                  : '3px solid transparent',
                 background: isActive
                   ? 'rgba(255,255,255,0.08)'
                   : isHovered

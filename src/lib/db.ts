@@ -364,20 +364,6 @@ export async function fetchInspection(id: string): Promise<InspectionEvent> {
   return data
 }
 
-export async function updateInspection(
-  id: string,
-  updates: Partial<InspectionEvent>,
-): Promise<InspectionEvent> {
-  const { data, error } = await supabase
-    .from('inspection_events')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single()
-  if (error) throw error
-  return data
-}
-
 // ─── Supabase Storage ─────────────────────────────────────────────────────────
 
 export async function uploadFile(

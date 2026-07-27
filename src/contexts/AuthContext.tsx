@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import type { UserRole, AuthUser } from '@/lib/types'
 
 interface AuthContextType {
@@ -28,19 +28,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        const role = getRoleForEmail(session.user.email ?? '')
-        setUser({
-          id: session.user.id,
-          email: session.user.email ?? '',
-          name: session.user.email?.split('@')[0] ?? 'User',
-          role,
-        })
-      }
+    if (!isSupabaseConfigured) {
       setIsLoading(false)
-    })
+      return
+    }
+
+    // Get initial session. On failure we must still clear isLoading, otherwise
+    // ProtectedRoute renders null forever and the app looks broken.
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        if (session?.user) {
+          const role = getRoleForEmail(session.user.email ?? '')
+          setUser({
+            id: session.user.id,
+            email: session.user.email ?? '',
+            name: session.user.email?.split('@')[0] ?? 'User',
+            role,
+          })
+        }
+      })
+      .catch((err) => console.error('Failed to restore session', err))
+      .finally(() => setIsLoading(false))
 
     // Listen for auth changes (magic link callback lands here)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -62,6 +71,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const login = async (email: string, role: UserRole): Promise<{ error?: string }> => {
+    if (!isSupabaseConfigured) {
+      return { error: 'Sign-in is unavailable: this build has no Supabase credentials.' }
+    }
     setRoleForEmail(email, role)
     const { error } = await supabase.auth.signInWithOtp({
       email,

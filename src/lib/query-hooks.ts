@@ -97,18 +97,6 @@ export function useUpdateDefect() {
   })
 }
 
-export function useUpdateInspection() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: Partial<import('./types').InspectionEvent> }) =>
-      db.updateInspection(id, updates),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.inspections })
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.events })
-    },
-  })
-}
-
 export function useUploadDocument() {
   const qc = useQueryClient()
   const { user } = useAuth()

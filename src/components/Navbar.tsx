@@ -103,10 +103,15 @@ const Navbar = () => {
             >
               Ontology
             </button>
+            {/*
+              `bg-transparent` is required when unscrolled: the `outline` variant
+              ships `bg-background` (white), which over the dark hero renders a
+              white pill with white text and hides the label entirely.
+            */}
             <Button
               variant="outline"
               onClick={() => navigate("/login")}
-              className={`border ${isScrolled ? 'border-foreground/30 text-foreground hover:bg-muted' : 'border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10'}`}
+              className={`border ${isScrolled ? 'border-foreground/30 text-foreground hover:bg-muted' : 'bg-transparent border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10'}`}
             >
               Sign In
             </Button>

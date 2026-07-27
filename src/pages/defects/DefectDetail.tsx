@@ -17,7 +17,6 @@ import {
 import { useDefect, useChangeOrders, useApprovals, useUpdateDefect, useDocuments } from '@/lib/query-hooks'
 import UploadDocumentForm from '@/components/actions/UploadDocumentForm'
 import type { DefectSeverity } from '@/lib/types'
-import UploadDocumentForm from '@/components/actions/UploadDocumentForm'
 
 const SEVERITY_STYLES: Record<DefectSeverity, { bg: string; text: string }> = {
   CRITICAL: { bg: 'hsl(0 72% 51% / 0.12)', text: 'hsl(var(--destructive))' },

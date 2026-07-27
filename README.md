@@ -60,14 +60,61 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
-## How can I deploy this project?
+## Deployment
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+**https://yam.limited is served by GitHub Pages**, built and published by
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) on every push to
+`main` (or a manual `workflow_dispatch`). Nothing else deploys this site — the
+Lovable "Share → Publish" flow is not in use.
 
-## Can I connect a custom domain to my Lovable project?
+- Custom domain: the `CNAME` file (`yam.limited`) is copied into `dist/` by the
+  workflow. `.nojekyll` stops Pages from running Jekyll over the build output.
+- `vercel.json` is **not** part of the live deployment. It only supplies SPA
+  rewrites should the project ever be previewed on Vercel; the production
+  domain is Pages.
 
-Yes, you can!
+### Required repository secrets
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+Vite inlines `VITE_*` variables **at build time**, so they must exist in CI —
+a local `.env` has no effect on the deployed bundle. Set both under
+*Settings → Secrets and variables → Actions*:
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+| Secret | Value |
+| --- | --- |
+| `VITE_SUPABASE_URL` | `https://<project-ref>.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | the project's anon/publishable key |
+
+The `anon` key is safe to expose in a client bundle — it is protected by
+row-level security, not secrecy.
+
+If they are absent the build still succeeds and the public marketing pages
+render normally, but every `/app/*` route will fail to load data and the
+workflow emits a warning. See `src/lib/supabase.ts` (`isSupabaseConfigured`).
+
+### Client-side routing on Pages
+
+GitHub Pages has no server-side SPA rewrite: it returns `public/404.html` for
+any path that isn't a real file. That page stashes the requested path in
+`?redirect=` and bounces to `/`, where an inline script in `index.html`
+restores it via `history.replaceState` before the router boots. Both halves are
+required — dropping either one silently sends every deep link (including the
+magic-link `/auth/callback`) to the homepage.
+
+## Local development
+
+```sh
+npm ci
+cp .env.example .env   # fill in your Supabase URL + anon key
+npm run dev            # http://localhost:8080
+```
+
+| Script | Purpose |
+| --- | --- |
+| `npm run dev` | Vite dev server |
+| `npm run build` | production build into `dist/` |
+| `npm run typecheck` | `tsc -p tsconfig.app.json --noEmit` |
+| `npm run lint` | ESLint |
+
+> Use `npm run typecheck`, not a bare `tsc --noEmit`. The root `tsconfig.json`
+> is a solution file (`"files": []` + project references), so `tsc --noEmit`
+> checks nothing and always exits 0.
