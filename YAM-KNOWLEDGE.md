@@ -317,7 +317,8 @@ YAM is not selling software — it's demonstrating what a domain-expert-led inte
 
 | Item | Value |
 |------|-------|
-| Supabase project | **none currently** — see warning below |
+| Supabase project | `yam-limited` — ref `xgpdfefxarllgykjbppn`, region `eu-central-1` |
+| Supabase URL | `https://xgpdfefxarllgykjbppn.supabase.co` |
 | Production host | **GitHub Pages** via `.github/workflows/deploy.yml` |
 | Custom domain | `yam.limited`, from the `CNAME` file copied into `dist/` |
 | Vercel project | `project-0` — builds the same repo, **preview URLs only, no custom domain** |
@@ -325,13 +326,28 @@ YAM is not selling software — it's demonstrating what a domain-expert-led inte
 | Dev branch convention | `claude/[description]-[hash]` |
 | Deploy branch | `main` |
 
-> ⚠️ **The Supabase project `ihippazqdkwssxnfzlwx` referenced by earlier revisions
-> of this file does not exist.** It is not present on the account, and the anon key
-> was never set as a CI secret, so *every* production build since the Supabase
-> cutover (commit `5cdfbc0`) shipped without credentials. `createClient` throws on a
-> missing URL, which took down every route until commit `eecb204` made the client
-> degrade gracefully. `/app/*` cannot load data until a real project exists and
-> `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` are set as GitHub Actions secrets.
+> ⚠️ **History:** the project `ihippazqdkwssxnfzlwx` named by earlier revisions of
+> this file never existed on the account, and its anon key was never set as a CI
+> secret — so *every* production build from the Supabase cutover (`5cdfbc0`) until
+> `eecb204` shipped without credentials and white-screened, because `createClient`
+> throws on a missing URL. The client now degrades gracefully instead.
+>
+> **`yam-limited` (`xgpdfefxarllgykjbppn`) replaces it**, provisioned July 2026 with
+> the full schema, all four migrations, the `project-documents` storage bucket, and
+> `supabase-seed-v2.sql` loaded (1 vessel, 1 project, 24 work packages, 15
+> inspections, 8 NCRs, 4 change orders, 3 approvals, 12 documents, 8 members, 15
+> world-model events). `/app/*` needs `VITE_SUPABASE_URL` and
+> `VITE_SUPABASE_ANON_KEY` set as **GitHub Actions secrets** — Vite inlines them at
+> build time, so a local `.env` does not affect the deployed bundle.
+
+> ⚠️ **RLS is deliberately permissive.** Migration 001 replaced the per-role
+> policies with `auth_all` (`USING (true)`) on every table, so *any* authenticated
+> user can read and write everything. Combined with unrestricted magic-link
+> sign-up, anyone who can receive email can sign in and edit the demo data. This is
+> the documented "phase 2 deferred" state, and it is required for the demo to work
+> at all — the seeded `project_members` rows carry synthetic UUIDs that never match
+> a real `auth.uid()`, so a membership-scoped policy would show an empty app.
+> Restricting sign-up (allowlist) is the prerequisite for tightening this.
 
 > ⚠️ Both GitHub Pages and Vercel build this repo on every push to `main`. Only
 > Pages serves the custom domain — Vercel needs its own env vars if it is ever
