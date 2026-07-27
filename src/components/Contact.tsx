@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Mail, Phone, MapPin, Send, ExternalLink } from "lucide-react";
+import { Mail, Phone, MapPin, Send, ExternalLink, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,6 +35,13 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
+const CONTACT_EMAIL = "info@yam-management.com";
+// E.164 without '+' or spaces — the format wa.me requires.
+const WHATSAPP_NUMBER = "393388162035";
+const PHONE_DISPLAY = "+39 338 816 2035";
+const WHATSAPP_PREFILL =
+  "Hi YAM, I'd like to discuss a yacht project.";
+
 const projectTypes = [
   { value: "new-build", label: "New Build Project" },
   { value: "refit", label: "Refit Project" },
@@ -56,21 +63,26 @@ const Contact = () => {
   });
 
   const onSubmit = (data: FormData) => {
-    // Construct mailto link
-    const subject = encodeURIComponent(
-      `YAM Inquiry: ${projectTypes.find((p) => p.value === data.projectType)?.label || data.projectType}`
-    );
+    const label =
+      projectTypes.find((p) => p.value === data.projectType)?.label ||
+      data.projectType;
+
+    const subject = encodeURIComponent(`YAM Inquiry: ${label}`);
     const body = encodeURIComponent(
-      `Name: ${data.name}\nEmail: ${data.email}\nPhone: ${data.phone || "Not provided"}\nProject Type: ${projectTypes.find((p) => p.value === data.projectType)?.label || data.projectType}\n\nMessage:\n${data.message}`
+      `Name: ${data.name}\nEmail: ${data.email}\nPhone: ${data.phone || "Not provided"}\nProject Type: ${label}\n\nMessage:\n${data.message}`
     );
 
-    window.location.href = `mailto:info@yam-management.com?subject=${subject}&body=${body}`;
+    // This hands off to the visitor's mail client — it does not deliver
+    // anything itself, and there is no reliable way to detect whether a
+    // handler actually opened. So: never claim the inquiry was sent, and
+    // never clear the form, or a visitor with no configured mail client
+    // silently loses everything they typed.
+    window.location.href = `mailto:${CONTACT_EMAIL}?subject=${subject}&body=${body}`;
 
-    toast.success("Opening your email client...", {
-      description: "Your inquiry details have been prepared.",
+    toast("Opening your email client…", {
+      description: `If nothing opens, write to ${CONTACT_EMAIL} or message us on WhatsApp — your text is still in the form.`,
+      duration: 10000,
     });
-
-    form.reset();
   };
 
   return (
@@ -100,10 +112,10 @@ const Contact = () => {
               <div>
                 <h4 className="font-semibold text-foreground mb-1">Email</h4>
                 <a
-                  href="mailto:info@yam-management.com"
+                  href={`mailto:${CONTACT_EMAIL}`}
                   className="text-muted-foreground hover:text-accent transition-colors"
                 >
-                  info@yam-management.com
+                  {CONTACT_EMAIL}
                 </a>
               </div>
             </div>
@@ -115,10 +127,28 @@ const Contact = () => {
               <div>
                 <h4 className="font-semibold text-foreground mb-1">Phone</h4>
                 <a
-                  href="tel:+33600000000"
+                  href={`tel:+${WHATSAPP_NUMBER}`}
                   className="text-muted-foreground hover:text-accent transition-colors"
                 >
-                  +33 6 00 00 00 00
+                  {PHONE_DISPLAY}
+                </a>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4">
+              <div className="icon-container flex-shrink-0">
+                <MessageCircle className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="font-semibold text-foreground mb-1">WhatsApp</h4>
+                <a
+                  href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WHATSAPP_PREFILL)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-accent transition-colors"
+                >
+                  Send a quick message
+                  <ExternalLink className="h-3.5 w-3.5" />
                 </a>
               </div>
             </div>
