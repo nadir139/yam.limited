@@ -481,15 +481,14 @@ export default function Dashboard() {
             <Button
               disabled={!canAdvancePhase || advancePhase.isPending}
               onClick={() =>
-                advancePhase.mutate(
-                  { currentPhase: project.phase },
-                  {
-                    onSuccess: () => {
-                      setAdvanceDialogOpen(false)
-                      showToast(`Phase advanced to ${PHASE_LABELS[PHASES[currentPhaseIndex + 1]]}`)
-                    },
+                // No argument: the server reads the current phase and derives
+                // the next one, so a stale client can't skip or repeat a phase.
+                advancePhase.mutate(undefined, {
+                  onSuccess: (updated) => {
+                    setAdvanceDialogOpen(false)
+                    showToast(`Phase advanced to ${PHASE_LABELS[updated.phase]}`)
                   },
-                )
+                })
               }
               style={{ backgroundColor: 'hsl(var(--primary))', color: 'white' }}
             >

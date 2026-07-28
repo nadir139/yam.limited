@@ -12,7 +12,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { useUpdateInspection } from '@/lib/query-hooks'
+import { useRecordInspectionResult } from '@/lib/query-hooks'
 import RaiseDefectForm from './RaiseDefectForm'
 import type { InspectionEvent, InspectionResult } from '@/lib/types'
 
@@ -58,7 +58,7 @@ export default function RecordInspectionResult({ inspection, onSuccess }: Props)
   const [notes, setNotes] = useState('')
   const [actualDate, setActualDate] = useState(new Date().toISOString().split('T')[0])
 
-  const update = useUpdateInspection()
+  const update = useRecordInspectionResult()
 
   const needsNCR = result === 'FAIL' || result === 'CONDITIONAL_PASS'
 
@@ -67,7 +67,9 @@ export default function RecordInspectionResult({ inspection, onSuccess }: Props)
     update.mutate(
       {
         id: inspection.id,
-        updates: { result, notes: notes || null, actual_date: actualDate },
+        result,
+        notes: notes || null,
+        actualDate,
       },
       {
         onSuccess: () => {
