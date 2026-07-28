@@ -431,5 +431,75 @@ real Actions are the system; this describes them.
 ### What this does not yet include
 
 - A UI that reads the registry (the `/ontology` page is still a static array).
-- The agent itself. The groundwork is done: a tool manifest exists, and the only
-  write path is validated and logged.
+
+---
+
+## 14. The Agent (added July 2026)
+
+`supabase/functions/agent/index.ts`, surfaced at `/app/agent`.
+
+### The design decision that matters
+
+The function creates its Supabase client from **the caller's JWT**, not the
+service-role key:
+
+```ts
+const supabase = createClient(supabaseUrl, anonKey, {
+  global: { headers: { Authorization: authHeader } },
+})
+```
+
+Everything follows from that one line. The agent inherits exactly the signed-in
+user's permissions — no more. It cannot write directly to a table, because §13
+revoked those grants from `authenticated` and the agent *is* `authenticated`.
+When it calls an Action, `auth.uid()` inside that function resolves to the human,
+so `world_model_events` records them as the actor, not "the agent". There is no
+second write path for it to reach for, and no privilege for it to escalate to.
+
+If someone ever swaps in `SUPABASE_SERVICE_ROLE_KEY` to "fix" a permissions
+error, all of that is gone at once: RLS off, write guard off, provenance
+meaningless. That is the single change to never make to this file.
+
+### Tools are generated, not hardcoded
+
+On each request the function reads `ontology_object_types`, `ontology_links` and
+`ontology_actions`, then builds:
+
+- `list_objects` / `get_object` — table names come from the registry, never from
+  the model, so a hallucinated table name resolves to nothing rather than to a
+  query
+- `get_event_history` — the append-only log, so the agent can explain *why*
+  something is in the state it is in
+- one tool per `ontology_actions` row where `is_agent_usable` — JSON Schema
+  derived from the `parameters` JSONB, description carrying the cascade note
+
+Adding an Action in SQL and registering it makes it available to the agent
+without touching TypeScript. The registry is the tool manifest.
+
+### Loop shape
+
+Manual agentic loop, `MAX_TURNS = 8`. Two details that are easy to get wrong:
+
+- the **entire** `response.content` array is pushed back as the assistant turn,
+  not just the text — thinking blocks must be replayed verbatim or the next
+  request is rejected
+- all parallel `tool_result` blocks go into **one** user message; splitting them
+  teaches the model to stop parallelising
+
+Model is `claude-opus-5` with adaptive thinking, `output_config.effort: "high"`,
+and server-side fallbacks enabled so a refusal is re-routed rather than returned.
+
+### Configuration
+
+`ANTHROPIC_API_KEY` must be set under *Project Settings → Edge Functions →
+Secrets*. Without it the function returns
+`{ error: "The agent is not configured on this project." }` with HTTP 500 — it
+fails closed and says so, rather than degrading silently.
+
+### What this does not yet do
+
+- No conversation memory. Each request starts from an empty message list; the
+  UI shows history but does not send it. Multi-turn follow-ups ("and what about
+  the other one?") will not resolve.
+- No streaming. The console waits for the complete response.
+- No cost or rate limiting per user.

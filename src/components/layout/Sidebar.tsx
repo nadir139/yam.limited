@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   FileText,
   Users,
+  Sparkles,
   LogOut,
   X,
 } from 'lucide-react'
@@ -22,6 +23,7 @@ interface SidebarProps {
 }
 
 const NAV_ITEMS = [
+  { icon: Sparkles, label: 'Agent', path: '/app/agent' },
   { icon: LayoutDashboard, label: 'Dashboard', path: '/app/dashboard' },
   { icon: Anchor, label: 'Project Overview', path: '/app/project' },
   { icon: Wrench, label: 'Work Packages', path: '/app/work-packages' },

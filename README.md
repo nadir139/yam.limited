@@ -93,11 +93,52 @@ applied by hand in the Supabase SQL editor, in this order:
 4. `supabase-migration-003-drop-members-fk.sql`
 5. `supabase-migration-004-drop-event-fk.sql`
 6. `supabase-seed-v2.sql` — Project ZERO demo data
+7. `supabase-migration-005-contact-inquiries.sql` — contact form storage
+8. `supabase-migration-006-actions-layer.sql` — first `SECURITY DEFINER` Actions
+9. `supabase-migration-007-actions-remaining.sql` — the rest of the Actions
+10. `supabase-migration-008-lock-write-path.sql` — revokes direct table writes
+11. `supabase-migration-009-ontology-registry.sql` — the self-describing registry
 
-> ⚠️ RLS is intentionally permissive (`USING (true)` on every table) and
-> magic-link sign-up is unrestricted, so anyone who can receive email can sign
-> in and edit the demo data. See `YAM-KNOWLEDGE.md` §12 for why this cannot be
-> tightened without first gating sign-up.
+Migrations 006–008 are the important ones. After 008 the `authenticated` and
+`anon` roles hold **zero** `INSERT`/`UPDATE`/`DELETE` grants on the domain
+tables: the only way to change anything is to call an Action via
+`supabase.rpc()`. That is what makes the cascade rules and the audit trail
+properties of the database rather than conventions the client is trusted to
+follow. See `YAM-KNOWLEDGE.md` §13.
+
+> ⚠️ RLS *read* policies are intentionally permissive (`USING (true)` on every
+> table) and magic-link sign-up is unrestricted, so anyone who can receive email
+> can sign in and read the demo data. Writes are constrained by the Actions
+> layer, but the data is still visible to any signed-in address. See
+> `YAM-KNOWLEDGE.md` §12 for why this cannot be tightened without first gating
+> sign-up.
+
+### Edge Functions
+
+Two Deno functions live in `supabase/functions/` and are deployed to the
+Supabase project (they are **not** part of the GitHub Pages build):
+
+| Function | Purpose |
+| --- | --- |
+| `contact-inquiry` | Validates the public contact form, writes it to `contact_inquiries`, then sends a notification via Resend |
+| `agent` | The world-model agent — reads the ontology registry, exposes it to Claude as tools, runs the tool loop |
+
+Both need secrets set under *Supabase → Project Settings → Edge Functions →
+Secrets* (these are server-side and never reach the browser):
+
+| Secret | Used by |
+| --- | --- |
+| `RESEND_API_KEY` | `contact-inquiry` |
+| `ANTHROPIC_API_KEY` | `agent` |
+
+`SUPABASE_URL` and `SUPABASE_ANON_KEY` are injected by the platform.
+
+The `agent` function deliberately builds its Supabase client from **the caller's
+JWT, not the service-role key**. Every tool it runs therefore executes with
+exactly the signed-in user's permissions — the write guard from migration 008
+applies to it unchanged, and `world_model_events` records the human as the
+actor. Swapping in the service-role key would silently remove every one of those
+guarantees.
 
 ### Client-side routing on Pages
 

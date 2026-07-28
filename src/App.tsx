@@ -27,6 +27,7 @@ const ChangeOrderList = lazy(() => import("./pages/change-orders/ChangeOrderList
 const ApprovalQueue = lazy(() => import("./pages/approvals/ApprovalQueue"));
 const DocumentLibrary = lazy(() => import("./pages/documents/DocumentLibrary"));
 const TeamView = lazy(() => import("./pages/team/TeamView"));
+const AgentConsole = lazy(() => import("./pages/agent/AgentConsole"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -73,6 +74,7 @@ const App = () => (
                 <Route path="/app/approvals" element={<ProtectedRoute><ApprovalQueue /></ProtectedRoute>} />
                 <Route path="/app/documents" element={<ProtectedRoute><DocumentLibrary /></ProtectedRoute>} />
                 <Route path="/app/team" element={<ProtectedRoute><TeamView /></ProtectedRoute>} />
+                <Route path="/app/agent" element={<ProtectedRoute><AgentConsole /></ProtectedRoute>} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
