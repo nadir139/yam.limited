@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Build-time secrets live in GitHub Actions secrets, never in the repo. The
+# anon key is public by design, but this file is also where a service-role key
+# would end up if someone pasted one in.
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
