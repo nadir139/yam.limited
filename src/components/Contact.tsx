@@ -21,6 +21,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").max(100),
@@ -62,27 +63,40 @@ const Contact = () => {
     },
   });
 
-  const onSubmit = (data: FormData) => {
+  const onSubmit = async (data: FormData) => {
     const label =
       projectTypes.find((p) => p.value === data.projectType)?.label ||
       data.projectType;
 
-    const subject = encodeURIComponent(`YAM Inquiry: ${label}`);
-    const body = encodeURIComponent(
-      `Name: ${data.name}\nEmail: ${data.email}\nPhone: ${data.phone || "Not provided"}\nProject Type: ${label}\n\nMessage:\n${data.message}`
-    );
+    try {
+      // Edge Function stores the lead in Supabase and emails it via Resend.
+      // supabase.functions.invoke handles the auth header for us.
+      const { error } = await supabase.functions.invoke("contact-inquiry", {
+        body: data,
+      });
+      if (error) throw error;
 
-    // This hands off to the visitor's mail client — it does not deliver
-    // anything itself, and there is no reliable way to detect whether a
-    // handler actually opened. So: never claim the inquiry was sent, and
-    // never clear the form, or a visitor with no configured mail client
-    // silently loses everything they typed.
-    window.location.href = `mailto:${CONTACT_EMAIL}?subject=${subject}&body=${body}`;
+      toast.success("Message sent", {
+        description: "Thanks — we'll get back to you shortly.",
+      });
+      form.reset();
+    } catch (err) {
+      console.error("Contact form submission failed", err);
 
-    toast("Opening your email client…", {
-      description: `If nothing opens, write to ${CONTACT_EMAIL} or message us on WhatsApp — your text is still in the form.`,
-      duration: 10000,
-    });
+      // Fall back to a mailto handoff so the inquiry isn't lost outright. Keep
+      // the form contents too — there's no way to confirm the mail client
+      // actually opened, so never claim success or clear what was typed.
+      const subject = encodeURIComponent(`YAM Inquiry: ${label}`);
+      const body = encodeURIComponent(
+        `Name: ${data.name}\nEmail: ${data.email}\nPhone: ${data.phone || "Not provided"}\nProject Type: ${label}\n\nMessage:\n${data.message}`
+      );
+      window.location.href = `mailto:${CONTACT_EMAIL}?subject=${subject}&body=${body}`;
+
+      toast("Couldn't reach our server", {
+        description: `Opening your email client as a backup. If nothing opens, write to ${CONTACT_EMAIL} or message us on WhatsApp — your text is still in the form.`,
+        duration: 10000,
+      });
+    }
   };
 
   return (
