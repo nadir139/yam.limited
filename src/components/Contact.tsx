@@ -35,7 +35,7 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
-const CONTACT_EMAIL = "info@yam-management.com";
+const CONTACT_EMAIL = "info@yam.limited";
 // E.164 without '+' or spaces — the format wa.me requires.
 const WHATSAPP_NUMBER = "393388162035";
 const PHONE_DISPLAY = "+39 338 816 2035";
