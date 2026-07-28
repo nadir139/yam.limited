@@ -14,7 +14,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table'
-import { useApprovals, useChangeOrders, useUpdateApproval } from '@/lib/query-hooks'
+import { useApprovals, useChangeOrders, useDecideApproval } from '@/lib/query-hooks'
 
 const TIER_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   TIER_1: { bg: 'hsl(158 64% 40% / 0.15)', text: 'hsl(var(--success))', label: 'Tier 1 (<€10k)' },
@@ -42,7 +42,7 @@ function DeadlineDisplay({ deadline }: { deadline: string | null }) {
 export default function ApprovalQueue() {
   const { data: approvals = [], isLoading: approvalsLoading } = useApprovals()
   const { data: changeOrders = [], isLoading: coLoading } = useChangeOrders()
-  const updateApproval = useUpdateApproval()
+  const updateApproval = useDecideApproval()
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dialogAction, setDialogAction] = useState<'APPROVED' | 'REJECTED'>('APPROVED')
@@ -75,22 +75,24 @@ export default function ApprovalQueue() {
 
   const handleDecision = () => {
     if (!dialogApprovalId) return
+    // Decision date and approver are stamped server-side from the signed-in
+    // user, so they can't be spoofed or left stale by the client.
     updateApproval.mutate(
       {
         id: dialogApprovalId,
-        updates: {
-          status: dialogAction,
-          decision_date: new Date().toISOString().split('T')[0],
-          decision_notes: notes || null,
-          approver_name: 'Nadir',
-        },
+        decision: dialogAction,
+        notes: notes || null,
       },
       {
-        onSuccess: () => {
+        onSuccess: ({ changeOrder }) => {
           setDialogOpen(false)
-          const msg = dialogAction === 'APPROVED' ? 'Approval confirmed.' : 'Approval rejected.'
-          setToast(msg)
-          setTimeout(() => setToast(null), 3000)
+          const verb = dialogAction === 'APPROVED' ? 'confirmed' : 'rejected'
+          setToast(
+            changeOrder
+              ? `Approval ${verb} — ${changeOrder.co_number} moved to ${changeOrder.status}.`
+              : `Approval ${verb}.`,
+          )
+          setTimeout(() => setToast(null), 4000)
         },
       },
     )

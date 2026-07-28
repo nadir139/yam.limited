@@ -14,7 +14,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { useDefect, useChangeOrders, useApprovals, useUpdateDefect, useDocuments } from '@/lib/query-hooks'
+import { useDefect, useChangeOrders, useApprovals, useUpdateDefectStatus, useDocuments } from '@/lib/query-hooks'
 import UploadDocumentForm from '@/components/actions/UploadDocumentForm'
 import type { DefectSeverity } from '@/lib/types'
 
@@ -86,7 +86,7 @@ export default function DefectDetail() {
   const { data: changeOrders = [], isLoading: coLoading } = useChangeOrders()
   const { data: approvals = [], isLoading: approvalsLoading } = useApprovals()
   const { data: allDocs = [] } = useDocuments()
-  const updateDefect = useUpdateDefect()
+  const updateDefect = useUpdateDefectStatus()
 
   const [closeDialogOpen, setCloseDialogOpen] = useState(false)
   const [closeNotes, setCloseNotes] = useState('')
@@ -159,7 +159,7 @@ export default function DefectDetail() {
             disabled={updateDefect.isPending}
             onClick={() =>
               updateDefect.mutate(
-                { id: defect.id, updates: { status: 'IN_PROGRESS' } },
+                { id: defect.id, status: 'IN_PROGRESS' },
                 { onSuccess: () => showToast('NCR marked In Progress.') },
               )
             }
@@ -445,10 +445,8 @@ export default function DefectDetail() {
                 updateDefect.mutate(
                   {
                     id: defect.id,
-                    updates: {
-                      status: 'CLOSED',
-                      closed_date: new Date().toISOString().split('T')[0],
-                    },
+                    status: 'CLOSED',
+                    closedDate: new Date().toISOString().split('T')[0],
                   },
                   {
                     onSuccess: () => {

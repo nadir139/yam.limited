@@ -148,212 +148,6 @@ export async function fetchEvents(): Promise<WorldModelEvent[]> {
   return data ?? []
 }
 
-// ─── Mutations ────────────────────────────────────────────────────────────────
-
-export async function updateInspection(
-  id: string,
-  updates: Partial<InspectionEvent>,
-): Promise<InspectionEvent> {
-  const { data, error } = await supabase
-    .from('inspection_events')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single()
-  if (error) throw error
-  return data
-}
-
-export async function createDefect(
-  defect: Omit<DefectRecord, 'id' | 'created_at'>,
-): Promise<DefectRecord> {
-  const { data, error } = await supabase
-    .from('defect_records')
-    .insert(defect)
-    .select()
-    .single()
-  if (error) throw error
-  return data
-}
-
-export async function updateDefect(
-  id: string,
-  updates: Partial<DefectRecord>,
-): Promise<DefectRecord> {
-  const { data, error } = await supabase
-    .from('defect_records')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single()
-  if (error) throw error
-  return data
-}
-
-export async function createChangeOrder(
-  co: Omit<ChangeOrder, 'id' | 'created_at'>,
-): Promise<ChangeOrder> {
-  const { data, error } = await supabase
-    .from('change_orders')
-    .insert(co)
-    .select()
-    .single()
-  if (error) throw error
-  return data
-}
-
-export async function updateApproval(
-  id: string,
-  updates: Partial<OwnerApproval>,
-): Promise<OwnerApproval> {
-  const { data, error } = await supabase
-    .from('owner_approvals')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single()
-  if (error) throw error
-  return data
-}
-
-export async function createDocument(
-  doc: Omit<Document, 'id' | 'created_at'>,
-): Promise<Document> {
-  const { data, error } = await supabase
-    .from('documents')
-    .insert(doc)
-    .select()
-    .single()
-  if (error) throw error
-  return data
-}
-
-export interface UploadProgress {
-  loaded: number
-  total: number
-}
-
-/**
- * Uploads a file to Supabase Storage and creates a Document record.
- * Returns the created Document.
- */
-export async function uploadDocument(
-  file: File,
-  meta: {
-    title: string
-    docType: Document['doc_type']
-    linkedObjectType: Document['linked_object_type']
-    linkedObjectId: string | null
-    uploadedBy: string
-    isClassDocument: boolean
-  },
-): Promise<Document> {
-  // Build a sanitised storage path
-  const ext = file.name.split('.').pop() ?? 'bin'
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-  const path = `${PROJECT_ID}/${meta.linkedObjectType ?? 'general'}/${Date.now()}_${safeName}`
-
-  const { error: storageError } = await supabase.storage
-    .from('project-documents')
-    .upload(path, file, { upsert: false })
-
-  if (storageError) throw new Error(`Storage upload failed: ${storageError.message}`)
-
-  // Get a signed URL valid for 1 year (used as the file_url)
-  const { data: signedData, error: signedError } = await supabase.storage
-    .from('project-documents')
-    .createSignedUrl(path, 60 * 60 * 24 * 365)
-
-  if (signedError) throw new Error(`Could not get signed URL: ${signedError.message}`)
-
-  // Get next doc number
-  const docNumber = await nextNumber('documents' as Parameters<typeof nextNumber>[0], 'DOC' as Parameters<typeof nextNumber>[1])
-
-  const doc = await createDocument({
-    project_id: PROJECT_ID,
-    doc_number: docNumber,
-    title: meta.title,
-    doc_type: meta.docType,
-    revision: 'Rev.0',
-    status: 'APPROVED',
-    file_url: signedData.signedUrl,
-    file_size: file.size,
-    mime_type: file.type,
-    uploaded_by: meta.uploadedBy,
-    uploaded_date: new Date().toISOString().split('T')[0],
-    linked_object_type: meta.linkedObjectType,
-    linked_object_id: meta.linkedObjectId,
-    is_class_document: meta.isClassDocument,
-  })
-
-  return doc
-}
-
-export async function logEvent(
-  event: Omit<WorldModelEvent, 'id' | 'triggered_at'>,
-): Promise<WorldModelEvent> {
-  const { data, error } = await supabase
-    .from('world_model_events')
-    .insert(event)
-    .select()
-    .single()
-  if (error) throw error
-  return data
-}
-
-export async function createApproval(
-  approval: Omit<OwnerApproval, 'id' | 'created_at'>,
-): Promise<OwnerApproval> {
-  const { data, error } = await supabase
-    .from('owner_approvals')
-    .insert(approval)
-    .select()
-    .single()
-  if (error) throw error
-  return data
-}
-
-export async function updateChangeOrder(
-  id: string,
-  updates: Partial<ChangeOrder>,
-): Promise<ChangeOrder> {
-  const { data, error } = await supabase
-    .from('change_orders')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single()
-  if (error) throw error
-  return data
-}
-
-export async function updateProject(
-  id: string,
-  updates: Partial<Project>,
-): Promise<Project> {
-  const { data, error } = await supabase
-    .from('projects')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single()
-  if (error) throw error
-  return data
-}
-
-/** Returns the next sequential number for a given table, formatted as PREFIX-YYYY-NNN */
-export async function nextNumber(
-  table: 'defect_records' | 'change_orders' | 'owner_approvals' | 'documents',
-  prefix: 'NCR' | 'CO' | 'APPR' | 'DOC',
-): Promise<string> {
-  const { count } = await supabase
-    .from(table)
-    .select('*', { count: 'exact', head: true })
-    .eq('project_id', PROJECT_ID)
-  const n = (count ?? 0) + 1
-  return `${prefix}-2026-${String(n).padStart(3, '0')}`
-}
-
 export async function fetchInspection(id: string): Promise<InspectionEvent> {
   const { data, error } = await supabase
     .from('inspection_events')
@@ -364,40 +158,166 @@ export async function fetchInspection(id: string): Promise<InspectionEvent> {
   return data
 }
 
-// ─── Supabase Storage ─────────────────────────────────────────────────────────
+// ─── Actions ──────────────────────────────────────────────────────────────────
+//
+// Every mutation goes through a SECURITY DEFINER Postgres function. The client
+// holds no INSERT/UPDATE/DELETE grant on any table, so these are not merely the
+// preferred write path — they are the only one.
+//
+// What that buys, versus the previous approach of orchestrating writes from the
+// browser: each Action is one transaction (no half-applied cascades), the actor
+// is stamped from the verified JWT rather than supplied by the caller, and the
+// world_model_events entry is written alongside the mutation rather than as a
+// separate call the client could skip.
 
-export async function uploadFile(
-  file: File,
-  path: string,
-): Promise<{ url: string; size: number; mimeType: string }> {
-  const { error } = await supabase.storage
-    .from('project-documents')
-    .upload(path, file, { upsert: true, contentType: file.type })
-  if (error) throw error
+/** Surfaces the Postgres exception message rather than a generic RPC failure. */
+function unwrap<T>(data: T | null, error: { message: string } | null, action: string): T {
+  if (error) throw new Error(error.message || `${action} failed`)
+  if (data === null) throw new Error(`${action} returned no data`)
+  return data
+}
 
-  const { data: urlData } = supabase.storage
-    .from('project-documents')
-    .getPublicUrl(path)
+export interface DefectInput {
+  title: string
+  description: string
+  location_on_vessel: string
+  severity: DefectRecord['severity']
+  root_cause: DefectRecord['root_cause']
+  disposition: DefectRecord['disposition']
+  is_class_defect: boolean
+  class_item_ref: string | null
+  cost_impact: number | null
+  schedule_impact_days: number | null
+  work_package_id: string | null
+  inspection_event_id: string | null
+}
 
+export interface CascadeResult {
+  defect: DefectRecord
+  changeOrder: ChangeOrder | null
+  approval: OwnerApproval | null
+}
+
+/**
+ * Raises an NCR. HIGH/CRITICAL severity with a cost impact automatically raises
+ * the Change Order and Owner Approval it implies — server-side, in one
+ * transaction, so the chain can never be left half-built.
+ */
+export async function raiseDefect(input: DefectInput): Promise<CascadeResult> {
+  const { data, error } = await supabase.rpc('action_raise_defect', {
+    p_title: input.title,
+    p_description: input.description,
+    p_location_on_vessel: input.location_on_vessel,
+    p_severity: input.severity,
+    p_root_cause: input.root_cause,
+    p_disposition: input.disposition,
+    p_is_class_defect: input.is_class_defect,
+    p_class_item_ref: input.class_item_ref,
+    p_cost_impact: input.cost_impact,
+    p_schedule_impact_days: input.schedule_impact_days,
+    p_work_package_id: input.work_package_id,
+    p_inspection_event_id: input.inspection_event_id,
+  })
+  const result = unwrap(data, error, 'Raise defect') as {
+    defect: DefectRecord
+    change_order: ChangeOrder | null
+    approval: OwnerApproval | null
+  }
   return {
-    url: urlData.publicUrl,
-    size: file.size,
-    mimeType: file.type,
+    defect: result.defect,
+    changeOrder: result.change_order,
+    approval: result.approval,
   }
 }
 
-export async function deleteFile(path: string): Promise<void> {
-  const { error } = await supabase.storage
-    .from('project-documents')
-    .remove([path])
-  if (error) throw error
+export async function updateDefectStatus(
+  id: string,
+  status: DefectRecord['status'],
+  closedDate?: string | null,
+): Promise<DefectRecord> {
+  const { data, error } = await supabase.rpc('action_update_defect_status', {
+    p_defect_id: id,
+    p_status: status,
+    p_closed_date: closedDate ?? null,
+  })
+  return unwrap(data, error, 'Update defect status') as DefectRecord
 }
 
-export async function nextDocNumber(): Promise<string> {
-  const { count } = await supabase
-    .from('documents')
-    .select('*', { count: 'exact', head: true })
-    .eq('project_id', PROJECT_ID)
-  const n = (count ?? 0) + 1
-  return `DOC-2026-${String(n).padStart(3, '0')}`
+export async function recordInspectionResult(
+  id: string,
+  result: InspectionEvent['result'],
+  notes: string | null,
+  actualDate: string | null,
+): Promise<InspectionEvent> {
+  const { data, error } = await supabase.rpc('action_record_inspection_result', {
+    p_inspection_id: id,
+    p_result: result,
+    p_notes: notes,
+    p_actual_date: actualDate,
+  })
+  return unwrap(data, error, 'Record inspection result') as InspectionEvent
+}
+
+/** Approving or rejecting also propagates the decision to the linked Change Order. */
+export async function decideApproval(
+  id: string,
+  decision: 'APPROVED' | 'REJECTED',
+  notes: string | null,
+): Promise<{ approval: OwnerApproval; changeOrder: ChangeOrder | null }> {
+  const { data, error } = await supabase.rpc('action_decide_approval', {
+    p_approval_id: id,
+    p_decision: decision,
+    p_notes: notes,
+  })
+  const result = unwrap(data, error, 'Decide approval') as {
+    approval: OwnerApproval
+    change_order: ChangeOrder | null
+  }
+  return { approval: result.approval, changeOrder: result.change_order }
+}
+
+/** The next phase is derived server-side, so it can't be driven off stale client state. */
+export async function advanceProjectPhase(): Promise<Project> {
+  const { data, error } = await supabase.rpc('action_advance_project_phase', {})
+  return unwrap(data, error, 'Advance phase') as Project
+}
+
+/**
+ * Uploads the file to Storage (which enforces its own RLS), then registers the
+ * resulting Document through an Action so it lands in the event log.
+ */
+export async function uploadDocument(
+  file: File,
+  meta: {
+    title: string
+    docType: Document['doc_type']
+    linkedObjectType: Document['linked_object_type']
+    linkedObjectId: string | null
+    isClassDocument: boolean
+  },
+): Promise<Document> {
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+  const path = `${PROJECT_ID}/${meta.linkedObjectType ?? 'general'}/${Date.now()}_${safeName}`
+
+  const { error: storageError } = await supabase.storage
+    .from('project-documents')
+    .upload(path, file, { upsert: false })
+  if (storageError) throw new Error(`Storage upload failed: ${storageError.message}`)
+
+  const { data: signedData, error: signedError } = await supabase.storage
+    .from('project-documents')
+    .createSignedUrl(path, 60 * 60 * 24 * 365)
+  if (signedError) throw new Error(`Could not get signed URL: ${signedError.message}`)
+
+  const { data, error } = await supabase.rpc('action_register_document', {
+    p_title: meta.title,
+    p_doc_type: meta.docType,
+    p_file_url: signedData.signedUrl,
+    p_file_size: file.size,
+    p_mime_type: file.type,
+    p_linked_object_type: meta.linkedObjectType,
+    p_linked_object_id: meta.linkedObjectId,
+    p_is_class_document: meta.isClassDocument,
+  })
+  return unwrap(data, error, 'Register document') as Document
 }

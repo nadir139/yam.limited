@@ -64,6 +64,10 @@ yam.limited/app/*         ← authenticated world model (all routes below)
 - **Frontend**: React 18 + TypeScript + Vite + Tailwind CSS v3
 - **UI components**: shadcn/ui (full set — all Radix primitives)
 - **Data**: Supabase (PostgreSQL + Realtime + Storage + Auth)
+- **Write path**: all mutations go through **Actions** — `SECURITY DEFINER`
+  Postgres functions called via `supabase.rpc()`. The client holds no
+  INSERT/UPDATE/DELETE grant on any table, so Actions are not the preferred
+  write path, they are the only one. See §13.
 - **State**: React Query (@tanstack/react-query) for server state
 - **Auth**: Supabase magic link (OTP) — role stored in localStorage by email key
 - **Deployment**: GitHub Pages (auto-deploy on push to `main`); Vercel builds the
@@ -75,10 +79,8 @@ yam.limited/app/*         ← authenticated world model (all routes below)
 src/
   lib/
     types.ts          ← ALL TypeScript types (the ontology in code)
-    db.ts             ← Supabase query/mutation functions
+    db.ts             ← reads via PostgREST; writes via rpc() to Actions
     query-hooks.ts    ← React Query hooks wrapping db.ts
-    intelligence.ts   ← Cascade rules engine (pure functions)
-    actions.ts        ← Typed action definitions
     supabase.ts       ← Supabase client + `isSupabaseConfigured` guard
   contexts/
     AuthContext.tsx   ← Supabase auth context (magic link)
@@ -356,3 +358,78 @@ YAM is not selling software — it's demonstrating what a domain-expert-led inte
 ---
 
 *This file is the single source of truth for the YAM development context. Update it at the end of each session.*
+
+---
+
+## 13. The Actions Layer (added July 2026)
+
+### Why
+
+Until this change, `authenticated` held **33 direct INSERT/UPDATE/DELETE grants**
+across the public schema. Any signed-in user could mutate any row straight from
+the browser, and Workspace sign-up is unrestricted. Two consequences:
+
+1. **Cascade rules were advisory.** The NCR → CO → Approval chain was
+   orchestrated as ~8 sequential writes from `query-hooks.ts`, with no
+   transaction around them. A failure at step 5 left a change order with no
+   approval, pointing at a defect whose status was never updated.
+2. **Provenance was forgeable.** `world_model_events` was written by the client,
+   with `triggered_by` supplied by the caller. A client could stamp any actor,
+   or skip the event entirely. Provenance you can forge is not provenance.
+
+### What replaced it
+
+Every mutation is now an **Action**: a `SECURITY DEFINER` Postgres function
+called via `supabase.rpc()`. Migration 008 revokes all direct write grants, so
+Actions are the only way to change anything. `SELECT` is retained — reads still
+go through PostgREST under the existing RLS policies.
+
+| Action | Cascades |
+|---|---|
+| `action_raise_defect` | → Change Order → Owner Approval (when HIGH/CRITICAL with cost impact) |
+| `action_decide_approval` | → Change Order status |
+| `action_update_defect_status` | — |
+| `action_record_inspection_result` | recomputes `defect_count` |
+| `action_advance_project_phase` | — |
+| `action_register_document` | — |
+
+Properties this buys:
+
+- **Atomicity.** Each Action is one transaction. Half-built cascades are now impossible.
+- **Unforgeable actor.** `triggered_by` comes from `auth.uid()`; the display name
+  is resolved from `project_members` by JWT email. Neither is client-supplied.
+- **Mandatory audit trail.** The `world_model_events` row is written in the same
+  transaction as the mutation, so a write cannot exist without its event.
+- **Agent-ready.** An agent given execute rights on these functions is safe by
+  construction — there is no other write path for it to misuse.
+
+Two behaviours changed as a side effect, both fixes:
+- Approving an approval now moves its Change Order to APPROVED. Previously the CO
+  stayed stuck in PENDING_APPROVAL forever.
+- Approvals can only be decided once; closed NCRs cannot be reopened.
+
+### Deleted
+
+`src/lib/intelligence.ts` and `src/lib/actions.ts` are gone. The cascade rules
+they held now live in the database, which is where they are enforced. Keeping a
+second TypeScript copy that nothing called was a live risk of the two drifting —
+particularly the approval tier thresholds, now solely in
+`approval_tier_for_cost()`.
+
+### The ontology registry
+
+Migration 009 adds `ontology_object_types`, `ontology_links` and
+`ontology_actions` — the object model as data the system can read about itself.
+`ontology_actions` doubles as an agent tool manifest: name, description,
+parameter schema, and which object types each Action cascades to. Verified
+against `information_schema` so the registry cannot silently drift from the
+functions it describes.
+
+These tables are **descriptive, not authoritative** — the real tables and the
+real Actions are the system; this describes them.
+
+### What this does not yet include
+
+- A UI that reads the registry (the `/ontology` page is still a static array).
+- The agent itself. The groundwork is done: a tool manifest exists, and the only
+  write path is validated and logged.
