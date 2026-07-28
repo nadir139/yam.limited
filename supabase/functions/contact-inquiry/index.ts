@@ -143,7 +143,10 @@ Deno.serve(async (req: Request) => {
   // From here, email is best-effort: the lead is already durably saved, so a
   // Resend failure is logged server-side, not surfaced as a failure to the visitor.
   const resendApiKey = Deno.env.get("RESEND_API_KEY");
-  const fromAddress = Deno.env.get("RESEND_FROM_EMAIL") || "YAM Website <onboarding@resend.dev>";
+  // yam.limited is verified in Resend (DKIM + SPF on the `send` subdomain), so
+  // this can send as info@yam.limited directly -- no more shared-address
+  // sandbox restriction, no more resend.dev showing up in the inbox.
+  const fromAddress = Deno.env.get("RESEND_FROM_EMAIL") || "YAM <info@yam.limited>";
 
   if (!resendApiKey) {
     console.error("RESEND_API_KEY not set -- inquiry saved but no email sent");
