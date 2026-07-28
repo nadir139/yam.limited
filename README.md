@@ -98,6 +98,7 @@ applied by hand in the Supabase SQL editor, in this order:
 9. `supabase-migration-007-actions-remaining.sql` — the rest of the Actions
 10. `supabase-migration-008-lock-write-path.sql` — revokes direct table writes
 11. `supabase-migration-009-ontology-registry.sql` — the self-describing registry
+12. `supabase-migration-010-public-ontology.sql` — registry readable by `anon`
 
 Migrations 006–008 are the important ones. After 008 the `authenticated` and
 `anon` roles hold **zero** `INSERT`/`UPDATE`/`DELETE` grants on the domain
@@ -105,6 +106,19 @@ tables: the only way to change anything is to call an Action via
 `supabase.rpc()`. That is what makes the cascade rules and the audit trail
 properties of the database rather than conventions the client is trusted to
 follow. See `YAM-KNOWLEDGE.md` §13.
+
+Migration 010 is the one exception to "everything needs a login": the three
+`ontology_*` registry tables are readable by `anon`, because the public
+`/ontology` page renders the object model from them. That publishes the *shape*
+of the system — type names, link names, Action signatures — and nothing else.
+Every domain table still returns zero rows to an anonymous caller, which is
+worth re-checking after any policy change:
+
+```sql
+set local role anon;
+select count(*) from defect_records;  -- must be 0
+select count(*) from ontology_object_types;  -- must be 9
+```
 
 > ⚠️ RLS *read* policies are intentionally permissive (`USING (true)` on every
 > table) and magic-link sign-up is unrestricted, so anyone who can receive email

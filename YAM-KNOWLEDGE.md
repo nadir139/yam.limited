@@ -5,7 +5,7 @@
 > Primary repo: `nadir139/yam.limited` (deployed via GitHub Pages -- see section 12)  
 > Live URL: `yam.limited`  
 > App URL: `yam.limited/app/dashboard`  
-> Supabase project: none -- not yet provisioned (see section 12)
+> Supabase project: `xgpdfefxarllgykjbppn` -- provisioned and live (see section 12)
 
 ---
 
@@ -99,6 +99,13 @@ src/
 
 ## 3. The 10 Object Types (The Ontology)
 
+> ⚠️ **Superseded — historical.** This was the design sketch. The built system
+> has **nine** object types, and they live in `ontology_object_types` (migration
+> 009), which is the only authoritative list. The differences: `SystemComponent`
+> was never built; `Subcontractor` became `Stakeholder` over `project_members`;
+> `WorldModelEvent` is the audit log rather than an object type in the registry.
+> Read the registry, or §14–15, before quoting anything below.
+
 | Object | Key Fields | Links To |
 |--------|-----------|----------|
 | **Vessel** | hullId, flagState, classNotation, LOA, GT | Project, SystemComponent |
@@ -120,6 +127,14 @@ src/
 ---
 
 ## 4. The Change Order Cascade (Core Intelligence Insight)
+
+> ⚠️ **Superseded — historical.** The eight-step chain below was an aspiration,
+> written against a demo vessel (`M/Y TESSERA`, `NCR-2026-047`) that does not
+> exist in any database. What is actually built cascades **three** objects —
+> Defect → Change Order → Owner Approval — gated on
+> `severity in ('HIGH','CRITICAL') and coalesce(cost_impact, 0) > 0`. See §13
+> and the `/ontology` Cascade tab, which quotes the live rule. The pitch below
+> is still the right pitch; do not quote its object IDs as if they were real.
 
 The single most important demo moment. One finding triggers 8 connected object state changes automatically.
 
@@ -428,9 +443,14 @@ functions it describes.
 These tables are **descriptive, not authoritative** — the real tables and the
 real Actions are the system; this describes them.
 
-### What this does not yet include
+### The registry now drives the public page
 
-- A UI that reads the registry (the `/ontology` page is still a static array).
+Migration 010 opens the three `ontology_*` tables to `anon` so `/ontology` can
+render from them. It also closes a gap 008 left: those tables were created in
+009, *after* the write lockdown, so they had picked up Supabase's default
+`grant all`. Nothing was exploitable — RLS was on with SELECT-only policies —
+but the registry is what the agent builds its tool manifest from, and it should
+not have been one permissive policy away from editable. 010 revokes the writes.
 
 ---
 
@@ -503,3 +523,53 @@ fails closed and says so, rather than degrading silently.
   the other one?") will not resolve.
 - No streaming. The console waits for the complete response.
 - No cost or rate limiting per user.
+
+---
+
+## 15. The /ontology page (rewritten July 2026)
+
+### What was wrong with it
+
+The page was a hardcoded array, and it had drifted badly. It documented ten
+"entity types" including `SystemComponent` and `DocumentRevision`, which were
+never built, and walked through a cascade on `M/Y TESSERA` / `NCR-2026-047` —
+a vessel and a defect that do not exist. The public claim and the running
+system had nothing to do with each other.
+
+### What it does now
+
+Reads `ontology_object_types`, `ontology_links` and `ontology_actions` at page
+load and renders from them. Three tabs:
+
+- **Object Graph** — an SVG of the nine types and eleven links. Hovering isolates
+  a node's edges; clicking pins it and fills a detail panel with its links in
+  both directions and the Actions that target it.
+- **Actions** — all six, with their real parameter schemas expanded from the
+  registry's `parameters` JSONB, and which object types each one cascades to.
+- **Cascade** — the gate condition quoted from `action_raise_defect`
+  (`severity in ('HIGH','CRITICAL') and coalesce(cost_impact, 0) > 0`) and the
+  tier thresholds from `approval_tier_for_cost()`.
+
+The counts in the hero are `types.length` / `links.length` / `actions.length`,
+so the page cannot advertise a number the database does not agree with.
+
+### The fallback
+
+`FALLBACK_ONTOLOGY` in `src/lib/ontology.ts` mirrors migration 009. It is used
+when Supabase is unconfigured, unreachable, or returns a partial result — a
+marketing page must never render empty. It is a fallback, not a source of
+truth; when it and the database disagree the database is right and this is
+stale. Update it if 009's seed data changes.
+
+### Graph layout
+
+Node positions are hand-placed in `LAYOUT`, not force-simulated. Nine nodes is
+few enough that a deliberate composition beats a solver, and fixed positions do
+not jitter between renders. The arrangement is load-bearing: the structural
+spine runs down the left, and the cascade turns the corner across the top
+right. A type present in the registry but missing from `LAYOUT` is still drawn,
+in a spare row, so the graph cannot silently under-report the model.
+
+Edge labels are offset perpendicular to their line and anchored toward the side
+they were pushed. Centring them on the line makes the halo that keeps them
+readable erase the arrow underneath.
