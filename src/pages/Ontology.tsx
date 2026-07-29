@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   Zap,
   CornerDownRight,
+  Users,
 } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Card, CardContent } from '@/components/ui/card'
@@ -63,7 +64,7 @@ export default function Ontology() {
     }
   }, [])
 
-  const { types, links, actions, live } = snapshot
+  const { types, links, actions, permissions, live } = snapshot
   const selected = pinned ?? hovered
 
   const labelFor = useMemo(
@@ -284,6 +285,13 @@ export default function Ontology() {
               </p>
             </div>
 
+            <p className="mb-6 max-w-2xl text-sm text-muted-foreground">
+              The roles under each Action are who may invoke it. That list is a
+              table in the database, checked inside the Action itself — not a
+              rule the interface is trusted to apply. Anyone on the project can
+              raise a finding; changing scope, money or a decision is narrower.
+            </p>
+
             <div className="mb-8 flex flex-col gap-3 sm:flex-row">
               <div className="flex flex-1 gap-3 rounded-[var(--radius)] border border-border p-4">
                 <Lock className="mt-0.5 h-4 w-4 flex-shrink-0 text-accent" />
@@ -309,7 +317,12 @@ export default function Ontology() {
 
             <div className="grid gap-4">
               {actions.map((action) => (
-                <ActionCard key={action.key} action={action} labelFor={labelFor} />
+                <ActionCard
+                  key={action.key}
+                  action={action}
+                  labelFor={labelFor}
+                  roles={permissions[action.key] ?? []}
+                />
               ))}
             </div>
           </TabsContent>
@@ -450,9 +463,12 @@ export default function Ontology() {
 function ActionCard({
   action,
   labelFor,
+  roles,
 }: {
   action: OntologyAction
   labelFor: Record<string, string>
+  /** Roles permitted to invoke it. Enforced by the Action, not by the UI. */
+  roles: string[]
 }) {
   const [open, setOpen] = useState(false)
   const required = action.parameters.filter((p) => p.required)
@@ -486,6 +502,20 @@ function ActionCard({
             </span>
             {action.cascades.map((c) => (
               <TypeChip key={c} typeKey={c} label={labelFor[c] ?? c} />
+            ))}
+          </div>
+        )}
+
+        {roles.length > 0 && (
+          <div className="mb-3 flex flex-wrap items-center gap-1.5">
+            <Users className="h-3.5 w-3.5 text-muted-foreground" />
+            {roles.map((r) => (
+              <span
+                key={r}
+                className="rounded-md border border-border px-2 py-0.5 text-[11px] text-muted-foreground"
+              >
+                {r.replace(/_/g, ' ').toLowerCase()}
+              </span>
             ))}
           </div>
         )}

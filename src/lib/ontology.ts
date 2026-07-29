@@ -46,6 +46,8 @@ export interface OntologySnapshot {
   types: OntologyObjectType[]
   links: OntologyLink[]
   actions: OntologyAction[]
+  /** Action key → the roles permitted to invoke it (migration 012). */
+  permissions: Record<string, string[]>
   /** False when the page fell back to the bundled copy below. */
   live: boolean
 }
@@ -58,7 +60,7 @@ export interface OntologySnapshot {
  * fallback, not a source of truth — when it and the database disagree, the
  * database is right and this is stale.
  */
-const FALLBACK: Omit<OntologySnapshot, 'live'> = {
+const FALLBACK: Omit<OntologySnapshot, 'live' | 'permissions'> = {
   types: [
     { key: 'VESSEL', label: 'Vessel', table_name: 'vessels', description: 'The physical asset. Everything else hangs off it.', display_order: 1 },
     { key: 'PROJECT', label: 'Project', table_name: 'projects', description: 'A campaign against a vessel — survey, refit or newbuild — with budget and phase.', display_order: 2 },
@@ -246,7 +248,28 @@ const FALLBACK: Omit<OntologySnapshot, 'live'> = {
   ],
 }
 
-export const FALLBACK_ONTOLOGY: OntologySnapshot = { ...FALLBACK, live: false }
+/**
+ * The permission matrix, as of migration 012. Same status as the rest of the
+ * fallback: a bundled copy, superseded by the database whenever it is reachable.
+ */
+const FALLBACK_PERMISSIONS: Record<string, string[]> = {
+  action_raise_defect: ['OWNER', 'OWNERS_REP', 'CAPTAIN', 'YARD_PM', 'CLASS_SURVEYOR', 'NAVAL_ARCHITECT', 'SUBCONTRACTOR'],
+  action_register_document: ['OWNER', 'OWNERS_REP', 'CAPTAIN', 'YARD_PM', 'CLASS_SURVEYOR', 'NAVAL_ARCHITECT', 'SUBCONTRACTOR'],
+  action_update_defect_status: ['OWNERS_REP', 'YARD_PM', 'CLASS_SURVEYOR', 'NAVAL_ARCHITECT'],
+  action_record_inspection_result: ['OWNERS_REP', 'YARD_PM', 'CLASS_SURVEYOR'],
+  action_schedule_inspection: ['OWNERS_REP', 'CAPTAIN', 'YARD_PM', 'CLASS_SURVEYOR'],
+  action_create_work_package: ['OWNERS_REP', 'YARD_PM', 'NAVAL_ARCHITECT'],
+  action_update_work_package: ['OWNERS_REP', 'YARD_PM', 'NAVAL_ARCHITECT'],
+  action_link_defect_to_work_package: ['OWNERS_REP', 'YARD_PM', 'NAVAL_ARCHITECT'],
+  action_decide_approval: ['OWNER', 'OWNERS_REP'],
+  action_advance_project_phase: ['OWNERS_REP'],
+}
+
+export const FALLBACK_ONTOLOGY: OntologySnapshot = {
+  ...FALLBACK,
+  permissions: FALLBACK_PERMISSIONS,
+  live: false,
+}
 
 /**
  * Reads the registry as an anonymous visitor.
@@ -259,10 +282,11 @@ export const FALLBACK_ONTOLOGY: OntologySnapshot = { ...FALLBACK, live: false }
 export async function fetchOntology(): Promise<OntologySnapshot> {
   if (!isSupabaseConfigured) return FALLBACK_ONTOLOGY
 
-  const [typesRes, linksRes, actionsRes] = await Promise.all([
+  const [typesRes, linksRes, actionsRes, permsRes] = await Promise.all([
     supabase.from('ontology_object_types').select('*').order('display_order'),
     supabase.from('ontology_links').select('*'),
     supabase.from('ontology_actions').select('*').order('key'),
+    supabase.from('action_permissions').select('*'),
   ])
 
   // Partial data would render a graph with edges pointing at nothing, which
@@ -274,9 +298,15 @@ export async function fetchOntology(): Promise<OntologySnapshot> {
     return FALLBACK_ONTOLOGY
   }
 
+  const permissions: Record<string, string[]> = {}
+  for (const row of (permsRes.data ?? []) as { action_key: string; role: string }[]) {
+    ;(permissions[row.action_key] ??= []).push(row.role)
+  }
+
   return {
     types: typesRes.data as OntologyObjectType[],
     links: linksRes.data as OntologyLink[],
+    permissions: Object.keys(permissions).length ? permissions : FALLBACK_PERMISSIONS,
     actions: (actionsRes.data as OntologyAction[]).map((a) => ({
       ...a,
       parameters: Array.isArray(a.parameters) ? a.parameters : [],

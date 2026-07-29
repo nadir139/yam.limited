@@ -5,16 +5,30 @@ import type { UserRole, AuthUser } from '@/lib/types'
 interface AuthContextType {
   user: AuthUser | null
   isLoading: boolean
-  login: (email: string, role: UserRole) => Promise<{ error?: string }>
+  login: (email: string) => Promise<{ error?: string }>
   logout: () => Promise<void>
 }
 
-// Store role in localStorage keyed by email since Supabase session doesn't carry it
-const getRoleForEmail = (email: string): UserRole =>
-  (localStorage.getItem(`yam_role_${email}`) as UserRole) || 'OWNERS_REP'
-
-const setRoleForEmail = (email: string, role: UserRole) =>
-  localStorage.setItem(`yam_role_${email}`, role)
+// The role is NOT stored here.
+//
+// It used to be: chosen at sign-in and kept in localStorage under
+// `yam_role_<email>`, which made it a display preference anyone could edit from
+// the browser console — and nothing server-side read it anyway. Since migration
+// 012 it is resolved from project_members by the verified JWT email, and every
+// Action enforces it. What is fetched below is therefore the real role, and a
+// user whose email is not a member of the project gets null.
+const resolveMember = async (email: string): Promise<{ name: string; role: UserRole | null }> => {
+  const { data } = await supabase
+    .from('project_members')
+    .select('name, role')
+    .ilike('email', email)
+    .limit(1)
+    .maybeSingle()
+  return {
+    name: data?.name ?? email.split('@')[0] ?? 'User',
+    role: (data?.role as UserRole | undefined) ?? null,
+  }
+}
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
@@ -37,14 +51,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // ProtectedRoute renders null forever and the app looks broken.
     supabase.auth
       .getSession()
-      .then(({ data: { session } }) => {
+      .then(async ({ data: { session } }) => {
         if (session?.user) {
-          const role = getRoleForEmail(session.user.email ?? '')
+          const email = session.user.email ?? ''
+          const member = await resolveMember(email)
           setUser({
             id: session.user.id,
-            email: session.user.email ?? '',
-            name: session.user.email?.split('@')[0] ?? 'User',
-            role,
+            email,
+            name: member.name,
+            role: member.role,
           })
         }
       })
@@ -52,14 +67,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .finally(() => setIsLoading(false))
 
     // Listen for auth changes (magic link callback lands here)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
-        const role = getRoleForEmail(session.user.email ?? '')
+        const email = session.user.email ?? ''
+        const member = await resolveMember(email)
         setUser({
           id: session.user.id,
-          email: session.user.email ?? '',
-          name: session.user.email?.split('@')[0] ?? 'User',
-          role,
+          email,
+          name: member.name,
+          role: member.role,
         })
       } else {
         setUser(null)
@@ -70,11 +86,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  const login = async (email: string, role: UserRole): Promise<{ error?: string }> => {
+  const login = async (email: string): Promise<{ error?: string }> => {
     if (!isSupabaseConfigured) {
       return { error: 'Sign-in is unavailable: this build has no Supabase credentials.' }
     }
-    setRoleForEmail(email, role)
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {

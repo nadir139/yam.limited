@@ -291,5 +291,10 @@ export interface AuthUser {
   id: string
   email: string
   name: string
-  role: UserRole
+  /**
+   * Null when the signed-in email is not in project_members. Such a user can
+   * read the project but call no Action — the database refuses them, so the UI
+   * must not pretend otherwise.
+   */
+  role: UserRole | null
 }

@@ -180,7 +180,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
           <div style={{ marginBottom: '10px' }}>
             <div style={{ fontSize: '13px', fontWeight: 600 }}>{user.name}</div>
             <div style={{ fontSize: '11px', opacity: 0.6, marginTop: '2px' }}>
-              {ROLE_LABELS[user.role] ?? user.role}
+              {user.role ? ROLE_LABELS[user.role] ?? user.role : 'No project role'}
             </div>
           </div>
         )}

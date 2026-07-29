@@ -12,6 +12,7 @@ import type {
   WorldModelEvent,
   Discipline,
   WorkPackageStatus,
+  UserRole,
 } from './types'
 
 // Fixed project ID for Project ZERO — matches seed data
@@ -464,4 +465,36 @@ export async function fetchObjectEvents(
     .order('triggered_at', { ascending: true })
   if (error) throw error
   return data ?? []
+}
+
+// ─── Who the caller is, and what they may do ─────────────────────────────────
+//
+// Role used to be chosen at sign-in and kept in localStorage, which made it a
+// display preference rather than a permission — editable from the browser
+// console, and read by nothing server-side. It is now resolved from
+// project_members by the verified JWT email (migration 012).
+
+export interface ActionPermission {
+  action_key: string
+  role: UserRole
+}
+
+/** The caller's project role, or null when their email is not a member. */
+export async function fetchMyRole(): Promise<UserRole | null> {
+  const { data, error } = await supabase.rpc('current_actor_role')
+  if (error) throw error
+  return (data as UserRole | null) ?? null
+}
+
+/**
+ * The whole matrix, which is public-readable and small.
+ *
+ * Fetched once and evaluated client-side so the UI can hide what the user
+ * cannot do. This is courtesy, not security — every Action re-checks, and a
+ * client that skips the check is refused by Postgres.
+ */
+export async function fetchActionPermissions(): Promise<ActionPermission[]> {
+  const { data, error } = await supabase.from('action_permissions').select('*')
+  if (error) throw error
+  return (data ?? []) as ActionPermission[]
 }

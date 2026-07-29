@@ -3,7 +3,7 @@ import { ClipboardCheck, CheckCircle2, AlertTriangle, XCircle, AlertCircle } fro
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { useRecordInspectionResult } from '@/lib/query-hooks'
+import { useRecordInspectionResult, usePermissions } from '@/lib/query-hooks'
 import RaiseDefectForm from '@/components/actions/RaiseDefectForm'
 import type { InspectionEvent, InspectionResult } from '@/lib/types'
 
@@ -59,6 +59,7 @@ export default function InlineInspectionResult({
   const [error, setError] = useState<string | null>(null)
 
   const record = useRecordInspectionResult()
+  const { can } = usePermissions()
   const recorded = inspection.result !== 'PENDING'
   const selected = OPTIONS.find((o) => o.value === result)!
 
@@ -81,6 +82,8 @@ export default function InlineInspectionResult({
       },
     )
   }
+
+  if (!can('action_record_inspection_result')) return null
 
   if (!open) {
     return (

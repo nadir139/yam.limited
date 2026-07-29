@@ -11,7 +11,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { useCreateWorkPackage, type WorkPackageInput } from '@/lib/query-hooks'
+import { useCreateWorkPackage, usePermissions, type WorkPackageInput } from '@/lib/query-hooks'
 import type { Discipline, WorkPackage } from '@/lib/types'
 
 const DISCIPLINES: { value: Discipline; label: string }[] = [
@@ -58,6 +58,7 @@ export default function CreateWorkPackageForm({
   const [created, setCreated] = useState<WorkPackage | null>(null)
   const [form, setForm] = useState<WorkPackageInput>(EMPTY)
   const mutation = useCreateWorkPackage()
+  const { can } = usePermissions()
 
   const set = <K extends keyof WorkPackageInput>(k: K, v: WorkPackageInput[K]) =>
     setForm((prev) => ({ ...prev, [k]: v }))
@@ -78,6 +79,10 @@ export default function CreateWorkPackageForm({
       },
     })
   }
+
+  // The Action refuses this for roles without scope authority; showing the
+  // button anyway would only offer a refusal.
+  if (!can('action_create_work_package')) return null
 
   return (
     <>

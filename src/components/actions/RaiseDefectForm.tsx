@@ -12,7 +12,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
-import { useCreateDefectWithCascade, type DefectFormInput, type CascadeResult } from '@/lib/query-hooks'
+import { useCreateDefectWithCascade, usePermissions, type DefectFormInput, type CascadeResult } from '@/lib/query-hooks'
 import type { DefectRecord } from '@/lib/types'
 
 const SEVERITY_COLORS: Record<DefectRecord['severity'], string> = {
@@ -50,6 +50,7 @@ export default function RaiseDefectForm({ workPackageId, inspectionEventId, onSu
   })
 
   const mutation = useCreateDefectWithCascade()
+  const { can } = usePermissions()
 
   const set = <K extends keyof DefectFormInput>(k: K, v: DefectFormInput[K]) =>
     setForm((prev) => ({ ...prev, [k]: v }))
@@ -88,6 +89,10 @@ export default function RaiseDefectForm({ workPackageId, inspectionEventId, onSu
     (form.severity === 'HIGH' || form.severity === 'CRITICAL') &&
     form.cost_impact != null &&
     form.cost_impact > 0
+
+  // Everyone on the project may raise an NCR -- reporting a problem is never
+  // gated -- so this only hides for someone who is not a member at all.
+  if (!can('action_raise_defect')) return null
 
   return (
     <>

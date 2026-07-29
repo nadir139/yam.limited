@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { AlertCircle } from 'lucide-react'
-import { useUpdateWorkPackage } from '@/lib/query-hooks'
+import { useUpdateWorkPackage, usePermissions } from '@/lib/query-hooks'
 import type { WorkPackage, WorkPackageStatus } from '@/lib/types'
 
 const STATUSES: WorkPackageStatus[] = [
@@ -22,6 +22,7 @@ const STATUSES: WorkPackageStatus[] = [
  */
 export default function WorkPackageStatusControl({ wp }: { wp: WorkPackage }) {
   const mutation = useUpdateWorkPackage()
+  const { can } = usePermissions()
   const [error, setError] = useState<string | null>(null)
 
   const change = (status: WorkPackageStatus) => {
@@ -32,6 +33,8 @@ export default function WorkPackageStatusControl({ wp }: { wp: WorkPackage }) {
       { onError: (e) => setError(e.message) },
     )
   }
+
+  if (!can('action_update_work_package')) return null
 
   return (
     <div className="flex flex-col gap-1.5">

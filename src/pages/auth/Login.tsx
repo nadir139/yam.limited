@@ -3,20 +3,10 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import type { UserRole } from '@/lib/types'
-
-const ROLES: { value: UserRole; label: string }[] = [
-  { value: 'OWNERS_REP', label: "Owner's Representative" },
-  { value: 'OWNER', label: 'Owner' },
-  { value: 'CAPTAIN', label: 'Captain' },
-  { value: 'YARD_PM', label: 'Yard Project Manager' },
-  { value: 'CLASS_SURVEYOR', label: 'Class Surveyor' },
-]
 
 export default function Login() {
   const { login } = useAuth()
-  const [email, setEmail] = useState('nadir@yam.limited')
-  const [role, setRole] = useState<UserRole>('OWNERS_REP')
+  const [email, setEmail] = useState('nadir.balena@gmail.com')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [sent, setSent] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -26,7 +16,7 @@ export default function Login() {
     e.preventDefault()
     setIsSubmitting(true)
     setError(null)
-    const result = await login(email, role)
+    const result = await login(email)
     setIsSubmitting(false)
     if (result.error) {
       setError(result.error)
@@ -49,7 +39,7 @@ export default function Login() {
   const handleResend = async () => {
     setIsSubmitting(true)
     setError(null)
-    const result = await login(email, role)
+    const result = await login(email)
     setIsSubmitting(false)
     if (result.error) {
       setError(result.error)
@@ -142,26 +132,10 @@ export default function Login() {
               />
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="role">Role</Label>
-              <select
-                id="role"
-                value={role}
-                onChange={(e) => setRole(e.target.value as UserRole)}
-                className="flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1"
-                style={{
-                  borderColor: 'hsl(var(--border))',
-                  backgroundColor: 'hsl(var(--background))',
-                  color: 'hsl(var(--foreground))',
-                }}
-              >
-                {ROLES.map((r) => (
-                  <option key={r.value} value={r.value}>
-                    {r.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <p className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
+              Your role on the project decides what you can do, and it comes from
+              the project team — not from this screen.
+            </p>
 
             {error && (
               <p className="text-xs" style={{ color: 'hsl(var(--destructive))' }}>
