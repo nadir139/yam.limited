@@ -1,21 +1,39 @@
-import { useState, useRef, useEffect } from 'react'
-import { Sparkles, Send, Wrench, AlertCircle, User } from 'lucide-react'
+import { useState, useRef, useEffect, Fragment } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Sparkles, Send, Wrench, AlertCircle, User, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { supabase } from '@/lib/supabase'
 import { useQueryClient } from '@tanstack/react-query'
 import { QUERY_KEYS } from '@/lib/query-hooks'
+import { typeColor } from '@/lib/ontology'
 
 interface ToolCall {
   tool: string
-  input: unknown
+  input: { object_type?: string } & Record<string, unknown>
   ok: boolean
+}
+
+/** An object the agent read, keyed in the response by its human number. */
+interface ObjectRef {
+  type: string
+  id: string
+  label: string
+}
+
+interface ChangedRef extends ObjectRef {
+  number: string
+  via: string
+  /** False for the Action's own target, true for what the cascade produced. */
+  cascaded: boolean
 }
 
 interface Turn {
   role: 'user' | 'agent'
   text: string
   trace?: ToolCall[]
+  index?: Record<string, ObjectRef>
+  changed?: ChangedRef[]
   isError?: boolean
 }
 
@@ -26,26 +44,184 @@ const SUGGESTIONS = [
   'Walk me through what NCR-2026-001 triggered.',
 ]
 
+/** How many prior turns to replay. The function bounds this again server-side. */
+const HISTORY_TURNS = 12
+
+/** Where each object type opens. Types without a page render as a plain chip. */
+const ROUTE_FOR: Record<string, (id: string) => string> = {
+  DEFECT_RECORD: (id) => `/app/defects/${id}`,
+  WORK_PACKAGE: (id) => `/app/work-packages/${id}`,
+  CHANGE_ORDER: () => '/app/change-orders',
+  OWNER_APPROVAL: () => '/app/approvals',
+  INSPECTION_EVENT: () => '/app/inspections',
+  DOCUMENT: () => '/app/documents',
+  PROJECT: () => '/app/project',
+  VESSEL: () => '/app/project',
+  SUBCONTRACTOR: () => '/app/team',
+}
+
 /** Actions mutate the world model; reads don't. Only the former need a label. */
 const isAction = (tool: string) => tool.startsWith('action_')
 
-const prettyTool = (tool: string) =>
-  tool.replace(/^action_/, '').replace(/_/g, ' ')
+const prettyTool = (call: ToolCall) => {
+  const base = call.tool.replace(/^action_/, '').replace(/_/g, ' ')
+  // "list objects" five times in a row says nothing; "list objects · defect
+  // record" says what the agent actually looked at.
+  const subject = call.input?.object_type
+  return subject ? `${base} · ${String(subject).replace(/_/g, ' ').toLowerCase()}` : base
+}
+
+/** Object numbers look like NCR-2026-001, WP-MECH-004, APPR-2026-005. */
+const NUMBER_SHAPE = /^[A-Z]{2,6}-[A-Z0-9-]+$/
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+const chipClass = (type: string) =>
+  `${typeColor(type)} inline-flex items-center whitespace-nowrap rounded ` +
+  `border border-current/30 bg-current/[0.08] px-1.5 py-px align-baseline ` +
+  `font-mono text-[12px] font-semibold`
+
+function ObjectChip({
+  number,
+  target,
+  onOpen,
+}: {
+  number: string
+  target: ObjectRef
+  onOpen: (r: ObjectRef) => void
+}) {
+  if (!ROUTE_FOR[target.type]) return <span className={chipClass(target.type)}>{number}</span>
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(target)}
+      title={target.label}
+      className={`${chipClass(target.type)} cursor-pointer hover:bg-current/[0.18]`}
+    >
+      {number}
+    </button>
+  )
+}
+
+/**
+ * Turns object numbers in the reply into links to the record.
+ *
+ * The agent is told to reference objects by number rather than describe them,
+ * and this is what makes that instruction pay off — the reader clicks through
+ * instead of reading a paragraph reconstructing what the object is. The index
+ * is built from ids the database returned, so a link can never point at
+ * something that does not exist.
+ */
+function LinkedText({
+  text,
+  index,
+  onOpen,
+}: {
+  text: string
+  index?: Record<string, ObjectRef>
+  onOpen: (r: ObjectRef) => void
+}) {
+  const keys = Object.keys(index ?? {}).filter((k) => NUMBER_SHAPE.test(k))
+  if (!index || keys.length === 0) return <>{text}</>
+
+  // Longest first, so CO-2026-0011 is not eaten by CO-2026-001.
+  const pattern = keys.sort((a, b) => b.length - a.length).map(escapeRe).join('|')
+  const parts = text.split(new RegExp(`(${pattern})`, 'g'))
+
+  return (
+    <>
+      {parts.map((part, i) =>
+        index[part] ? (
+          <ObjectChip key={i} number={part} target={index[part]} onOpen={onOpen} />
+        ) : (
+          <Fragment key={i}>{part}</Fragment>
+        ),
+      )}
+    </>
+  )
+}
+
+/**
+ * The propagation, drawn.
+ *
+ * When an Action cascades, prose has to spell out that recording one thing
+ * created two others. Showing the chain as connected nodes makes the shape
+ * legible at a glance — which is the whole argument for a world model over a
+ * task list, so it should not be buried in a paragraph.
+ */
+function CascadeChain({
+  changed,
+  onOpen,
+}: {
+  changed: ChangedRef[]
+  onOpen: (r: ObjectRef) => void
+}) {
+  if (changed.length === 0) return null
+
+  return (
+    <div className="mb-3 rounded-[var(--radius)] border border-accent/30 bg-accent/[0.04] p-3">
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {changed.length === 1 ? 'Recorded' : 'Recorded, and what followed'}
+      </p>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {changed.map((c, i) => (
+          // Arrow and the node it points at wrap together, so a line break can
+          // never leave an arrow dangling at the end of a row.
+          <span key={c.id} className="inline-flex items-center gap-1.5">
+            {i > 0 && (
+              <ArrowRight
+                className="h-3.5 w-3.5 flex-shrink-0 text-accent"
+                aria-label="which created"
+              />
+            )}
+            <button
+              type="button"
+              onClick={() => onOpen(c)}
+              title={c.label}
+              disabled={!ROUTE_FOR[c.type]}
+              className={`${typeColor(c.type)} inline-flex min-w-0 items-center gap-1.5 ` +
+                'rounded-md border border-current/40 bg-current/[0.1] px-2 py-1 text-xs ' +
+                'enabled:hover:bg-current/[0.2]'}
+            >
+              {/* The number must never break across lines — a half-rendered
+                  NCR-2026-\n012 reads as a different object. */}
+              <span className="whitespace-nowrap font-mono font-semibold">{c.number}</span>
+              <span className="max-w-[130px] truncate text-muted-foreground">{c.label}</span>
+            </button>
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export default function AgentConsole() {
   const [turns, setTurns] = useState<Turn[]>([])
   const [prompt, setPrompt] = useState('')
   const [busy, setBusy] = useState(false)
   const qc = useQueryClient()
+  const navigate = useNavigate()
   const endRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [turns, busy])
 
+  const openObject = (r: ObjectRef) => {
+    const href = ROUTE_FOR[r.type]?.(r.id)
+    if (href) navigate(href)
+  }
+
   const ask = async (question: string) => {
     const text = question.trim()
     if (!text || busy) return
+
+    // Captured before the optimistic user turn is appended, so what goes up is
+    // exactly the exchange that preceded this question. Error bubbles are
+    // dropped — "could not reach the agent" is not something to reason over.
+    const history = turns
+      .filter((t) => !t.isError)
+      .slice(-HISTORY_TURNS)
+      .map((t) => ({ role: t.role, text: t.text }))
 
     setTurns((t) => [...t, { role: 'user', text }])
     setPrompt('')
@@ -53,25 +229,24 @@ export default function AgentConsole() {
 
     try {
       const { data, error } = await supabase.functions.invoke('agent', {
-        body: { prompt: text },
+        body: { prompt: text, history },
       })
       if (error) throw error
 
-      if (data?.error) {
-        setTurns((t) => [
-          ...t,
-          { role: 'agent', text: data.error, trace: data.trace, isError: true },
-        ])
-      } else {
-        setTurns((t) => [
-          ...t,
-          { role: 'agent', text: data.reply ?? '(no reply)', trace: data.trace },
-        ])
-      }
+      setTurns((t) => [
+        ...t,
+        {
+          role: 'agent',
+          text: data?.error ?? data?.reply ?? '(no reply)',
+          trace: data?.trace,
+          index: data?.index,
+          changed: data?.changed,
+          isError: Boolean(data?.error),
+        },
+      ])
 
-      // The agent may have mutated the world model through an Action, so any
-      // cached view could now be stale.
-      if ((data?.trace as ToolCall[] | undefined)?.some((c) => isAction(c.tool))) {
+      // An Action ran, so any cached view of the world model may now be stale.
+      if ((data?.changed as ChangedRef[] | undefined)?.length) {
         Object.values(QUERY_KEYS).forEach((key) => {
           if (Array.isArray(key)) qc.invalidateQueries({ queryKey: key })
         })
@@ -213,23 +388,28 @@ export default function AgentConsole() {
                           }}
                         >
                           <Wrench size={10} />
-                          {prettyTool(call.tool)}
+                          {prettyTool(call)}
                           {!call.ok && ' · failed'}
                         </span>
                       ))}
                     </div>
                   )}
+
+                  {turn.changed && turn.changed.length > 0 && (
+                    <CascadeChain changed={turn.changed} onOpen={openObject} />
+                  )}
+
                   <div
                     style={{
                       fontSize: 14,
-                      lineHeight: 1.6,
+                      lineHeight: 1.7,
                       whiteSpace: 'pre-wrap',
                       color: turn.isError
                         ? 'hsl(var(--destructive))'
                         : 'hsl(var(--foreground))',
                     }}
                   >
-                    {turn.text}
+                    <LinkedText text={turn.text} index={turn.index} onOpen={openObject} />
                   </div>
                 </div>
               </div>

@@ -182,11 +182,129 @@ Read before you write. Use list_objects and get_object to ground yourself in rea
 
 The action_* tools are the only way to change anything. They run with ${actorName}'s own permissions and record them as the actor, so you cannot do anything they could not do themselves. Each one validates its input server-side and writes an audit event in the same transaction.
 
-Several actions cascade. Raising a HIGH or CRITICAL defect that carries a cost impact automatically raises the Change Order and the Owner Approval it requires. Deciding an approval propagates that decision to the Change Order it gates. When a cascade fires, say plainly what else changed -- that propagation is the point of the system, and the user needs to know an approval is now waiting on them.
+Several actions cascade. Raising a HIGH or CRITICAL defect that carries a cost impact automatically raises the Change Order and the Owner Approval it requires. Deciding an approval propagates that decision to the Change Order it gates. Say in one line what else moved -- an approval now waiting on someone is the thing they need to know.
 
-Before taking an action that is not clearly implied by the request, say what you are about to do and why. If the request is ambiguous in a way that would change what you do -- which work package, what severity, whose approval -- ask rather than assume. If an action fails, report the error as given; do not retry it with altered inputs hoping it lands.
+## Act
+When you are asked to record something, record it. Fill the fields you were given, leave unknown optional fields empty, and state your assumptions in one line afterwards -- a filed record that ${actorName} corrects beats an interrogation.
 
-Answer in plain prose. Money in euros, dates as written. Reference objects by their human number (NCR-2026-001, CO-2026-003) rather than UUIDs, which mean nothing to the reader.`;
+Ask at most one question per reply, and only when the answer changes what gets written and you cannot reasonably default it. Never ask for something already in this conversation: earlier turns are above, read them before asking. If you find yourself asking twice for the same thing, write the record instead.
+
+If an action fails, report the error as given; do not retry it with altered inputs hoping it lands. If you have no tool for what was asked, say so in one sentence and offer the nearest thing you can do.
+
+## Answer
+Be brief. Most questions deserve two or three sentences. Lead with the answer, then the reason. Do not use headed sections unless asked for a full review, and never restate the project back to someone who works on it.
+
+Reference objects by their number -- NCR-2026-001, CO-2026-003. The interface turns those into links to the record, so never describe an object the reader can simply click, and never print a UUID. Money in euros, dates as written.`;
+}
+
+const MAX_HISTORY_TURNS = 12;
+const MAX_HISTORY_CHARS = 4000;
+
+/**
+ * Coerces client-supplied history into alternating message params.
+ *
+ * The history comes from the browser, so it is not trusted as a record of what
+ * happened -- it is trusted only as context the user is choosing to re-send.
+ * That is the same trust level as the prompt itself, and everything the agent
+ * can do is bounded by the caller's own permissions regardless, so a forged
+ * history grants nothing. It is bounded here for cost, not for safety.
+ */
+function sanitizeHistory(raw: unknown): Anthropic.Beta.BetaMessageParam[] {
+  if (!Array.isArray(raw)) return [];
+  const out: Anthropic.Beta.BetaMessageParam[] = [];
+  for (const item of raw.slice(-MAX_HISTORY_TURNS)) {
+    if (!item || typeof item !== "object") continue;
+    const { role, text } = item as { role?: unknown; text?: unknown };
+    if (role !== "user" && role !== "agent") continue;
+    if (typeof text !== "string" || !text.trim()) continue;
+    const content = text.slice(0, MAX_HISTORY_CHARS);
+    const mapped = role === "user" ? "user" : "assistant";
+    // The API rejects two messages in the same role back to back, and a
+    // dropped turn (an error bubble, say) can easily produce that.
+    if (out.length > 0 && out[out.length - 1].role === mapped) {
+      out[out.length - 1] = { role: mapped, content };
+      continue;
+    }
+    out.push({ role: mapped, content });
+  }
+  // A conversation replayed to the model must start with a user turn.
+  while (out.length > 0 && out[0].role !== "user") out.shift();
+  return out;
+}
+
+/** The human-readable identifier column, per table. */
+const NUMBER_FIELD: Record<string, string> = {
+  defect_records: "ncr_number",
+  change_orders: "co_number",
+  owner_approvals: "approval_number",
+  work_packages: "wp_number",
+  inspection_events: "inspection_number",
+  documents: "doc_number",
+  projects: "name",
+  vessels: "name",
+  project_members: "name",
+};
+
+interface ObjectRef {
+  type: string
+  id: string
+  label: string
+}
+
+/**
+ * Collects every object the agent touched, keyed by its human number.
+ *
+ * The system prompt already has the agent write "NCR-2026-001" rather than a
+ * UUID, so the console can turn those strings into links to the real record
+ * without the model having to cooperate any further. Deriving the index from
+ * tool results rather than asking the model to emit it means it cannot be
+ * wrong: an id is only ever one the database returned.
+ */
+class ObjectIndex {
+  private refs = new Map<string, ObjectRef>()
+
+  constructor(private typeForTable: Map<string, string>) {}
+
+  /** Records any row-shaped values found in a tool result. */
+  harvest(table: string | undefined, value: unknown) {
+    if (Array.isArray(value)) {
+      for (const v of value) this.harvest(table, v)
+      return
+    }
+    if (!value || typeof value !== "object") return
+    const row = value as Record<string, unknown>
+
+    if (typeof row.id === "string") {
+      const found = table ?? this.tableFromShape(row)
+      const field = found ? NUMBER_FIELD[found] : undefined
+      const number = field ? row[field] : undefined
+      if (found && typeof number === "string" && number) {
+        this.refs.set(number, {
+          type: this.typeForTable.get(found) ?? found,
+          id: row.id,
+          label: typeof row.title === "string" ? row.title : number,
+        })
+      }
+    }
+
+    // Action results nest rows under keys ({ defect, change_order, approval }),
+    // so the cascade's objects are reached by walking one level in.
+    for (const v of Object.values(row)) {
+      if (v && typeof v === "object") this.harvest(undefined, v)
+    }
+  }
+
+  /** Identifies a nested row by which number column it carries. */
+  private tableFromShape(row: Record<string, unknown>): string | undefined {
+    for (const [table, field] of Object.entries(NUMBER_FIELD)) {
+      if (field !== "name" && typeof row[field] === "string") return table
+    }
+    return undefined
+  }
+
+  toJSON(): Record<string, ObjectRef> {
+    return Object.fromEntries(this.refs)
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -211,7 +329,7 @@ Deno.serve(async (req: Request) => {
     return json({ error: "Not signed in." }, 401, origin);
   }
 
-  let body: { prompt?: unknown };
+  let body: { prompt?: unknown; history?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -221,6 +339,16 @@ Deno.serve(async (req: Request) => {
   if (prompt.length < 2 || prompt.length > 2000) {
     return json({ error: "Ask a question between 2 and 2000 characters." }, 400, origin);
   }
+
+  // Prior turns, replayed so the agent can see what it was already told.
+  // Without this every request starts blank and the agent re-asks for details
+  // the user gave it one message ago -- which reads as obtuse and makes a
+  // multi-step task impossible to finish.
+  //
+  // Text only: thinking blocks and tool calls must be replayed verbatim within
+  // a single request's loop, but carrying them across turns buys nothing and
+  // costs tokens on every subsequent message.
+  const history = sanitizeHistory(body.history);
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -258,8 +386,14 @@ Deno.serve(async (req: Request) => {
   const actorName = memberRes.data?.[0]?.name ?? actorEmail;
 
   const tableFor = new Map(types.map((t) => [t.key, t.table_name]));
+  const typeForTable = new Map(types.map((t) => [t.table_name, t.key]));
   const actionKeys = new Set(actions.map((a) => a.key));
   const tools = buildTools(types, actions);
+
+  const index = new ObjectIndex(typeForTable);
+  const changed: Array<
+    ObjectRef & { number: string; via: string; cascaded: boolean }
+  > = [];
 
   const anthropic = new Anthropic({ apiKey: anthropicKey });
 
@@ -270,7 +404,9 @@ Deno.serve(async (req: Request) => {
       if (!table) return { error: `Unknown object type: ${input.object_type}` };
       const limit = Math.min(Math.max(Number(input.limit) || 25, 1), MAX_ROWS);
       const { data, error } = await supabase.from(table).select("*").limit(limit);
-      return error ? { error: error.message } : { rows: data };
+      if (error) return { error: error.message };
+      index.harvest(table, data);
+      return { rows: data };
     }
 
     if (name === "get_object") {
@@ -282,7 +418,9 @@ Deno.serve(async (req: Request) => {
         .eq("id", String(input.id))
         .maybeSingle();
       if (error) return { error: error.message };
-      return data ? { object: data } : { error: "No object with that id." };
+      if (!data) return { error: "No object with that id." };
+      index.harvest(table, data);
+      return { object: data };
     }
 
     if (name === "get_event_history") {
@@ -299,13 +437,37 @@ Deno.serve(async (req: Request) => {
       // Goes through PostgREST as the caller. The Action validates, mutates and
       // logs atomically; a rejection here is the database refusing, not us.
       const { data, error } = await supabase.rpc(name, input);
-      return error ? { error: error.message } : { result: data };
+      if (error) return { error: error.message };
+
+      // An Action returns the object it changed plus anything the cascade
+      // created alongside it ({ defect, change_order, approval }). Recording
+      // them in order lets the console draw the propagation rather than leaving
+      // the reader to reconstruct it from prose.
+      //
+      // Harvested into a fresh index, not diffed against the running one: an
+      // Action often updates an object the agent had already read, and a diff
+      // would report that nothing changed.
+      const touched = new ObjectIndex(typeForTable);
+      touched.harvest(undefined, data);
+      index.harvest(undefined, data);
+
+      let first = true;
+      for (const [number, ref] of Object.entries(touched.toJSON())) {
+        // The first object back is the Action's own target; the rest are what
+        // the cascade produced.
+        const existing = changed.findIndex((c) => c.id === ref.id);
+        if (existing >= 0) changed.splice(existing, 1);
+        changed.push({ ...ref, number, via: name, cascaded: !first });
+        first = false;
+      }
+      return { result: data };
     }
 
     return { error: `Unknown tool: ${name}` };
   }
 
   const messages: Anthropic.Beta.BetaMessageParam[] = [
+    ...history,
     { role: "user", content: prompt },
   ];
   const system = buildSystemPrompt(types, links, actorName);
@@ -350,7 +512,11 @@ Deno.serve(async (req: Request) => {
           .map((b) => b.text)
           .join("\n")
           .trim();
-        return json({ reply, trace }, 200, origin);
+        return json(
+          { reply, trace, index: index.toJSON(), changed },
+          200,
+          origin,
+        );
       }
 
       // Parallel tool calls must all come back in ONE user message, or the model
@@ -373,13 +539,24 @@ Deno.serve(async (req: Request) => {
     }
 
     return json(
-      { reply: "I ran out of steps before finishing. Try narrowing the request.", trace },
+      {
+        reply: "I ran out of steps before finishing. Try narrowing the request.",
+        trace,
+        index: index.toJSON(),
+        changed,
+      },
       200,
       origin,
     );
   } catch (err) {
     console.error("Agent turn failed", err);
     const message = err instanceof Error ? err.message : String(err);
-    return json({ error: `The agent failed: ${message}`, trace }, 500, origin);
+    // `changed` still ships on failure: an Action may have committed before a
+    // later turn threw, and the user needs to know a record exists.
+    return json(
+      { error: `The agent failed: ${message}`, trace, index: index.toJSON(), changed },
+      500,
+      origin,
+    );
   }
 });
