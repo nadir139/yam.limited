@@ -24,6 +24,7 @@ const InspectionList = lazy(() => import("./pages/inspections/InspectionList"));
 const DefectList = lazy(() => import("./pages/defects/DefectList"));
 const DefectDetail = lazy(() => import("./pages/defects/DefectDetail"));
 const ChangeOrderList = lazy(() => import("./pages/change-orders/ChangeOrderList"));
+const ChangeOrderDetail = lazy(() => import("./pages/change-orders/ChangeOrderDetail"));
 const ApprovalQueue = lazy(() => import("./pages/approvals/ApprovalQueue"));
 const DocumentLibrary = lazy(() => import("./pages/documents/DocumentLibrary"));
 const TeamView = lazy(() => import("./pages/team/TeamView"));
@@ -71,6 +72,7 @@ const App = () => (
                 <Route path="/app/defects" element={<ProtectedRoute><DefectList /></ProtectedRoute>} />
                 <Route path="/app/defects/:id" element={<ProtectedRoute><DefectDetail /></ProtectedRoute>} />
                 <Route path="/app/change-orders" element={<ProtectedRoute><ChangeOrderList /></ProtectedRoute>} />
+                <Route path="/app/change-orders/:id" element={<ProtectedRoute><ChangeOrderDetail /></ProtectedRoute>} />
                 <Route path="/app/approvals" element={<ProtectedRoute><ApprovalQueue /></ProtectedRoute>} />
                 <Route path="/app/documents" element={<ProtectedRoute><DocumentLibrary /></ProtectedRoute>} />
                 <Route path="/app/team" element={<ProtectedRoute><TeamView /></ProtectedRoute>} />

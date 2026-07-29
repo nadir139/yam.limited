@@ -660,3 +660,40 @@ In `action_update_work_package` a null parameter means "leave this field alone",
 so the Action can overwrite a value but never clear one. `actual_start` and
 `actual_end` are filled from the status when the caller omits them: a package
 that is ACTIVE started, one that is COMPLETE ended.
+
+---
+
+## 17. Object pages and recorded history (July 2026)
+
+### The 404
+
+`WorkPackageList` navigated to `/work-packages/${id}` — missing the `/app`
+prefix — so every work package row fell through to NotFound. It was the only
+occurrence of that mistake, but a second dead link existed alongside it:
+`ChangeOrderList` linked to `/app/change-orders/:id`, a route that was never
+registered. Both are fixed; `ChangeOrderDetail` is new.
+
+### ObjectHistory
+
+`src/components/ObjectHistory.tsx` renders the complete recorded history of one
+object from `world_model_events`, oldest first, showing only the fields that
+actually changed as `before → after` with the actor and timestamp. Events
+carrying `cascade_from_event_id` are marked as consequences rather than
+decisions.
+
+`fetchObjectEvents` is deliberately unbounded, unlike `fetchEvents` (which caps
+at 20 for the dashboard): an object's own page should show everything that ever
+happened to it. Nothing here is a changelog someone maintains — every Action
+writes its event in the same transaction as its mutation, so the history cannot
+drift from what actually happened.
+
+It is mounted on the work package, change order and NCR detail pages. Objects
+created by the original seed have no events, and the empty state says so rather
+than implying nothing happened.
+
+### A type that was wrong
+
+`WorldModelEvent` was missing `triggered_by_name`, which the table has and every
+Action writes. The name is resolved from `project_members` at write time rather
+than joined at read time, so history still reads correctly after someone leaves
+the project.

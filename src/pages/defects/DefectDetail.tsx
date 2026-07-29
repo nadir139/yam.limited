@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog'
 import { useDefect, useChangeOrders, useApprovals, useUpdateDefectStatus, useDocuments } from '@/lib/query-hooks'
 import UploadDocumentForm from '@/components/actions/UploadDocumentForm'
+import ObjectHistory from '@/components/ObjectHistory'
 import type { DefectSeverity } from '@/lib/types'
 
 const SEVERITY_STYLES: Record<DefectSeverity, { bg: string; text: string }> = {
@@ -417,6 +418,16 @@ export default function DefectDetail() {
           </Card>
         )
       })()}
+
+      {/* History */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">History</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ObjectHistory objectType="DEFECT_RECORD" objectId={defect.id} />
+        </CardContent>
+      </Card>
 
       {/* Close NCR dialog */}
       <Dialog open={closeDialogOpen} onOpenChange={setCloseDialogOpen}>

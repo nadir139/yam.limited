@@ -125,7 +125,7 @@ export default function WorkPackageList() {
                 <TableRow
                   key={wp.id}
                   className="cursor-pointer"
-                  onClick={() => navigate(`/work-packages/${wp.id}`)}
+                  onClick={() => navigate(`/app/work-packages/${wp.id}`)}
                 >
                   <TableCell className="font-mono text-xs font-medium">{wp.wp_number}</TableCell>
                   <TableCell>

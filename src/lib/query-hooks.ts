@@ -214,3 +214,14 @@ export function useLinkDefectToWorkPackage() {
     onSuccess: invalidate,
   })
 }
+
+/** Every recorded change to one object, oldest first. */
+export const useObjectEvents = (
+  objectType: Parameters<typeof db.fetchObjectEvents>[0],
+  objectId: string | undefined,
+) =>
+  useQuery({
+    queryKey: ['events', objectType, objectId],
+    queryFn: () => db.fetchObjectEvents(objectType, objectId!),
+    enabled: !!objectId,
+  })
