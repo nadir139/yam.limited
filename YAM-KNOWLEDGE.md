@@ -516,13 +516,44 @@ Secrets*. Without it the function returns
 `{ error: "The agent is not configured on this project." }` with HTTP 500 — it
 fails closed and says so, rather than degrading silently.
 
+### Conversation memory (added after first testing)
+
+The first build sent no history: every request started from an empty message
+list. In testing this was fatal, not cosmetic. Across five turns the agent
+re-asked for the same severity, cost and location three times, took **zero**
+Actions, and finally replied that the NCRs "don't exist yet… I'd have to invent
+the substance of them" — one message after being given every detail. It was
+also the hidden cause of the verbosity, since each answer had to re-establish
+the whole project from scratch.
+
+The console now sends the prior turns (12 max, 4000 chars each, error bubbles
+dropped) and `sanitizeHistory` coerces them into alternating roles. The history
+is client-supplied, so it is not trusted as a record of what happened — only as
+context the user chose to re-send. That is the same trust level as the prompt,
+and every tool remains bounded by the caller's own permissions, so a forged
+history grants nothing. It is bounded for cost, not for safety.
+
+### Object links and the cascade chain
+
+`ObjectIndex` collects every row the agent reads, keyed by its human number
+(`NCR-2026-001` → `{type, id, label}`), and the response carries it as `index`.
+The console linkifies any of those numbers appearing in the reply, so the agent
+writing "NCR-2026-001" produces a clickable chip into the record. Derived from
+tool results rather than asked of the model, so a link can never point at
+something that does not exist.
+
+`changed` carries what an Action touched, in order: its own target first, then
+whatever the cascade produced. The console draws that as connected nodes.
+Prose describing that recording one thing created two others is exactly the
+part a reader skims — the whole argument for a world model over a task list
+should not be buried in a paragraph.
+
 ### What this does not yet do
 
-- No conversation memory. Each request starts from an empty message list; the
-  UI shows history but does not send it. Multi-turn follow-ups ("and what about
-  the other one?") will not resolve.
 - No streaming. The console waits for the complete response.
 - No cost or rate limiting per user.
+- No Action creates a work package, or re-links an existing defect onto one.
+  Both were asked for in testing and both hit a wall.
 
 ---
 
