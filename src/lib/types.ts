@@ -277,7 +277,10 @@ export interface WorldModelEvent {
   object_id: string
   before_state: Record<string, unknown> | null
   after_state: Record<string, unknown>
-  triggered_by: string // user id
+  triggered_by: string // user id, from auth.uid() server-side
+  // Display name resolved from project_members at write time, so the history
+  // still reads correctly if someone later leaves the project.
+  triggered_by_name: string
   triggered_at: string
   cascade_from_event_id: string | null // if auto-triggered
 }

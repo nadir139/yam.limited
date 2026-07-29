@@ -18,6 +18,7 @@ import RaiseDefectForm from '@/components/actions/RaiseDefectForm'
 import UploadDocumentForm from '@/components/actions/UploadDocumentForm'
 import ScheduleInspectionForm from '@/components/actions/ScheduleInspectionForm'
 import WorkPackageStatusControl from '@/components/actions/WorkPackageStatusControl'
+import ObjectHistory from '@/components/ObjectHistory'
 
 const eur = (n: number) =>
   new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
@@ -174,6 +175,7 @@ export default function WorkPackageDetail() {
           <TabsTrigger value="documents">
             Documents ({documents.length})
           </TabsTrigger>
+          <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
 
         <TabsContent value="inspections">
@@ -279,6 +281,14 @@ export default function WorkPackageDetail() {
                 ))}
               </TableBody>
             </Table>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="history">
+          <Card>
+            <CardContent className="p-5">
+              <ObjectHistory objectType="WORK_PACKAGE" objectId={wp.id} />
+            </CardContent>
           </Card>
         </TabsContent>
       </Tabs>

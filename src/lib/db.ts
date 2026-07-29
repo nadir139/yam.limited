@@ -442,3 +442,26 @@ export async function linkDefectToWorkPackage(
   }
   return { defect: result.defect, workPackage: result.work_package }
 }
+
+/**
+ * The full recorded history of one object, oldest first.
+ *
+ * `fetchEvents` returns the project's last 20 events for the dashboard; this is
+ * scoped to a single object and unbounded, because an object's page should show
+ * everything that ever happened to it. Nothing in this system is overwritten
+ * silently — every Action writes an event in the same transaction as its
+ * mutation, so this is the whole story, not a summary of it.
+ */
+export async function fetchObjectEvents(
+  objectType: WorldModelEvent['object_type'],
+  objectId: string,
+): Promise<WorldModelEvent[]> {
+  const { data, error } = await supabase
+    .from('world_model_events')
+    .select('*')
+    .eq('object_type', objectType)
+    .eq('object_id', objectId)
+    .order('triggered_at', { ascending: true })
+  if (error) throw error
+  return data ?? []
+}
