@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect, Fragment } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Sparkles, Send, Wrench, AlertCircle, User, ArrowRight } from 'lucide-react'
+import { Sparkles, Send, Wrench, AlertCircle, User, ArrowRight, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { supabase } from '@/lib/supabase'
 import { useQueryClient } from '@tanstack/react-query'
 import { QUERY_KEYS } from '@/lib/query-hooks'
 import { typeColor } from '@/lib/ontology'
+import ChatObjectPanel from './ChatObjectPanel'
 
 interface ToolCall {
   tool: string
@@ -47,17 +47,24 @@ const SUGGESTIONS = [
 /** How many prior turns to replay. The function bounds this again server-side. */
 const HISTORY_TURNS = 12
 
-/** Where each object type opens. Types without a page render as a plain chip. */
-const ROUTE_FOR: Record<string, (id: string) => string> = {
-  DEFECT_RECORD: (id) => `/app/defects/${id}`,
-  WORK_PACKAGE: (id) => `/app/work-packages/${id}`,
-  CHANGE_ORDER: () => '/app/change-orders',
-  OWNER_APPROVAL: () => '/app/approvals',
-  INSPECTION_EVENT: () => '/app/inspections',
-  DOCUMENT: () => '/app/documents',
-  PROJECT: () => '/app/project',
-  VESSEL: () => '/app/project',
-  SUBCONTRACTOR: () => '/app/team',
+/**
+ * The conversation survives leaving the page.
+ *
+ * sessionStorage rather than component state: opening a record used to discard
+ * the whole thread, and you came back to a blank console with no way to pick up
+ * where you were. Per-tab and cleared when the tab closes, which is the right
+ * lifetime for a working conversation.
+ */
+const STORAGE_KEY = 'yam.agent.turns'
+
+function loadTurns(): Turn[] {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY)
+    const parsed = raw ? JSON.parse(raw) : null
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
 }
 
 /** Actions mutate the world model; reads don't. Only the former need a label. */
@@ -83,22 +90,45 @@ const chipClass = (type: string) =>
 function ObjectChip({
   number,
   target,
-  onOpen,
+  isOpen,
+  onToggle,
 }: {
   number: string
   target: ObjectRef
-  onOpen: (r: ObjectRef) => void
+  isOpen: boolean
+  onToggle: (number: string, target: ObjectRef) => void
 }) {
-  if (!ROUTE_FOR[target.type]) return <span className={chipClass(target.type)}>{number}</span>
   return (
     <button
       type="button"
-      onClick={() => onOpen(target)}
+      onClick={() => onToggle(number, target)}
       title={target.label}
-      className={`${chipClass(target.type)} cursor-pointer hover:bg-current/[0.18]`}
+      className={`${chipClass(target.type)} cursor-pointer hover:bg-current/[0.18] ${
+        isOpen ? 'ring-1 ring-current' : ''
+      }`}
     >
       {number}
     </button>
+  )
+}
+
+/**
+ * The subset of Markdown the agent actually produces: **bold** and `- ` bullets.
+ *
+ * Rendered rather than stripped, and built as React nodes rather than injected
+ * HTML — the reply is model output, so it never becomes markup.
+ */
+function renderInline(
+  text: string,
+  key: string,
+  linkify: (chunk: string, key: string) => React.ReactNode,
+): React.ReactNode[] {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
+    part.startsWith('**') && part.endsWith('**') && part.length > 4 ? (
+      <strong key={`${key}-b${i}`}>{linkify(part.slice(2, -2), `${key}-b${i}`)}</strong>
+    ) : (
+      <Fragment key={`${key}-t${i}`}>{linkify(part, `${key}-t${i}`)}</Fragment>
+    ),
   )
 }
 
@@ -114,28 +144,51 @@ function ObjectChip({
 function LinkedText({
   text,
   index,
-  onOpen,
+  openNumbers,
+  onToggle,
 }: {
   text: string
   index?: Record<string, ObjectRef>
-  onOpen: (r: ObjectRef) => void
+  openNumbers: string[]
+  onToggle: (number: string, target: ObjectRef) => void
 }) {
   const keys = Object.keys(index ?? {}).filter((k) => NUMBER_SHAPE.test(k))
-  if (!index || keys.length === 0) return <>{text}</>
 
-  // Longest first, so CO-2026-0011 is not eaten by CO-2026-001.
-  const pattern = keys.sort((a, b) => b.length - a.length).map(escapeRe).join('|')
-  const parts = text.split(new RegExp(`(${pattern})`, 'g'))
+  const linkify = (chunk: string, key: string): React.ReactNode => {
+    if (!index || keys.length === 0) return chunk
+    // Longest first, so CO-2026-0011 is not eaten by CO-2026-001.
+    const pattern = keys.sort((a, b) => b.length - a.length).map(escapeRe).join('|')
+    return chunk.split(new RegExp(`(${pattern})`, 'g')).map((part, i) =>
+      index[part] ? (
+        <ObjectChip
+          key={`${key}-${i}`}
+          number={part}
+          target={index[part]}
+          isOpen={openNumbers.includes(part)}
+          onToggle={onToggle}
+        />
+      ) : (
+        <Fragment key={`${key}-${i}`}>{part}</Fragment>
+      ),
+    )
+  }
 
   return (
     <>
-      {parts.map((part, i) =>
-        index[part] ? (
-          <ObjectChip key={i} number={part} target={index[part]} onOpen={onOpen} />
-        ) : (
-          <Fragment key={i}>{part}</Fragment>
-        ),
-      )}
+      {text.split('\n').map((line, i) => {
+        const bullet = /^\s*[-*]\s+/.exec(line)
+        const content = bullet ? line.slice(bullet[0].length) : line
+        return (
+          <div key={i} className={bullet ? 'flex gap-2' : undefined}>
+            {bullet && (
+              <span aria-hidden style={{ color: 'hsl(var(--muted-foreground))' }}>
+                •
+              </span>
+            )}
+            <span className="min-w-0">{renderInline(content, `l${i}`, linkify)}</span>
+          </div>
+        )
+      })}
     </>
   )
 }
@@ -150,10 +203,12 @@ function LinkedText({
  */
 function CascadeChain({
   changed,
-  onOpen,
+  openNumbers,
+  onToggle,
 }: {
   changed: ChangedRef[]
-  onOpen: (r: ObjectRef) => void
+  openNumbers: string[]
+  onToggle: (number: string, target: ObjectRef) => void
 }) {
   if (changed.length === 0) return null
 
@@ -175,12 +230,11 @@ function CascadeChain({
             )}
             <button
               type="button"
-              onClick={() => onOpen(c)}
+              onClick={() => onToggle(c.number, c)}
               title={c.label}
-              disabled={!ROUTE_FOR[c.type]}
               className={`${typeColor(c.type)} inline-flex min-w-0 items-center gap-1.5 ` +
                 'rounded-md border border-current/40 bg-current/[0.1] px-2 py-1 text-xs ' +
-                'enabled:hover:bg-current/[0.2]'}
+                `hover:bg-current/[0.2] ${openNumbers.includes(c.number) ? 'ring-1 ring-current' : ''}`}
             >
               {/* The number must never break across lines — a half-rendered
                   NCR-2026-\n012 reads as a different object. */}
@@ -195,20 +249,50 @@ function CascadeChain({
 }
 
 export default function AgentConsole() {
-  const [turns, setTurns] = useState<Turn[]>([])
+  const [turns, setTurns] = useState<Turn[]>(loadTurns)
   const [prompt, setPrompt] = useState('')
   const [busy, setBusy] = useState(false)
+  // Objects opened inline, keyed by the turn they were opened from, so a panel
+  // appears where you clicked rather than somewhere you have to go looking.
+  const [openPanels, setOpenPanels] = useState<Record<number, string[]>>({})
   const qc = useQueryClient()
-  const navigate = useNavigate()
   const endRef = useRef<HTMLDivElement>(null)
+  const restored = useRef(turns.length > 0)
 
   useEffect(() => {
+    try {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(turns))
+    } catch {
+      // A full storage quota must not take down the conversation.
+    }
+  }, [turns])
+
+  useEffect(() => {
+    // Don't yank a restored conversation to the bottom before it has painted;
+    // only follow along for turns that arrive while you are watching.
+    if (restored.current) {
+      restored.current = false
+      return
+    }
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [turns, busy])
 
-  const openObject = (r: ObjectRef) => {
-    const href = ROUTE_FOR[r.type]?.(r.id)
-    if (href) navigate(href)
+  const togglePanel = (turnIndex: number) => (number: string, _target: ObjectRef) => {
+    setOpenPanels((prev) => {
+      const current = prev[turnIndex] ?? []
+      return {
+        ...prev,
+        [turnIndex]: current.includes(number)
+          ? current.filter((n) => n !== number)
+          : [...current, number],
+      }
+    })
+  }
+
+  const clearConversation = () => {
+    setTurns([])
+    setOpenPanels({})
+    sessionStorage.removeItem(STORAGE_KEY)
   }
 
   const ask = async (question: string) => {
@@ -288,8 +372,19 @@ export default function AgentConsole() {
         <p style={{ fontSize: 14, color: 'hsl(var(--muted-foreground))' }}>
           Ask about the project, or tell it what changed. It reads the live world
           model and acts through the same typed Actions you do — under your
-          identity, with every change recorded against your name.
+          identity, with every change recorded against your name. Click any
+          reference to open it here without leaving the conversation.
         </p>
+        {turns.length > 0 && (
+          <button
+            onClick={clearConversation}
+            className="mt-2 inline-flex items-center gap-1.5 text-xs hover:underline"
+            style={{ color: 'hsl(var(--muted-foreground))' }}
+          >
+            <Trash2 size={12} />
+            Clear conversation
+          </button>
+        )}
       </div>
 
       {turns.length === 0 && (
@@ -396,21 +491,44 @@ export default function AgentConsole() {
                   )}
 
                   {turn.changed && turn.changed.length > 0 && (
-                    <CascadeChain changed={turn.changed} onOpen={openObject} />
+                    <CascadeChain
+                      changed={turn.changed}
+                      openNumbers={openPanels[i] ?? []}
+                      onToggle={togglePanel(i)}
+                    />
                   )}
 
                   <div
                     style={{
                       fontSize: 14,
                       lineHeight: 1.7,
-                      whiteSpace: 'pre-wrap',
                       color: turn.isError
                         ? 'hsl(var(--destructive))'
                         : 'hsl(var(--foreground))',
                     }}
                   >
-                    <LinkedText text={turn.text} index={turn.index} onOpen={openObject} />
+                    <LinkedText
+                      text={turn.text}
+                      index={turn.index}
+                      openNumbers={openPanels[i] ?? []}
+                      onToggle={togglePanel(i)}
+                    />
                   </div>
+
+                  {/* Objects opened from this turn, inline. */}
+                  {(openPanels[i] ?? []).map((number) => {
+                    const ref = turn.index?.[number]
+                    if (!ref) return null
+                    return (
+                      <ChatObjectPanel
+                        key={number}
+                        number={number}
+                        objectType={ref.type}
+                        objectId={ref.id}
+                        onClose={() => togglePanel(i)(number, ref)}
+                      />
+                    )
+                  })}
                 </div>
               </div>
             )}

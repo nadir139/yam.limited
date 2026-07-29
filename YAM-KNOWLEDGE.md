@@ -697,3 +697,42 @@ than implying nothing happened.
 Action writes. The name is resolved from `project_members` at write time rather
 than joined at read time, so history still reads correctly after someone leaves
 the project.
+
+---
+
+## 18. The chat as the working surface (July 2026)
+
+The agent console is intended to be where most work happens — the user says what
+they want, the agent does it. Three things blocked that.
+
+### The conversation was lost on every navigation
+
+Clicking an object reference navigated away, and the console's turns lived only
+in component state. Coming back gave a blank page with no way to resume: no
+memory, no history, nothing to scroll. Turns are now persisted to
+`sessionStorage` (`yam.agent.turns`) and restored on mount — per tab, cleared
+when the tab closes, which matches the lifetime of a working conversation. A
+**Clear conversation** control appears once there is something to clear.
+
+The scroll-to-bottom effect skips its first run when a conversation was
+restored, so returning to the page leaves you where the thread was rather than
+yanking you to the end.
+
+### Objects now open inside the chat
+
+Clicking a reference toggles an inline panel under that turn instead of
+navigating: key fields, and the actions that object supports —
+approve/reject for an Owner Approval, a status select for an NCR or work
+package. Several can be open at once, they close independently, and an
+external-link icon still opens the full record for anyone who wants it.
+
+Panels read from the lists React Query already holds, so opening one costs no
+round trip and reflects changes made anywhere else in the app. `ChatObjectPanel`
+is keyed by object type; a type it does not know renders its number and a link
+rather than failing.
+
+### Markdown was rendering as literal asterisks
+
+The agent writes `**bold**` and `- ` bullets and the console printed them raw.
+`renderInline` handles exactly that subset, building React nodes — never
+injected HTML, since the reply is model output.
