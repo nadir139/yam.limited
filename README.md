@@ -99,6 +99,7 @@ applied by hand in the Supabase SQL editor, in this order:
 10. `supabase-migration-008-lock-write-path.sql` — revokes direct table writes
 11. `supabase-migration-009-ontology-registry.sql` — the self-describing registry
 12. `supabase-migration-010-public-ontology.sql` — registry readable by `anon`
+13. `supabase-migration-011-work-package-actions.sql` — Actions that plan the work
 
 Migrations 006–008 are the important ones. After 008 the `authenticated` and
 `anon` roles hold **zero** `INSERT`/`UPDATE`/`DELETE` grants on the domain

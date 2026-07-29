@@ -16,6 +16,8 @@ import {
 } from '@/lib/query-hooks'
 import RaiseDefectForm from '@/components/actions/RaiseDefectForm'
 import UploadDocumentForm from '@/components/actions/UploadDocumentForm'
+import ScheduleInspectionForm from '@/components/actions/ScheduleInspectionForm'
+import WorkPackageStatusControl from '@/components/actions/WorkPackageStatusControl'
 
 const eur = (n: number) =>
   new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
@@ -96,6 +98,10 @@ export default function WorkPackageDetail() {
             )}
           </div>
           <h1 className="text-xl font-bold">{wp.title}</h1>
+        </div>
+        <div className="ml-auto flex flex-wrap items-center gap-3">
+          <WorkPackageStatusControl wp={wp} />
+          <ScheduleInspectionForm workPackageId={wp.id} />
         </div>
       </div>
 

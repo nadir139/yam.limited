@@ -173,3 +173,44 @@ export function useUploadDocument() {
     onSuccess: invalidate,
   })
 }
+
+// ─── Planning the work ────────────────────────────────────────────────────────
+
+export type WorkPackageInput = db.WorkPackageInput
+export type WorkPackageUpdate = db.WorkPackageUpdate
+export type InspectionInput = db.InspectionInput
+
+export function useCreateWorkPackage() {
+  const invalidate = useCascadeInvalidation()
+  return useMutation({
+    mutationFn: (input: WorkPackageInput) => db.createWorkPackage(input),
+    onSuccess: invalidate,
+  })
+}
+
+/** Completing a package is refused server-side while open NCRs are linked to it. */
+export function useUpdateWorkPackage() {
+  const invalidate = useCascadeInvalidation()
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: WorkPackageUpdate }) =>
+      db.updateWorkPackage(id, patch),
+    onSuccess: invalidate,
+  })
+}
+
+export function useScheduleInspection() {
+  const invalidate = useCascadeInvalidation()
+  return useMutation({
+    mutationFn: (input: InspectionInput) => db.scheduleInspection(input),
+    onSuccess: invalidate,
+  })
+}
+
+export function useLinkDefectToWorkPackage() {
+  const invalidate = useCascadeInvalidation()
+  return useMutation({
+    mutationFn: ({ defectId, workPackageId }: { defectId: string; workPackageId: string | null }) =>
+      db.linkDefectToWorkPackage(defectId, workPackageId),
+    onSuccess: invalidate,
+  })
+}
