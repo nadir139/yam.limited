@@ -13,6 +13,7 @@ import {
   useUpdateWorkPackage,
 } from '@/lib/query-hooks'
 import { typeColor } from '@/lib/ontology'
+import InlineInspectionResult from './InlineInspectionResult'
 import type {
   DefectRecord,
   WorkPackageStatus,
@@ -264,6 +265,7 @@ export default function ChatObjectPanel({
           <Field label="Findings" value={i.defect_count} />
         </>
       )
+      actions = <InlineInspectionResult inspection={i} />
     }
   } else if (objectType === 'DOCUMENT') {
     const doc = documents.find((x) => x.id === objectId)
