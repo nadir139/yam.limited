@@ -10,6 +10,8 @@ import type {
   Document,
   ProjectMember,
   WorldModelEvent,
+  Discipline,
+  WorkPackageStatus,
 } from './types'
 
 // Fixed project ID for Project ZERO — matches seed data
@@ -320,4 +322,123 @@ export async function uploadDocument(
     p_is_class_document: meta.isClassDocument,
   })
   return unwrap(data, error, 'Register document') as Document
+}
+
+// ─── Planning the work ────────────────────────────────────────────────────────
+//
+// Added in migration 011. Before it, the write path could only record what went
+// wrong — the job list itself could be seeded but never grown, which made this a
+// defect tracker attached to a fixed scope rather than a model of the project.
+
+export interface WorkPackageInput {
+  title: string
+  discipline: Discipline
+  description: string | null
+  planned_hours: number | null
+  planned_cost: number | null
+  trade_contractor: string | null
+  planned_start: string | null
+  planned_end: string | null
+  is_class_item: boolean
+  class_item_ref: string | null
+}
+
+/** Adds scope. The WP number is assigned server-side from the discipline. */
+export async function createWorkPackage(input: WorkPackageInput): Promise<WorkPackage> {
+  const { data, error } = await supabase.rpc('action_create_work_package', {
+    p_title: input.title,
+    p_discipline: input.discipline,
+    p_description: input.description,
+    p_planned_hours: input.planned_hours,
+    p_planned_cost: input.planned_cost,
+    p_trade_contractor: input.trade_contractor,
+    p_planned_start: input.planned_start,
+    p_planned_end: input.planned_end,
+    p_is_class_item: input.is_class_item,
+    p_class_item_ref: input.class_item_ref,
+  })
+  const result = unwrap(data, error, 'Create work package') as { work_package: WorkPackage }
+  return result.work_package
+}
+
+export interface WorkPackageUpdate {
+  status?: WorkPackageStatus
+  planned_hours?: number | null
+  planned_cost?: number | null
+  actual_hours?: number | null
+  actual_cost?: number | null
+  trade_contractor?: string | null
+  planned_start?: string | null
+  planned_end?: string | null
+  actual_start?: string | null
+  actual_end?: string | null
+}
+
+/**
+ * Progresses a work package. Omitted fields are left as they are — this cannot
+ * clear a value, only overwrite one.
+ *
+ * Moving to COMPLETE is refused while open NCRs are linked to the package. That
+ * rejection comes from the database, and its message names them.
+ */
+export async function updateWorkPackage(
+  id: string,
+  patch: WorkPackageUpdate,
+): Promise<WorkPackage> {
+  const { data, error } = await supabase.rpc('action_update_work_package', {
+    p_work_package_id: id,
+    p_status: patch.status ?? null,
+    p_planned_hours: patch.planned_hours ?? null,
+    p_planned_cost: patch.planned_cost ?? null,
+    p_actual_hours: patch.actual_hours ?? null,
+    p_actual_cost: patch.actual_cost ?? null,
+    p_trade_contractor: patch.trade_contractor ?? null,
+    p_planned_start: patch.planned_start ?? null,
+    p_planned_end: patch.planned_end ?? null,
+    p_actual_start: patch.actual_start ?? null,
+    p_actual_end: patch.actual_end ?? null,
+  })
+  const result = unwrap(data, error, 'Update work package') as { work_package: WorkPackage }
+  return result.work_package
+}
+
+export interface InspectionInput {
+  title: string
+  inspector_role: InspectionEvent['inspector_role']
+  work_package_id: string | null
+  inspector_name: string | null
+  scheduled_date: string | null
+  is_class_inspection: boolean
+  class_item_ref: string | null
+}
+
+/** Books an attendance. Result stays PENDING until recordInspectionResult. */
+export async function scheduleInspection(input: InspectionInput): Promise<InspectionEvent> {
+  const { data, error } = await supabase.rpc('action_schedule_inspection', {
+    p_title: input.title,
+    p_inspector_role: input.inspector_role,
+    p_work_package_id: input.work_package_id,
+    p_inspector_name: input.inspector_name,
+    p_scheduled_date: input.scheduled_date,
+    p_is_class_inspection: input.is_class_inspection,
+    p_class_item_ref: input.class_item_ref,
+  })
+  const result = unwrap(data, error, 'Schedule inspection') as { inspection: InspectionEvent }
+  return result.inspection
+}
+
+/** Attaches an open NCR to a work package, or detaches it when given null. */
+export async function linkDefectToWorkPackage(
+  defectId: string,
+  workPackageId: string | null,
+): Promise<{ defect: DefectRecord; workPackage: WorkPackage | null }> {
+  const { data, error } = await supabase.rpc('action_link_defect_to_work_package', {
+    p_defect_id: defectId,
+    p_work_package_id: workPackageId,
+  })
+  const result = unwrap(data, error, 'Attach NCR') as {
+    defect: DefectRecord
+    work_package: WorkPackage | null
+  }
+  return { defect: result.defect, workPackage: result.work_package }
 }

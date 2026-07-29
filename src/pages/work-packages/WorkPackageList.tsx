@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table'
 import { useWorkPackages } from '@/lib/query-hooks'
+import CreateWorkPackageForm from '@/components/actions/CreateWorkPackageForm'
 import type { Discipline, WorkPackageStatus } from '@/lib/types'
 
 const eur = (amount: number) =>
@@ -71,11 +72,14 @@ export default function WorkPackageList() {
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto">
-      <div>
-        <h1 className="text-2xl font-bold">Work Packages</h1>
-        <p className="text-sm mt-1" style={{ color: 'hsl(var(--muted-foreground))' }}>
-          {workPackages.length} packages across {new Set(workPackages.map((w) => w.discipline)).size} disciplines
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Work Packages</h1>
+          <p className="text-sm mt-1" style={{ color: 'hsl(var(--muted-foreground))' }}>
+            {workPackages.length} packages across {new Set(workPackages.map((w) => w.discipline)).size} disciplines
+          </p>
+        </div>
+        <CreateWorkPackageForm />
       </div>
 
       {/* Filters */}

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { useInspections, useWorkPackages } from '@/lib/query-hooks'
 import type { InspectionResult } from '@/lib/types'
 import RecordInspectionResult from '@/components/actions/RecordInspectionResult'
+import ScheduleInspectionForm from '@/components/actions/ScheduleInspectionForm'
 
 const RESULT_STYLES: Record<InspectionResult, { bg: string; text: string }> = {
   PASS: { bg: 'hsl(158 64% 40% / 0.15)', text: 'hsl(var(--success))' },
@@ -61,11 +62,14 @@ export default function InspectionList() {
 
   return (
     <div className="flex flex-col gap-6 max-w-5xl mx-auto">
-      <div>
-        <h1 className="text-2xl font-bold">Inspections</h1>
-        <p className="text-sm mt-1" style={{ color: 'hsl(var(--muted-foreground))' }}>
-          {inspections.length} events · {pending} pending · {classCount} class items
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Inspections</h1>
+          <p className="text-sm mt-1" style={{ color: 'hsl(var(--muted-foreground))' }}>
+            {inspections.length} events · {pending} pending · {classCount} class items
+          </p>
+        </div>
+        <ScheduleInspectionForm />
       </div>
 
       <div className="flex flex-wrap gap-3 items-center">

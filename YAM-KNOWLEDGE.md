@@ -604,3 +604,59 @@ in a spare row, so the graph cannot silently under-report the model.
 Edge labels are offset perpendicular to their line and anchored toward the side
 they were pushed. Centring them on the line makes the halo that keeps them
 readable erase the arrow underneath.
+
+---
+
+## 16. Planning the work (migration 011)
+
+### The gap
+
+The Actions layer could record what went wrong but not plan the work. You could
+raise an NCR, record an inspection result and decide an approval — but nothing
+created a work package, and nothing created an inspection. The job list could be
+seeded and never grown, which made the system a defect tracker bolted to a fixed
+scope rather than a model of the project. Testing the agent surfaced it twice in
+one conversation: it was asked to create an HVAC work package and to re-file an
+NCR under it, and had no tool for either.
+
+### What 011 adds
+
+| Action | Does |
+| --- | --- |
+| `action_create_work_package` | Adds scope. Starts DRAFT. |
+| `action_update_work_package` | Progresses it, books actuals. |
+| `action_schedule_inspection` | Books an attendance *before* it happens. |
+| `action_link_defect_to_work_package` | Attaches an open NCR to the scope it hits. |
+
+Registering them in `ontology_actions` is what makes them available to the
+agent — no TypeScript change. The `/ontology` page picked them up for the same
+reason.
+
+### Two guards worth keeping
+
+**A work package cannot go COMPLETE while open NCRs are linked to it**, and the
+rejection names them (`Cannot complete WP-MECH-007: open NCRs against it
+(NCR-2026-007)`). This is the clearest demonstration of why defects and scope
+belong in one model: the database refuses a claim the project's own records
+contradict, instead of leaving someone to notice later. The UI surfaces that
+message verbatim rather than rewording it.
+
+**A closed NCR cannot be re-linked.** A settled record may already have an
+approval granted against it; re-filing it under different scope rewrites
+history.
+
+### Numbering
+
+`WP-<ABBREV>-<seq>` / `INSP-<ABBREV>-<seq>`, sequence taken from the highest
+suffix sharing the same *prefix* — not per discipline. The seed is not perfectly
+consistent (WP-HULL-002 is a STRUCTURAL package), so numbering follows the
+numbers that exist rather than the category they ought to belong to.
+`discipline_abbrev()` holds the mapping; an inspection with no work package
+falls back to `INSP-CLASS-` or `INSP-GEN-`.
+
+### Partial updates
+
+In `action_update_work_package` a null parameter means "leave this field alone",
+so the Action can overwrite a value but never clear one. `actual_start` and
+`actual_end` are filled from the status when the caller omits them: a package
+that is ACTIVE started, one that is COMPLETE ended.
