@@ -225,3 +225,30 @@ export const useObjectEvents = (
     queryFn: () => db.fetchObjectEvents(objectType, objectId!),
     enabled: !!objectId,
   })
+
+// ─── Permissions ──────────────────────────────────────────────────────────────
+
+export const useMyRole = () =>
+  useQuery({ queryKey: ['my-role'], queryFn: db.fetchMyRole, staleTime: 5 * 60_000 })
+
+/**
+ * `can('action_create_work_package')` — for hiding controls the role cannot use.
+ *
+ * Defaults to false while loading, so a control never flashes in and then
+ * fails. The Action enforces regardless; this only spares the user a refusal
+ * they could not have predicted.
+ */
+export function usePermissions() {
+  const { data: role = null, isLoading: roleLoading } = useMyRole()
+  const { data: matrix = [], isLoading: matrixLoading } = useQuery({
+    queryKey: ['action-permissions'],
+    queryFn: db.fetchActionPermissions,
+    staleTime: 5 * 60_000,
+  })
+
+  const isLoading = roleLoading || matrixLoading
+  const can = (actionKey: string) =>
+    !isLoading && role !== null && matrix.some((p) => p.action_key === actionKey && p.role === role)
+
+  return { role, can, isLoading }
+}

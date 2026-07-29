@@ -746,3 +746,64 @@ object's history.
 The agent writes `**bold**` and `- ` bullets and the console printed them raw.
 `renderInline` handles exactly that subset, building React nodes — never
 injected HTML, since the reply is model output.
+
+---
+
+## 19. Roles become permissions (migration 012)
+
+### What "role" used to mean
+
+Nothing. The user picked one at sign-in and it was stored in `localStorage`
+under `yam_role_<email>`. No Action ever read it, and anyone could change their
+own role from the browser console. The Actions layer made the write path
+*auditable* but not *authorised*: it recorded who did something, never whether
+they were allowed to.
+
+### What it means now
+
+`current_actor_role()` resolves the role from `project_members` by the verified
+JWT email. `action_permissions(action_key, role)` holds the matrix as data, and
+every Action begins with `perform require_permission('<its own name>')`.
+
+The matrix is a table rather than a `CASE` statement so it can be read by the
+`/ontology` page and the agent, and changed without a deploy. Reading it is
+public; writing it is granted to nobody.
+
+### The shape of the matrix
+
+- **Anyone on the project can raise an NCR, upload a document, and post.**
+  Reporting a problem is never gated. A system that makes bad news hard to file
+  gets the bad news late, which is the failure this product exists to prevent.
+- **Recording a survey result** is the class surveyor, yard QC and owner's rep.
+- **Scope and money** — creating and updating work packages, re-linking NCRs —
+  is the owner's rep, yard PM and naval architect. Not the captain, not
+  subcontractors, not class.
+- **Approvals** are the owner and the owner's rep, and `require_approval_authority`
+  adds the rule the tiers always implied but never enforced: Tier 3 (over
+  €50,000) is the owner's decision alone.
+- **Advancing the project phase** is the owner's rep only.
+
+### How the guard was applied
+
+Ten functions each needed one line. Rather than re-emitting ten bodies by hand,
+where a transcription slip would silently change behaviour, the migration reads
+each definition from `pg_catalog` and inserts the call after its outer `begin`.
+Verified first that every `action_*` function contains exactly one occurrence of
+that marker, and afterwards that each contains exactly one guard. Re-creating
+the function proves it still compiles. The block is idempotent — a second run
+inserts nothing.
+
+### ⚠️ Behaviour change
+
+An authenticated user whose email is not in `project_members` can now call **no
+Action at all**; they get `You are not a member of this project`. Reads are
+unaffected, so they can still see everything — that is the pre-existing RLS
+looseness recorded in §12, not something 012 introduced.
+
+### The client
+
+`AuthContext` resolves name and role from `project_members`; the sign-in screen
+no longer asks for a role, because it was never the user's to choose.
+`usePermissions()` exposes `can('action_x')`, used to hide controls a role
+cannot use. That is courtesy, not security: every Action re-checks, and a client
+that skips the check is refused by Postgres.

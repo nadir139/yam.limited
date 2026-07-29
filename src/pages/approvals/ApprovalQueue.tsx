@@ -14,7 +14,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table'
-import { useApprovals, useChangeOrders, useDecideApproval } from '@/lib/query-hooks'
+import { useApprovals, useChangeOrders, useDecideApproval, usePermissions } from '@/lib/query-hooks'
 
 const TIER_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   TIER_1: { bg: 'hsl(158 64% 40% / 0.15)', text: 'hsl(var(--success))', label: 'Tier 1 (<€10k)' },
@@ -43,6 +43,8 @@ export default function ApprovalQueue() {
   const { data: approvals = [], isLoading: approvalsLoading } = useApprovals()
   const { data: changeOrders = [], isLoading: coLoading } = useChangeOrders()
   const updateApproval = useDecideApproval()
+  const { can, role } = usePermissions()
+  const mayDecide = can('action_decide_approval')
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dialogAction, setDialogAction] = useState<'APPROVED' | 'REJECTED'>('APPROVED')
@@ -182,6 +184,12 @@ export default function ApprovalQueue() {
                     {approval.deadline && <DeadlineDisplay deadline={approval.deadline} />}
                   </div>
 
+                  {!mayDecide ? (
+                    <p className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                      Decisions on this queue are the owner's and the owner's rep's.
+                      {role ? ` Your role is ${role.replace(/_/g, ' ').toLowerCase()}.` : ''}
+                    </p>
+                  ) : (
                   <div className="flex gap-2">
                     <Button
                       size="sm"
@@ -200,7 +208,8 @@ export default function ApprovalQueue() {
                       <XCircle size={14} className="mr-1.5" />
                       Reject
                     </Button>
-                  </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )

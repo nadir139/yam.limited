@@ -11,6 +11,7 @@ import {
   useUpdateDefectStatus,
   useDecideApproval,
   useUpdateWorkPackage,
+  usePermissions,
 } from '@/lib/query-hooks'
 import { typeColor } from '@/lib/ontology'
 import InlineInspectionResult from './InlineInspectionResult'
@@ -101,6 +102,7 @@ export default function ChatObjectPanel({
   const updateDefect = useUpdateDefectStatus()
   const decideApproval = useDecideApproval()
   const updateWp = useUpdateWorkPackage()
+  const { can } = usePermissions()
 
   const run = <T,>(m: { mutate: (v: T, o: object) => void }, vars: T) => {
     setError(null)
@@ -127,7 +129,7 @@ export default function ChatObjectPanel({
           <Field label="Class item" value={d.is_class_defect ? d.class_item_ref || 'Yes' : 'No'} />
         </>
       )
-      actions = (
+      actions = !can('action_update_defect_status') ? null : (
         <select
           className={selectClass}
           style={selectStyle}
@@ -188,7 +190,7 @@ export default function ChatObjectPanel({
         </>
       )
       actions =
-        a.status === 'PENDING' ? (
+        a.status === 'PENDING' && can('action_decide_approval') ? (
           <div className="flex gap-1.5">
             <Button
               size="sm"
@@ -231,7 +233,7 @@ export default function ChatObjectPanel({
           <Field label="Contractor" value={w.trade_contractor ?? '—'} />
         </>
       )
-      actions = (
+      actions = !can('action_update_work_package') ? null : (
         <select
           className={selectClass}
           style={selectStyle}

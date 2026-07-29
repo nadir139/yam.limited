@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { useScheduleInspection, useWorkPackages, type InspectionInput } from '@/lib/query-hooks'
+import { useScheduleInspection, useWorkPackages, usePermissions, type InspectionInput } from '@/lib/query-hooks'
 import type { InspectionEvent } from '@/lib/types'
 
 const ROLES: { value: InspectionEvent['inspector_role']; label: string }[] = [
@@ -51,6 +51,7 @@ export default function ScheduleInspectionForm({
   const [form, setForm] = useState<InspectionInput>(empty)
   const { data: workPackages = [] } = useWorkPackages()
   const mutation = useScheduleInspection()
+  const { can } = usePermissions()
 
   const set = <K extends keyof InspectionInput>(k: K, v: InspectionInput[K]) =>
     setForm((prev) => ({ ...prev, [k]: v }))
@@ -71,6 +72,8 @@ export default function ScheduleInspectionForm({
       },
     })
   }
+
+  if (!can('action_schedule_inspection')) return null
 
   return (
     <>
