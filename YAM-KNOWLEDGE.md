@@ -731,6 +731,16 @@ round trip and reflects changes made anywhere else in the app. `ChatObjectPanel`
 is keyed by object type; a type it does not know renders its number and a link
 rather than failing.
 
+Inspections are the one case that needed a form rather than a control — result,
+date and notes — so `InlineInspectionResult` expands in place instead of opening
+the full dialog, which would have sent the user out of the chat. Notes are
+required for anything other than a pass, enforced by the field itself. After a
+FAIL or CONDITIONAL_PASS it offers to raise the NCR, through `RaiseDefectForm`;
+that one is a dialog rather than a route change, so the conversation survives it.
+Amending an already-recorded result is allowed, because
+`action_record_inspection_result` allows it and every amendment lands in the
+object's history.
+
 ### Markdown was rendering as literal asterisks
 
 The agent writes `**bold**` and `- ` bullets and the console printed them raw.
