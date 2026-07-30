@@ -133,6 +133,19 @@ function buildTools(types: OntologyType[], actions: OntologyAction[]) {
         required: [],
       },
     },
+    {
+      name: "get_object_story",
+      description:
+        "Everything that ever happened to ONE object: its own events oldest-first, and every message posted about it. Read this before answering any question about how an object got to its current state, or before reporting what it cost or how long it took. A row's fields are what someone typed when they raised it -- often an estimate made in the first five minutes. The reasons attached to its events and the messages on its thread are where the real story is, including why it was closed and what the work actually turned out to be.",
+      input_schema: {
+        type: "object",
+        properties: {
+          object_type: { type: "string", enum: typeKeys },
+          id: { type: "string", description: "The object's UUID" },
+        },
+        required: ["object_type", "id"],
+      },
+    },
   ];
 
   const actionTools = actions.map((a) => {
@@ -179,6 +192,10 @@ ${linkLines}
 
 ## How to work
 Read before you write. Use list_objects and get_object to ground yourself in real data -- never guess an id, a number, or a status.
+
+A row is not the whole record. The fields on an object are what someone typed when they filed it, which for cost and duration is usually an estimate made in the first five minutes. Before you answer any question about how an object got where it is, or report what it cost or how long it took, call get_object_story: it returns the object's events -- each carrying the reason the person gave -- and every message on its thread. Say what the record actually says, including a correction that supersedes the original figure. Never report that something was closed without explanation before you have looked at its story.
+
+When someone tells you what a job really cost, really took, or was really caused by, that is new knowledge and it belongs in the record: call action_amend_defect_impact rather than only replying. Closing an NCR ends its status, not its record -- a closed NCR can still be corrected.
 
 The action_* tools are the only way to change anything. They run with ${actorName}'s own permissions and record them as the actor, so you cannot do anything they could not do themselves. Each one validates its input server-side and writes an audit event in the same transaction.
 
@@ -431,6 +448,48 @@ Deno.serve(async (req: Request) => {
         .order("triggered_at", { ascending: false })
         .limit(limit);
       return error ? { error: error.message } : { events: data };
+    }
+
+    // One object's whole story. The row alone is what someone believed when
+    // they filed it; the events carry the reasons, and the thread carries what
+    // people said afterwards. Reporting an NCR's cost from the row and calling
+    // the closure uncommented -- when the comment is sitting on its thread --
+    // is exactly the failure this exists to prevent.
+    if (name === "get_object_story") {
+      const objectType = String(input.object_type);
+      const table = tableFor.get(objectType);
+      if (!table) return { error: `Unknown object type: ${objectType}` };
+      const id = String(input.id);
+
+      const [objectRes, eventsRes, messagesRes] = await Promise.all([
+        supabase.from(table).select("*").eq("id", id).maybeSingle(),
+        supabase
+          .from("world_model_events")
+          .select("*")
+          .eq("object_type", objectType)
+          .eq("object_id", id)
+          .order("triggered_at", { ascending: true })
+          .limit(MAX_ROWS),
+        supabase
+          .from("messages")
+          .select("*")
+          .eq("linked_object_type", objectType)
+          .eq("linked_object_id", id)
+          .order("created_at", { ascending: true })
+          .limit(MAX_ROWS),
+      ]);
+
+      if (objectRes.error) return { error: objectRes.error.message };
+      if (!objectRes.data) return { error: "No object with that id." };
+      index.harvest(table, objectRes.data);
+
+      return {
+        object: objectRes.data,
+        events: eventsRes.error ? [] : eventsRes.data,
+        messages: messagesRes.error ? [] : messagesRes.data,
+        events_error: eventsRes.error?.message,
+        messages_error: messagesRes.error?.message,
+      };
     }
 
     if (actionKeys.has(name)) {

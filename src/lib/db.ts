@@ -237,17 +237,63 @@ export async function raiseDefect(input: DefectInput): Promise<CascadeResult> {
   }
 }
 
+/**
+ * Moves an NCR through its lifecycle.
+ *
+ * `notes` is not optional in practice: the Action refuses CLOSED and DISPUTED
+ * without one, because those are the two transitions that end an argument, and
+ * the reason is the only part of them worth keeping. It is written to the
+ * object's event and posted to its thread, so the agent reads it back with the
+ * rest of the record rather than reporting a closure with no explanation.
+ */
 export async function updateDefectStatus(
   id: string,
   status: DefectRecord['status'],
   closedDate?: string | null,
+  notes?: string | null,
 ): Promise<DefectRecord> {
   const { data, error } = await supabase.rpc('action_update_defect_status', {
     p_defect_id: id,
     p_status: status,
     p_closed_date: closedDate ?? null,
+    p_notes: notes?.trim() || null,
   })
   return unwrap(data, error, 'Update defect status') as DefectRecord
+}
+
+export interface DefectAmendment {
+  reason: string
+  cost_impact?: number | null
+  schedule_impact_days?: number | null
+  root_cause?: DefectRecord['root_cause'] | null
+  description?: string | null
+}
+
+/**
+ * Corrects what an NCR actually cost or actually took, once that is known.
+ *
+ * The figures on a freshly raised NCR are a guess made in the first five
+ * minutes. Without this there was no way to replace them — a job estimated at
+ * €30 and a day stayed €30 and a day even after it turned out to be a €50
+ * switch over three. The old values are kept in the event's `before_state` and
+ * the reason is required, so this corrects the record without erasing what was
+ * first believed. Allowed on closed NCRs: closing ends the status, not the
+ * record.
+ */
+export async function amendDefectImpact(
+  id: string,
+  patch: DefectAmendment,
+): Promise<DefectRecord> {
+  const { data, error } = await supabase.rpc('action_amend_defect_impact', {
+    p_defect_id: id,
+    p_reason: patch.reason,
+    p_cost_impact: patch.cost_impact ?? null,
+    p_schedule_impact_days: patch.schedule_impact_days ?? null,
+    p_root_cause: patch.root_cause ?? null,
+    p_description: patch.description?.trim() || null,
+  })
+  const result = unwrap(data, error, 'Correct NCR impact') as { defect: DefectRecord }
+  return result.defect
 }
 
 export async function recordInspectionResult(

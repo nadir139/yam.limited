@@ -14,8 +14,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { useDefect, useChangeOrders, useApprovals, useUpdateDefectStatus, useDocuments } from '@/lib/query-hooks'
+import {
+  useDefect,
+  useChangeOrders,
+  useApprovals,
+  useUpdateDefectStatus,
+  useDocuments,
+  usePermissions,
+} from '@/lib/query-hooks'
 import UploadDocumentForm from '@/components/actions/UploadDocumentForm'
+import AmendDefectImpact from '@/components/actions/AmendDefectImpact'
 import ObjectHistory from '@/components/ObjectHistory'
 import MessageThread from '@/components/MessageThread'
 import type { DefectSeverity } from '@/lib/types'
@@ -89,9 +97,12 @@ export default function DefectDetail() {
   const { data: approvals = [], isLoading: approvalsLoading } = useApprovals()
   const { data: allDocs = [] } = useDocuments()
   const updateDefect = useUpdateDefectStatus()
+  const { can } = usePermissions()
 
   const [closeDialogOpen, setCloseDialogOpen] = useState(false)
   const [closeNotes, setCloseNotes] = useState('')
+  const [closeError, setCloseError] = useState<string | null>(null)
+  const [amendOpen, setAmendOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
 
   const showToast = (msg: string) => {
@@ -176,6 +187,13 @@ export default function DefectDetail() {
             style={{ backgroundColor: 'hsl(var(--success))', color: 'white' }}
           >
             Close NCR
+          </Button>
+        )}
+        {/* Available on closed NCRs too: closing ends the status, not the
+            record, and what a job really cost is usually known afterwards. */}
+        {can('action_amend_defect_impact') && (
+          <Button size="sm" variant="outline" onClick={() => setAmendOpen(true)}>
+            Correct impact
           </Button>
         )}
       </div>
@@ -444,34 +462,47 @@ export default function DefectDetail() {
             <DialogTitle>Close NCR — {defect.ncr_number}</DialogTitle>
           </DialogHeader>
           <p className="text-sm mb-4" style={{ color: 'hsl(var(--muted-foreground))' }}>
-            Closing this NCR marks it as resolved. Provide closure notes or reference the corrective action taken.
+            Say what actually happened. This is kept on the NCR's record and its
+            thread — it is what anyone reading the job back later has to go on,
+            including the agent.
           </p>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="close-notes">Closure Notes</Label>
+            <Label htmlFor="close-notes">Closure notes (required)</Label>
             <Textarea
               id="close-notes"
               value={closeNotes}
-              onChange={(e) => setCloseNotes(e.target.value)}
-              placeholder="Describe how this defect was resolved..."
+              onChange={(e) => {
+                setCloseNotes(e.target.value)
+                setCloseError(null)
+              }}
+              placeholder="What was the real cause, and what was done about it?"
               rows={3}
             />
+            {closeError && (
+              <p className="text-xs" style={{ color: 'hsl(var(--destructive))' }}>
+                {closeError}
+              </p>
+            )}
           </div>
           <DialogFooter className="mt-4">
             <Button variant="outline" onClick={() => setCloseDialogOpen(false)}>Cancel</Button>
             <Button
-              disabled={updateDefect.isPending}
+              disabled={updateDefect.isPending || closeNotes.trim().length === 0}
               onClick={() =>
                 updateDefect.mutate(
                   {
                     id: defect.id,
                     status: 'CLOSED',
                     closedDate: new Date().toISOString().split('T')[0],
+                    notes: closeNotes,
                   },
                   {
                     onSuccess: () => {
                       setCloseDialogOpen(false)
-                      showToast('NCR closed successfully.')
+                      setCloseNotes('')
+                      showToast('NCR closed. Your note is on the record.')
                     },
+                    onError: (e) => setCloseError(e.message),
                   },
                 )
               }
@@ -480,6 +511,23 @@ export default function DefectDetail() {
               {updateDefect.isPending ? 'Closing…' : 'Confirm Close'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Correct the recorded impact */}
+      <Dialog open={amendOpen} onOpenChange={setAmendOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Correct impact — {defect.ncr_number}</DialogTitle>
+          </DialogHeader>
+          <AmendDefectImpact
+            defect={defect}
+            onSaved={() => {
+              setAmendOpen(false)
+              showToast('Record corrected. The old figures are kept in its history.')
+            }}
+            onCancel={() => setAmendOpen(false)}
+          />
         </DialogContent>
       </Dialog>
     </div>

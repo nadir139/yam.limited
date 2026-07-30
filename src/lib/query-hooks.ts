@@ -79,6 +79,11 @@ function useCascadeInvalidation() {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.documents })
     qc.invalidateQueries({ queryKey: QUERY_KEYS.project })
     qc.invalidateQueries({ queryKey: QUERY_KEYS.events })
+    // Some Actions post to an object's thread — closing an NCR files its reason
+    // there, and correcting one files what changed. Without this the note the
+    // user just wrote does not appear until a reload, which reads exactly like
+    // it was thrown away.
+    qc.invalidateQueries({ queryKey: ['messages'] })
   }
 }
 
@@ -103,10 +108,29 @@ export function useUpdateDefectStatus() {
   return useMutation<
     DefectRecord,
     Error,
-    { id: string; status: DefectRecord['status']; closedDate?: string | null }
+    {
+      id: string
+      status: DefectRecord['status']
+      closedDate?: string | null
+      /** Required by the Action for CLOSED and DISPUTED. */
+      notes?: string | null
+    }
   >({
-    mutationFn: ({ id, status, closedDate }) =>
-      db.updateDefectStatus(id, status, closedDate),
+    mutationFn: ({ id, status, closedDate, notes }) =>
+      db.updateDefectStatus(id, status, closedDate, notes),
+    onSuccess: invalidate,
+  })
+}
+
+/**
+ * Corrects an NCR's recorded cost, duration, root cause or description once the
+ * real figures are known — including on a closed NCR. The previous values stay
+ * in the event log.
+ */
+export function useAmendDefectImpact() {
+  const invalidate = useCascadeInvalidation()
+  return useMutation<DefectRecord, Error, { id: string; patch: db.DefectAmendment }>({
+    mutationFn: ({ id, patch }) => db.amendDefectImpact(id, patch),
     onSuccess: invalidate,
   })
 }

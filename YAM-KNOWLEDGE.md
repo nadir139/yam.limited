@@ -866,3 +866,122 @@ video integration does not.
 
 Work package and change order detail pages (a Conversation tab), the NCR page (a
 card), and `/app/messages` for the project channel plus the unplanned-work view.
+
+---
+
+## 21. More than one project (migration 014)
+
+Until 014 the app was Project ZERO with the seams painted over. Two habits made
+that structural rather than cosmetic.
+
+### Every read policy was `USING (true)`
+
+Any signed-in address could read every row of every project. With one demo
+project that reads as a permissive demo; with a real second project on the same
+database it is a data breach waiting for a second tenant. Reads are now
+`USING (is_project_member(project_id))`, and `projects` and `vessels` get the
+two special cases they need — `projects` keys on `id`, and a vessel is visible
+through the project that refits it.
+
+Verified by signing a second address in and counting: zero rows from every
+domain table.
+
+### The Actions guessed the project
+
+Every creating Action resolved its project as `select id from projects order by
+created_at limit 1` — "the first project that exists". Harmless with one.
+Silently wrong with two: an NCR raised on the Sardinia property would have been
+filed against the ketch, and nothing would have looked broken.
+
+`resolve_project(p_explicit uuid)` replaces the guess. Given null it looks up
+the caller's memberships, and **raises rather than picking** when there is more
+than one. Refusing beats guessing here: a wrong project assignment is invisible
+for weeks.
+
+### Role was checked on the wrong project
+
+Migration 012's guard was `require_permission('action_x')` — does the caller
+hold a role permitting this *anywhere*. `require_permission_for_object` resolves
+the object's own project first, so a YARD_PM on one project cannot act on
+another project's objects.
+
+### A DO block that silently did nothing
+
+The first attempt at rewriting those guards looped over a 2-D array and sliced
+it `pairs[i:i][1:3]`, which matches nothing in Postgres. The block ran, threw no
+error, and changed not one function. It was caught only because the result was
+verified afterwards — which is the entire argument for verifying afterwards. The
+replacement is one explicit `rewrite_action_guard()` call per function, each
+returning what it did.
+
+### Still to do
+
+`action_raise_defect`, `action_register_document` and
+`action_advance_project_phase` still hardcode
+`'a1b2c3d4-0002-0000-0000-000000000001'`. Each needs a `p_project_id` threaded
+through `resolve_project()`, which changes its signature and therefore the
+client and the registry with it. The client still hardcodes `PROJECT_ID` in
+`src/lib/db.ts` (11 call sites) and has no project switcher.
+
+---
+
+## 22. The reason, and the correction (migration 015)
+
+Reported from use, not found by review, and the most instructive bug in the
+project so far.
+
+Someone raised an NCR for a light in the master cabin, closed it, and typed
+"forget about the light, it was the switch actually" into the closure notes box.
+Asked about that NCR afterwards, the agent reported €30, one day, closed, no
+comment — every word true of the row, and none of it true of the job.
+
+### The note was never sent
+
+`DefectDetail.tsx` collected `closeNotes` into React state; the mutate call
+omitted it. `action_update_defect_status` had no notes parameter to send it to.
+In a system whose entire claim is that nothing is lost, the single most
+important fact about a closure was discarded at the browser — invisibly, because
+the field looked like it worked. That text is gone. It was never written
+anywhere; there was nothing to recover.
+
+The note is now part of the Action, and **required** for `CLOSED` and
+`DISPUTED` — the two transitions that end an argument. It is written to
+`world_model_events.after_state.reason` *and* posted as a message on the NCR's
+thread, so the agent picks it up with the rest of the record rather than only
+when it thinks to read the audit log.
+
+### The numbers could not be corrected
+
+Even with the note, the figures were stuck. The cost and duration on an NCR are
+an estimate made in its first five minutes; closing was terminal; €30 and one
+day stayed €30 and one day forever. The project totals were built on guesses
+nobody could correct, so the agent's only remaining move was to file a prose
+note saying the record was wrong.
+
+`action_amend_defect_impact` corrects cost, schedule, root cause and
+description, **including on a closed NCR** — closing ends the status, not the
+record. It is not an edit: the old values go into the event's `before_state`,
+the reason is required, and the change is posted to the thread. What was first
+believed stays recoverable alongside what turned out to be true, which is the
+difference between an ontology and a spreadsheet.
+
+Guards, all verified inside a rolled-back transaction: no reason → refused,
+nothing to change → refused, negative cost → refused, close without a note →
+refused.
+
+### The agent could not see any of it
+
+Both fixes would have been useless on their own, because the agent had no tool
+that read one object's history. `get_event_history` returns the *project's* last
+N events, newest first — an NCR's own story was reachable only by luck. Hence
+`get_object_story(object_type, id)`: the row, its events oldest-first, and every
+message on its thread, in one call. The system prompt now says a row is not the
+whole record, and to read the story before reporting what anything cost.
+
+### Where it appears
+
+A required closure-notes field on the NCR page and a staged reason prompt in the
+chat panel (the select no longer fires straight into a refusal). "Correct
+impact" opens `AmendDefectImpact` — a dialog on the NCR page, expanded in place
+in the chat. `ObjectHistory` pulls `reason` out of the diff and renders it as a
+quote, because it is why the other fields moved, not another field that moved.
