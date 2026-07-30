@@ -102,6 +102,8 @@ applied by hand in the Supabase SQL editor, in this order:
 13. `supabase-migration-011-work-package-actions.sql` — Actions that plan the work
 14. `supabase-migration-012-role-permissions.sql` — roles become permissions
 15. `supabase-migration-013-messages-and-immutability.sql` — conversation, and nothing gets deleted
+16. `supabase-migration-014-multi-project.sql` — reads scoped to project membership; Actions stop guessing the project
+17. `supabase-migration-015-closure-notes-and-corrections.sql` — closing an NCR requires a reason; a closed NCR can still be corrected
 
 Migrations 006–008 are the important ones. After 008 the `authenticated` and
 `anon` roles hold **zero** `INSERT`/`UPDATE`/`DELETE` grants on the domain
@@ -134,12 +136,18 @@ select grantee, string_agg(distinct privilege_type, ',') as privs
  group by grantee;   -- must be exactly: SELECT
 ```
 
-> ⚠️ RLS *read* policies are intentionally permissive (`USING (true)` on every
-> table) and magic-link sign-up is unrestricted, so anyone who can receive email
-> can sign in and read the demo data. Writes are constrained by the Actions
-> layer, but the data is still visible to any signed-in address. See
-> `YAM-KNOWLEDGE.md` §12 for why this cannot be tightened without first gating
-> sign-up.
+After migration 014 every read policy is `USING (is_project_member(project_id))`
+rather than `USING (true)`. Magic-link sign-up is still unrestricted — anyone who
+can receive email can create an account — but an account that belongs to no
+project now reads zero rows from every domain table. Worth re-checking with a
+second address after any policy change:
+
+```sql
+-- signed in as an address with no project_members row
+select count(*) from defect_records;   -- must be 0
+select count(*) from messages;         -- must be 0
+select count(*) from work_packages;    -- must be 0
+```
 
 ### Edge Functions
 

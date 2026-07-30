@@ -17,6 +17,7 @@ const EVENT_LABELS: Record<string, string> = {
   DEFECT_CREATED: 'Raised',
   DEFECT_RAISED: 'Raised',
   DEFECT_STATUS_CHANGED: 'Status changed',
+  DEFECT_IMPACT_AMENDED: 'Impact corrected',
   DEFECT_RELINKED: 'Re-attached',
   CHANGE_ORDER_CREATED: 'Raised',
   CHANGE_ORDER_APPROVED: 'Approved',
@@ -58,6 +59,10 @@ const HIDDEN_FIELDS = new Set([
   'linked_object_id',
   'change_order_id',
   'defect_record_id',
+  // Not a field that changed — it is why the others did. Rendered as prose
+  // below the diff instead of as `— → "it was the switch"`, because it is the
+  // part of the event a person actually came to read.
+  'reason',
 ])
 
 const label = (k: string) =>
@@ -92,6 +97,7 @@ function EventRow({ event, isLast }: { event: WorldModelEvent; isLast: boolean }
   const fields = changedFields(before, after)
   const isCreation = !before
   const isCascade = Boolean(event.cascade_from_event_id)
+  const reason = typeof after?.reason === 'string' ? after.reason.trim() : ''
 
   return (
     <div className="flex gap-3">
@@ -165,6 +171,18 @@ function EventRow({ event, isLast }: { event: WorldModelEvent; isLast: boolean }
               </div>
             ))}
           </div>
+        )}
+
+        {reason && (
+          <blockquote
+            className="mt-2 border-l-2 pl-2.5 text-xs italic"
+            style={{
+              borderColor: 'hsl(var(--accent))',
+              color: 'hsl(var(--foreground))',
+            }}
+          >
+            {reason}
+          </blockquote>
         )}
       </div>
     </div>

@@ -15,6 +15,8 @@ import {
 } from '@/lib/query-hooks'
 import { typeColor } from '@/lib/ontology'
 import InlineInspectionResult from './InlineInspectionResult'
+import AmendDefectImpact from '@/components/actions/AmendDefectImpact'
+import { Textarea } from '@/components/ui/textarea'
 import type {
   DefectRecord,
   WorkPackageStatus,
@@ -89,6 +91,11 @@ export default function ChatObjectPanel({
 }) {
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
+  // CLOSED and DISPUTED are refused by the Action without a reason, so the
+  // select stages the change and asks for one rather than firing and failing.
+  const [pendingStatus, setPendingStatus] = useState<DefectRecord['status'] | null>(null)
+  const [reason, setReason] = useState('')
+  const [amending, setAmending] = useState(false)
 
   // Everything comes from the lists React Query already holds, so opening a
   // panel costs no round trip and reflects any change made elsewhere.
@@ -129,27 +136,112 @@ export default function ChatObjectPanel({
           <Field label="Class item" value={d.is_class_defect ? d.class_item_ref || 'Yes' : 'No'} />
         </>
       )
-      actions = !can('action_update_defect_status') ? null : (
-        <select
-          className={selectClass}
-          style={selectStyle}
-          value={d.status}
-          disabled={updateDefect.isPending || d.status === 'CLOSED'}
-          onChange={(e) =>
-            run(updateDefect, {
-              id: d.id,
-              status: e.target.value as DefectRecord['status'],
-              closedDate:
-                e.target.value === 'CLOSED'
-                  ? new Date().toISOString().split('T')[0]
-                  : null,
-            })
-          }
-        >
-          {DEFECT_STATUSES.map((s) => (
-            <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
-          ))}
-        </select>
+      const canAmend = can('action_amend_defect_impact')
+      const commit = (status: DefectRecord['status'], note: string | null) => {
+        run(updateDefect, {
+          id: d.id,
+          status,
+          closedDate:
+            status === 'CLOSED' ? new Date().toISOString().split('T')[0] : null,
+          notes: note,
+        })
+        setPendingStatus(null)
+        setReason('')
+      }
+
+      const canStatus = can('action_update_defect_status') && d.status !== 'CLOSED'
+      actions = !canStatus && !canAmend ? null : (
+        <div className="flex w-full flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {canStatus && (
+              <select
+                className={selectClass}
+                style={selectStyle}
+                value={pendingStatus ?? d.status}
+                disabled={updateDefect.isPending}
+                onChange={(e) => {
+                  const next = e.target.value as DefectRecord['status']
+                  if (next === d.status) return setPendingStatus(null)
+                  // Everything else is a working state and needs no argument;
+                  // these two end the matter, and the reason is the only part
+                  // worth keeping.
+                  if (next === 'CLOSED' || next === 'DISPUTED') {
+                    setPendingStatus(next)
+                    setError(null)
+                  } else {
+                    commit(next, null)
+                  }
+                }}
+              >
+                {DEFECT_STATUSES.map((s) => (
+                  <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
+                ))}
+              </select>
+            )}
+            {d.status === 'CLOSED' && (
+              <span className="text-[11px]" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                Closed{d.closed_date ? ` on ${d.closed_date}` : ''}
+              </span>
+            )}
+            {canAmend && !amending && !pendingStatus && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs"
+                onClick={() => setAmending(true)}
+              >
+                Correct impact
+              </Button>
+            )}
+          </div>
+
+          {pendingStatus && (
+            <div className="flex flex-col gap-1.5">
+              <Textarea
+                rows={2}
+                className="text-xs"
+                autoFocus
+                placeholder={
+                  pendingStatus === 'CLOSED'
+                    ? 'What was the real cause, and what was done about it?'
+                    : 'What is disputed, and by whom?'
+                }
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+              />
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  className="h-7 text-xs"
+                  disabled={updateDefect.isPending || reason.trim().length === 0}
+                  onClick={() => commit(pendingStatus, reason)}
+                >
+                  Mark {pendingStatus.replace(/_/g, ' ').toLowerCase()}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs"
+                  onClick={() => {
+                    setPendingStatus(null)
+                    setReason('')
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {amending && (
+            <AmendDefectImpact
+              defect={d}
+              compact
+              onSaved={() => setAmending(false)}
+              onCancel={() => setAmending(false)}
+            />
+          )}
+        </div>
       )
     }
   } else if (objectType === 'CHANGE_ORDER') {
