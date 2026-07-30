@@ -107,6 +107,12 @@ export default function ProjectOverview() {
                 <DetailRow label="Build Yard" value={vessel.build_yard} />
               </>
             )}
+            {!vessel && (
+              <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                No vessel on this project. Property and survey projects carry the
+                same work packages, findings and approvals without one.
+              </p>
+            )}
           </CardContent>
         </Card>
 

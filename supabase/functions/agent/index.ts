@@ -152,6 +152,10 @@ function buildTools(types: OntologyType[], actions: OntologyAction[]) {
     const properties: Record<string, unknown> = {};
     const required: string[] = [];
     for (const p of a.parameters ?? []) {
+      // p_project_id is filled in by the dispatcher from the conversation's own
+      // project. Exposing it would offer the model a decision it has no basis
+      // for and every reason to get wrong.
+      if (p.name === "p_project_id") continue;
       properties[p.name] = paramSchema(p);
       if (p.required) required.push(p.name);
     }
@@ -168,10 +172,21 @@ function buildTools(types: OntologyType[], actions: OntologyAction[]) {
   return [...readTools, ...actionTools];
 }
 
+interface ProjectSummary {
+  id: string;
+  name: string;
+  project_type: string;
+  phase: string;
+  yard_name: string | null;
+  yard_location: string | null;
+  vessel_name: string | null;
+}
+
 function buildSystemPrompt(
   types: OntologyType[],
   links: OntologyLink[],
   actorName: string,
+  project: ProjectSummary,
 ) {
   const typeLines = types
     .map((t) => `- ${t.key} (${t.label}): ${t.description}`)
@@ -180,9 +195,18 @@ function buildSystemPrompt(
     .map((l) => `- ${l.from_type} ${l.label} ${l.to_type}`)
     .join("\n");
 
-  return `You are the world-model agent for YAM, a maritime intelligence platform for yacht refit and survey projects. You are assisting ${actorName} on Project ZERO, a 55m sailing ketch undergoing a RINA 5-year special survey at Pendennis Shipyard.
+  const subject = project.vessel_name
+    ? `${project.vessel_name}, currently in the ${project.phase.replace(/_/g, " ").toLowerCase()} phase`
+    : `currently in the ${project.phase.replace(/_/g, " ").toLowerCase()} phase`;
+  const where = [project.yard_name, project.yard_location].filter(Boolean).join(", ");
 
-The system is not a task tracker. It maintains a world model: every survey finding, change order and owner approval is a typed object linked to other objects, and state changes propagate automatically.
+  return `You are the world-model agent for YAM, a platform for managing physical work against a recorded model of the asset it is done to. You are assisting ${actorName} on "${project.name}" -- a ${project.project_type.replace(/_/g, " ").toLowerCase()} project${where ? ` at ${where}` : ""}, ${subject}.
+
+Everything you read and write belongs to this project and no other. The caller may be on several; you are on this one. Never mention or infer anything about their other projects.
+
+Not every project is a boat. A PROPERTY project models a building: the same work packages, findings, change orders and approvals, with no vessel, no class society and no haul-out. Do not reach for maritime vocabulary when the project is not maritime -- "the yard" is a contractor, and a finding is an unpermitted balcony rather than a corroded frame.
+
+The system is not a task tracker. It maintains a world model: every finding, change order and owner approval is a typed object linked to other objects, and state changes propagate automatically.
 
 ## Object types
 ${typeLines}
@@ -346,7 +370,7 @@ Deno.serve(async (req: Request) => {
     return json({ error: "Not signed in." }, 401, origin);
   }
 
-  let body: { prompt?: unknown; history?: unknown };
+  let body: { prompt?: unknown; history?: unknown; projectId?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -383,13 +407,65 @@ Deno.serve(async (req: Request) => {
   }
   const actorEmail = userData.user.email ?? "Unknown";
 
+  // Which project this conversation is about.
+  //
+  // The client sends it, but nothing here trusts that: `projects` is read
+  // through the caller's own JWT and its read policy is membership-scoped, so a
+  // project the caller does not belong to simply returns no row. That is the
+  // whole check -- there is no branch to forget.
+  const requestedProjectId =
+    typeof body.projectId === "string" && body.projectId ? body.projectId : null;
+
+  const projectQuery = supabase
+    .from("projects")
+    .select("id, name, project_type, phase, yard_name, yard_location, vessel:vessels(name)");
+  const { data: projectRows, error: projectError } = requestedProjectId
+    ? await projectQuery.eq("id", requestedProjectId).limit(1)
+    : await projectQuery.order("created_at").limit(2);
+
+  if (projectError) {
+    console.error("Failed to load the project", projectError);
+    return json({ error: "Could not load the project." }, 500, origin);
+  }
+  if (!projectRows || projectRows.length === 0) {
+    return json(
+      { error: "That project is not one of yours, or you are on no project yet." },
+      403,
+      origin,
+    );
+  }
+  // Only reachable when the client sent nothing: refuse to pick, exactly as
+  // resolve_project() does server-side.
+  if (!requestedProjectId && projectRows.length > 1) {
+    return json({ error: "You are on more than one project -- open one first." }, 400, origin);
+  }
+
+  const row = projectRows[0] as Record<string, unknown>;
+  const vessel = row.vessel as { name?: string } | { name?: string }[] | null;
+  const project: ProjectSummary = {
+    id: String(row.id),
+    name: String(row.name),
+    project_type: String(row.project_type),
+    phase: String(row.phase),
+    yard_name: (row.yard_name as string | null) ?? null,
+    yard_location: (row.yard_location as string | null) ?? null,
+    vessel_name:
+      (Array.isArray(vessel) ? vessel[0]?.name : vessel?.name) ?? null,
+  };
+  const projectId = project.id;
+
   // Load the ontology registry -- the agent's tool manifest is generated from
   // the same table that documents the object model.
   const [typesRes, linksRes, actionsRes, memberRes] = await Promise.all([
     supabase.from("ontology_object_types").select("*").order("display_order"),
     supabase.from("ontology_links").select("*"),
     supabase.from("ontology_actions").select("*").eq("is_agent_usable", true),
-    supabase.from("project_members").select("name").ilike("email", actorEmail).limit(1),
+    supabase
+      .from("project_members")
+      .select("name")
+      .eq("project_id", projectId)
+      .ilike("email", actorEmail)
+      .limit(1),
   ]);
 
   if (typesRes.error || linksRes.error || actionsRes.error) {
@@ -405,6 +481,11 @@ Deno.serve(async (req: Request) => {
   const tableFor = new Map(types.map((t) => [t.key, t.table_name]));
   const typeForTable = new Map(types.map((t) => [t.table_name, t.key]));
   const actionKeys = new Set(actions.map((a) => a.key));
+  const actionTakesProject = new Set(
+    actions
+      .filter((a) => (a.parameters ?? []).some((p) => p.name === "p_project_id"))
+      .map((a) => a.key),
+  );
   const tools = buildTools(types, actions);
 
   const index = new ObjectIndex(typeForTable);
@@ -414,13 +495,27 @@ Deno.serve(async (req: Request) => {
 
   const anthropic = new Anthropic({ apiKey: anthropicKey });
 
+  // Which column carries the project, per table. RLS already hides other
+  // members' projects, but a caller on two projects can legitimately read both
+  // -- so without this the agent would answer a question about the property
+  // using rows from the ketch. Correct permissions, wrong answer.
+  const projectColumn = (table: string): string | null => {
+    if (table === "projects") return "id";
+    if (table === "vessels") return null; // reached through its project
+    return "project_id";
+  };
+
   /** Dispatches one tool call. Table names come from the registry, never the model. */
   async function runTool(name: string, input: Record<string, unknown>) {
     if (name === "list_objects") {
       const table = tableFor.get(String(input.object_type));
       if (!table) return { error: `Unknown object type: ${input.object_type}` };
       const limit = Math.min(Math.max(Number(input.limit) || 25, 1), MAX_ROWS);
-      const { data, error } = await supabase.from(table).select("*").limit(limit);
+      let query = supabase.from(table).select("*").limit(limit);
+      const column = projectColumn(table);
+      if (column) query = query.eq(column, projectId);
+      if (table === "vessels" && project.vessel_name === null) return { rows: [] };
+      const { data, error } = await query;
       if (error) return { error: error.message };
       index.harvest(table, data);
       return { rows: data };
@@ -429,13 +524,12 @@ Deno.serve(async (req: Request) => {
     if (name === "get_object") {
       const table = tableFor.get(String(input.object_type));
       if (!table) return { error: `Unknown object type: ${input.object_type}` };
-      const { data, error } = await supabase
-        .from(table)
-        .select("*")
-        .eq("id", String(input.id))
-        .maybeSingle();
+      let query = supabase.from(table).select("*").eq("id", String(input.id));
+      const column = projectColumn(table);
+      if (column) query = query.eq(column, projectId);
+      const { data, error } = await query.maybeSingle();
       if (error) return { error: error.message };
-      if (!data) return { error: "No object with that id." };
+      if (!data) return { error: "No object with that id on this project." };
       index.harvest(table, data);
       return { object: data };
     }
@@ -445,6 +539,7 @@ Deno.serve(async (req: Request) => {
       const { data, error } = await supabase
         .from("world_model_events")
         .select("*")
+        .eq("project_id", projectId)
         .order("triggered_at", { ascending: false })
         .limit(limit);
       return error ? { error: error.message } : { events: data };
@@ -461,11 +556,17 @@ Deno.serve(async (req: Request) => {
       if (!table) return { error: `Unknown object type: ${objectType}` };
       const id = String(input.id);
 
+      const objectQuery = supabase.from(table).select("*").eq("id", id);
+      const objectColumn = projectColumn(table);
+
       const [objectRes, eventsRes, messagesRes] = await Promise.all([
-        supabase.from(table).select("*").eq("id", id).maybeSingle(),
+        (objectColumn
+          ? objectQuery.eq(objectColumn, projectId)
+          : objectQuery).maybeSingle(),
         supabase
           .from("world_model_events")
           .select("*")
+          .eq("project_id", projectId)
           .eq("object_type", objectType)
           .eq("object_id", id)
           .order("triggered_at", { ascending: true })
@@ -473,6 +574,7 @@ Deno.serve(async (req: Request) => {
         supabase
           .from("messages")
           .select("*")
+          .eq("project_id", projectId)
           .eq("linked_object_type", objectType)
           .eq("linked_object_id", id)
           .order("created_at", { ascending: true })
@@ -480,7 +582,7 @@ Deno.serve(async (req: Request) => {
       ]);
 
       if (objectRes.error) return { error: objectRes.error.message };
-      if (!objectRes.data) return { error: "No object with that id." };
+      if (!objectRes.data) return { error: "No object with that id on this project." };
       index.harvest(table, objectRes.data);
 
       return {
@@ -493,9 +595,17 @@ Deno.serve(async (req: Request) => {
     }
 
     if (actionKeys.has(name)) {
+      // The project is supplied here rather than left to the model. Every
+      // creating Action takes p_project_id and refuses to guess when the caller
+      // is on more than one, so omitting it would turn a normal request into an
+      // error the model would then try to "fix" by picking one.
+      const args = actionTakesProject.has(name)
+        ? { ...input, p_project_id: projectId }
+        : input;
+
       // Goes through PostgREST as the caller. The Action validates, mutates and
       // logs atomically; a rejection here is the database refusing, not us.
-      const { data, error } = await supabase.rpc(name, input);
+      const { data, error } = await supabase.rpc(name, args);
       if (error) return { error: error.message };
 
       // An Action returns the object it changed plus anything the cascade
@@ -529,7 +639,7 @@ Deno.serve(async (req: Request) => {
     ...history,
     { role: "user", content: prompt },
   ];
-  const system = buildSystemPrompt(types, links, actorName);
+  const system = buildSystemPrompt(types, links, actorName, project);
   const trace: Array<{ tool: string; input: unknown; ok: boolean }> = [];
 
   try {

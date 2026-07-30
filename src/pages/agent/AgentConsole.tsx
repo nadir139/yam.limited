@@ -4,9 +4,16 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { supabase } from '@/lib/supabase'
 import { useQueryClient } from '@tanstack/react-query'
-import { QUERY_KEYS } from '@/lib/query-hooks'
+import { useProjectId } from '@/lib/query-hooks'
 import { typeColor } from '@/lib/ontology'
 import ChatObjectPanel from './ChatObjectPanel'
+
+/** Cache prefixes an Action could have invalidated, whichever Action it was. */
+const INVALIDATE_ON_CHANGE = [
+  'defects', 'defect', 'change-orders', 'change-order', 'approvals',
+  'inspections', 'documents', 'work-packages', 'work-package',
+  'project', 'events', 'messages',
+]
 
 interface ToolCall {
   tool: string
@@ -256,6 +263,7 @@ export default function AgentConsole() {
   // appears where you clicked rather than somewhere you have to go looking.
   const [openPanels, setOpenPanels] = useState<Record<number, string[]>>({})
   const qc = useQueryClient()
+  const projectId = useProjectId()
   const endRef = useRef<HTMLDivElement>(null)
   const restored = useRef(turns.length > 0)
 
@@ -313,7 +321,10 @@ export default function AgentConsole() {
 
     try {
       const { data, error } = await supabase.functions.invoke('agent', {
-        body: { prompt: text, history },
+        // The project is sent, not inferred. The Edge Function verifies
+        // membership before using it, so this decides which project the agent
+        // is working on without deciding whether the caller may.
+        body: { prompt: text, history, projectId },
       })
       if (error) throw error
 
@@ -330,10 +341,11 @@ export default function AgentConsole() {
       ])
 
       // An Action ran, so any cached view of the world model may now be stale.
+      // Matched by prefix, which reaches the project-scoped keys underneath.
       if ((data?.changed as ChangedRef[] | undefined)?.length) {
-        Object.values(QUERY_KEYS).forEach((key) => {
-          if (Array.isArray(key)) qc.invalidateQueries({ queryKey: key })
-        })
+        for (const key of INVALIDATE_ON_CHANGE) {
+          qc.invalidateQueries({ queryKey: [key] })
+        }
       }
     } catch (err) {
       console.error('Agent request failed', err)

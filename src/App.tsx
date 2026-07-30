@@ -6,6 +6,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { ProjectProvider } from "@/contexts/ProjectContext";
+import { LanguageProvider } from "@/lib/i18n";
 import Index from "./pages/Index";
 
 // The public landing page (Index) is the only eagerly-loaded route. Everything
@@ -53,10 +55,15 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+      <LanguageProvider>
       <TooltipProvider>
         <Toaster />
         <Sonner />
         <AuthProvider>
+          {/* Project selection depends on who is signed in, so it nests inside
+              auth. Language does not depend on either, and wraps both so the
+              public pages can translate too. */}
+          <ProjectProvider>
           <BrowserRouter>
             <Suspense fallback={null}>
               <Routes>
@@ -84,8 +91,10 @@ const App = () => (
               </Routes>
             </Suspense>
           </BrowserRouter>
+          </ProjectProvider>
         </AuthProvider>
       </TooltipProvider>
+      </LanguageProvider>
     </ThemeProvider>
   </QueryClientProvider>
 );

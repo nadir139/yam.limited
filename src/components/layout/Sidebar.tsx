@@ -17,38 +17,38 @@ import {
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/contexts/AuthContext'
-import { useDefects, useApprovals } from '@/lib/query-hooks'
+import { useDefects, useApprovals, useMyRole } from '@/lib/query-hooks'
+import { useTranslation } from '@/lib/i18n'
 
 interface SidebarProps {
   onClose?: () => void
 }
 
+// Labels are translation keys rather than English strings, so the navigation
+// follows the language menu instead of staying English around translated pages.
 const NAV_ITEMS = [
-  { icon: Sparkles, label: 'Agent', path: '/app/agent' },
-  { icon: LayoutDashboard, label: 'Dashboard', path: '/app/dashboard' },
-  { icon: Anchor, label: 'Project Overview', path: '/app/project' },
-  { icon: Wrench, label: 'Work Packages', path: '/app/work-packages' },
-  { icon: ClipboardCheck, label: 'Inspections', path: '/app/inspections' },
-  { icon: AlertTriangle, label: 'Defect Records', path: '/app/defects', badge: 'defects' },
-  { icon: GitBranch, label: 'Change Orders', path: '/app/change-orders' },
-  { icon: CheckCircle2, label: 'Approvals', path: '/app/approvals', badge: 'approvals' },
-  { icon: FileText, label: 'Documents', path: '/app/documents' },
-  { icon: MessagesSquare, label: 'Conversation', path: '/app/messages' },
-  { icon: Users, label: 'Team', path: '/app/team' },
+  { icon: Sparkles, labelKey: 'nav.agent', path: '/app/agent' },
+  { icon: LayoutDashboard, labelKey: 'nav.dashboard', path: '/app/dashboard' },
+  { icon: Anchor, labelKey: 'nav.project', path: '/app/project' },
+  { icon: Wrench, labelKey: 'nav.workPackages', path: '/app/work-packages' },
+  { icon: ClipboardCheck, labelKey: 'nav.inspections', path: '/app/inspections' },
+  { icon: AlertTriangle, labelKey: 'nav.defects', path: '/app/defects', badge: 'defects' },
+  { icon: GitBranch, labelKey: 'nav.changeOrders', path: '/app/change-orders' },
+  { icon: CheckCircle2, labelKey: 'nav.approvals', path: '/app/approvals', badge: 'approvals' },
+  { icon: FileText, labelKey: 'nav.documents', path: '/app/documents' },
+  { icon: MessagesSquare, labelKey: 'nav.messages', path: '/app/messages' },
+  { icon: Users, labelKey: 'nav.team', path: '/app/team' },
 ]
-
-const ROLE_LABELS: Record<string, string> = {
-  OWNERS_REP: "Owner's Rep",
-  OWNER: 'Owner',
-  CAPTAIN: 'Captain',
-  YARD_PM: 'Yard PM',
-  CLASS_SURVEYOR: 'Class Surveyor',
-}
 
 export default function Sidebar({ onClose }: SidebarProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout } = useAuth()
+  const { t } = useTranslation()
+  // The role shown is the one held on the ACTIVE project. The same person can
+  // be owner's rep on one and nothing on another, so a single stored role would
+  // be wrong the moment there were two projects.
+  const { data: role = null } = useMyRole()
   const [hoveredPath, setHoveredPath] = useState<string | null>(null)
 
   const { data: defects = [] } = useDefects()
@@ -150,7 +150,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
               }}
             >
               <item.icon size={16} style={{ flexShrink: 0, opacity: isActive ? 1 : 0.7 }} />
-              <span style={{ flex: 1, opacity: isActive ? 1 : 0.85 }}>{item.label}</span>
+              <span style={{ flex: 1, opacity: isActive ? 1 : 0.85 }}>{t(item.labelKey)}</span>
               {badgeCount > 0 && (
                 <Badge
                   style={{
@@ -182,7 +182,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
           <div style={{ marginBottom: '10px' }}>
             <div style={{ fontSize: '13px', fontWeight: 600 }}>{user.name}</div>
             <div style={{ fontSize: '11px', opacity: 0.6, marginTop: '2px' }}>
-              {user.role ? ROLE_LABELS[user.role] ?? user.role : 'No project role'}
+              {role ? t(`role.${role}`) : t('nav.noRole')}
             </div>
           </div>
         )}
@@ -202,7 +202,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
           }}
         >
           <LogOut size={14} />
-          Sign out
+          {t('nav.signOut')}
         </button>
       </div>
     </div>

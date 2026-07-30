@@ -2,26 +2,20 @@ import { Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ThemeToggle } from '@/components/ThemeToggle'
-import { useProject } from '@/lib/query-hooks'
+import LanguagePicker from '@/components/LanguagePicker'
+import ProjectSwitcher from './ProjectSwitcher'
+import { useActiveProject } from '@/contexts/ProjectContext'
+import { useTranslation } from '@/lib/i18n'
 
 interface TopbarProps {
   onMenuClick: () => void
 }
 
-const PHASE_DISPLAY: Record<string, string> = {
-  PRE_SURVEY: 'PRE SURVEY',
-  HAUL_OUT: 'HAUL OUT',
-  STRUCTURAL: 'STRUCTURAL',
-  SYSTEMS: 'SYSTEMS',
-  INTERIOR: 'INTERIOR',
-  SEA_TRIALS: 'SEA TRIALS',
-  DELIVERED: 'DELIVERED',
-}
-
 export default function Topbar({ onMenuClick }: TopbarProps) {
-  const { data: project } = useProject()
-  const phase = project?.phase ?? ''
-  const phaseLabel = PHASE_DISPLAY[phase] ?? phase.replace(/_/g, ' ')
+  const { activeProject } = useActiveProject()
+  const { t } = useTranslation()
+  const phase = activeProject?.phase
+  const phaseLabel = phase ? t(`phase.${phase}`) : ''
 
   return (
     <div
@@ -48,29 +42,9 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
         <span className="sr-only">Open menu</span>
       </Button>
 
-      {/* Center: project info */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <div>
-          <div
-            style={{
-              fontWeight: 700,
-              fontSize: '15px',
-              lineHeight: 1.2,
-              color: 'hsl(var(--foreground))',
-            }}
-          >
-            Project ZERO
-          </div>
-          <div
-            style={{
-              fontSize: '11px',
-              color: 'hsl(var(--muted-foreground))',
-              lineHeight: 1.2,
-            }}
-          >
-            55m Ketch · RINA
-          </div>
-        </div>
+      {/* Center: which project, and how to leave it */}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center' }}>
+        <ProjectSwitcher />
       </div>
 
       {/* Right: phase badge + theme toggle */}
@@ -87,9 +61,10 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
               padding: '3px 8px',
             }}
           >
-            {phaseLabel}
+            {phaseLabel.toUpperCase()}
           </Badge>
         )}
+        <LanguagePicker />
         <ThemeToggle />
       </div>
     </div>
