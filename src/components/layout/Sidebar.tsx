@@ -11,6 +11,7 @@ import {
   FileText,
   Users,
   Sparkles,
+  MessagesSquare,
   LogOut,
   X,
 } from 'lucide-react'
@@ -32,6 +33,7 @@ const NAV_ITEMS = [
   { icon: GitBranch, label: 'Change Orders', path: '/app/change-orders' },
   { icon: CheckCircle2, label: 'Approvals', path: '/app/approvals', badge: 'approvals' },
   { icon: FileText, label: 'Documents', path: '/app/documents' },
+  { icon: MessagesSquare, label: 'Conversation', path: '/app/messages' },
   { icon: Users, label: 'Team', path: '/app/team' },
 ]
 

@@ -71,6 +71,7 @@ const FALLBACK: Omit<OntologySnapshot, 'live' | 'permissions'> = {
     { key: 'OWNER_APPROVAL', label: 'Owner Approval', table_name: 'owner_approvals', description: 'A decision the owner must make, tiered by cost, with a deadline.', display_order: 7 },
     { key: 'DOCUMENT', label: 'Document', table_name: 'documents', description: 'Evidence attached to any other object.', display_order: 8 },
     { key: 'SUBCONTRACTOR', label: 'Stakeholder', table_name: 'project_members', description: 'A party to the project and the role they hold.', display_order: 9 },
+    { key: 'MESSAGE', label: 'Message', table_name: 'messages', description: 'What people said, attached to the object they said it about. Site knowledge, decisions, and work done outside the plan.', display_order: 10 },
   ],
   links: [
     { from_type: 'PROJECT', to_type: 'VESSEL', label: 'concerns', cardinality: 'MANY_TO_ONE', via_column: 'vessel_id' },
@@ -84,6 +85,7 @@ const FALLBACK: Omit<OntologySnapshot, 'live' | 'permissions'> = {
     { from_type: 'OWNER_APPROVAL', to_type: 'CHANGE_ORDER', label: 'authorises', cardinality: 'ONE_TO_ONE', via_column: 'change_order_id' },
     { from_type: 'DOCUMENT', to_type: 'PROJECT', label: 'filed under', cardinality: 'MANY_TO_ONE', via_column: 'project_id' },
     { from_type: 'SUBCONTRACTOR', to_type: 'PROJECT', label: 'works on', cardinality: 'MANY_TO_ONE', via_column: 'project_id' },
+    { from_type: 'MESSAGE', to_type: 'PROJECT', label: 'posted in', cardinality: 'MANY_TO_ONE', via_column: 'project_id' },
   ],
   actions: [
     {
@@ -228,6 +230,22 @@ const FALLBACK: Omit<OntologySnapshot, 'live' | 'permissions'> = {
       ],
     },
     {
+      key: 'action_post_message',
+      label: 'Post message',
+      description: 'Adds a message to the project conversation, optionally attached to an object. Use kind UNPLANNED_WORK to record work done outside the agreed scope, DECISION for something settled, MEETING_NOTE for what came out of a meeting.',
+      target_type: 'MESSAGE',
+      cascades: [],
+      is_agent_usable: true,
+      parameters: [
+        { name: 'p_body', type: 'text', required: true },
+        { name: 'p_kind', type: 'enum', values: ['NOTE', 'DECISION', 'UNPLANNED_WORK', 'MEETING_NOTE', 'HANDOVER'] },
+        { name: 'p_linked_object_type', type: 'enum', values: ['VESSEL', 'PROJECT', 'WORK_PACKAGE', 'CHANGE_ORDER', 'INSPECTION_EVENT', 'DEFECT_RECORD', 'OWNER_APPROVAL', 'DOCUMENT', 'SUBCONTRACTOR'] },
+        { name: 'p_linked_object_id', type: 'uuid' },
+        { name: 'p_source', type: 'enum', values: ['APP', 'MEETING', 'EMAIL'] },
+        { name: 'p_meeting_ref', type: 'text' },
+      ],
+    },
+    {
       key: 'action_register_document',
       label: 'Register document',
       description: 'Records an uploaded document and links it to another object.',
@@ -263,6 +281,7 @@ const FALLBACK_PERMISSIONS: Record<string, string[]> = {
   action_link_defect_to_work_package: ['OWNERS_REP', 'YARD_PM', 'NAVAL_ARCHITECT'],
   action_decide_approval: ['OWNER', 'OWNERS_REP'],
   action_advance_project_phase: ['OWNERS_REP'],
+  action_post_message: ['OWNER', 'OWNERS_REP', 'CAPTAIN', 'YARD_PM', 'CLASS_SURVEYOR', 'NAVAL_ARCHITECT', 'SUBCONTRACTOR'],
 }
 
 export const FALLBACK_ONTOLOGY: OntologySnapshot = {
@@ -327,6 +346,7 @@ export const TYPE_COLOR: Record<string, string> = {
   OWNER_APPROVAL: 'text-[#ca8a04] dark:text-[#facc15]',
   DOCUMENT: 'text-[#0891b2] dark:text-[#22d3ee]',
   SUBCONTRACTOR: 'text-[#64748b] dark:text-[#94a3b8]',
+  MESSAGE: 'text-[#7c3aed] dark:text-[#a78bfa]',
 }
 
 export const typeColor = (key: string) => TYPE_COLOR[key] ?? 'text-muted-foreground'

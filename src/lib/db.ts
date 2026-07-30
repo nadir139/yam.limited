@@ -13,6 +13,10 @@ import type {
   Discipline,
   WorkPackageStatus,
   UserRole,
+  Message,
+  MessageKind,
+  MessageSource,
+  ObjectType,
 } from './types'
 
 // Fixed project ID for Project ZERO — matches seed data
@@ -497,4 +501,71 @@ export async function fetchActionPermissions(): Promise<ActionPermission[]> {
   const { data, error } = await supabase.from('action_permissions').select('*')
   if (error) throw error
   return (data ?? []) as ActionPermission[]
+}
+
+// ─── Messages ─────────────────────────────────────────────────────────────────
+//
+// Communication is part of the world model rather than beside it: a message
+// hangs off the object it is about, using the same polymorphic link documents
+// use. That is what makes it answerable later — "what did the yard say about
+// the chiller" works because the conversation is attached to the chiller's work
+// package, not sitting in a room called #general.
+
+/** The project-wide channel: messages attached to no particular object. */
+export async function fetchProjectMessages(): Promise<Message[]> {
+  const { data, error } = await supabase
+    .from('messages')
+    .select('*')
+    .is('linked_object_type', null)
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return (data ?? []) as Message[]
+}
+
+/** The thread on one object. */
+export async function fetchObjectMessages(
+  objectType: ObjectType,
+  objectId: string,
+): Promise<Message[]> {
+  const { data, error } = await supabase
+    .from('messages')
+    .select('*')
+    .eq('linked_object_type', objectType)
+    .eq('linked_object_id', objectId)
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return (data ?? []) as Message[]
+}
+
+/** Everything logged as work outside the agreed scope, newest first. */
+export async function fetchUnplannedWork(): Promise<Message[]> {
+  const { data, error } = await supabase
+    .from('messages')
+    .select('*')
+    .eq('kind', 'UNPLANNED_WORK')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []) as Message[]
+}
+
+export interface MessageInput {
+  body: string
+  kind?: MessageKind
+  linkedObjectType?: ObjectType | null
+  linkedObjectId?: string | null
+  source?: MessageSource
+  meetingRef?: string | null
+}
+
+export async function postMessage(input: MessageInput): Promise<Message> {
+  const { data, error } = await supabase.rpc('action_post_message', {
+    p_body: input.body,
+    p_kind: input.kind ?? 'NOTE',
+    p_linked_object_type: input.linkedObjectType ?? null,
+    p_linked_object_id: input.linkedObjectId ?? null,
+    p_source: input.source ?? 'APP',
+    p_meeting_ref: input.meetingRef ?? null,
+  })
+  const result = unwrap(data, error, 'Post message') as { message: Message }
+  return result.message
 }

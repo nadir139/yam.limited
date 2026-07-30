@@ -28,6 +28,7 @@ const LAYOUT: Record<string, { x: number; y: number }> = {
   DEFECT_RECORD: { x: 600, y: 80 },
   CHANGE_ORDER: { x: 845, y: 80 },
   OWNER_APPROVAL: { x: 845, y: 250 },
+  MESSAGE: { x: 600, y: 430 },
 }
 
 /** Object types the cascade runs through — drawn with a heavier edge. */

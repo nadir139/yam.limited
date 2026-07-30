@@ -101,6 +101,7 @@ applied by hand in the Supabase SQL editor, in this order:
 12. `supabase-migration-010-public-ontology.sql` — registry readable by `anon`
 13. `supabase-migration-011-work-package-actions.sql` — Actions that plan the work
 14. `supabase-migration-012-role-permissions.sql` — roles become permissions
+15. `supabase-migration-013-messages-and-immutability.sql` — conversation, and nothing gets deleted
 
 Migrations 006–008 are the important ones. After 008 the `authenticated` and
 `anon` roles hold **zero** `INSERT`/`UPDATE`/`DELETE` grants on the domain
@@ -119,7 +120,18 @@ worth re-checking after any policy change:
 ```sql
 set local role anon;
 select count(*) from defect_records;  -- must be 0
-select count(*) from ontology_object_types;  -- must be 9
+select count(*) from ontology_object_types;  -- must be 10
+```
+
+After migration 013, `anon` and `authenticated` hold **`SELECT` and nothing
+else** on every table — 008 had left `TRUNCATE` granted, which bypasses RLS
+entirely. Worth re-checking after any schema change:
+
+```sql
+select grantee, string_agg(distinct privilege_type, ',') as privs
+  from information_schema.role_table_grants
+ where grantee in ('anon','authenticated') and table_schema = 'public'
+ group by grantee;   -- must be exactly: SELECT
 ```
 
 > ⚠️ RLS *read* policies are intentionally permissive (`USING (true)` on every

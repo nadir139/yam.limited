@@ -76,6 +76,16 @@ export type InspectionResult = 'PASS' | 'CONDITIONAL_PASS' | 'FAIL' | 'PENDING'
 
 export type DocumentStatus = 'DRAFT' | 'UNDER_REVIEW' | 'APPROVED' | 'SUPERSEDED'
 
+export type MessageKind =
+  | 'NOTE'
+  | 'DECISION'
+  /** Work done outside the agreed scope — the signal worth learning from. */
+  | 'UNPLANNED_WORK'
+  | 'MEETING_NOTE'
+  | 'HANDOVER'
+
+export type MessageSource = 'APP' | 'MEETING' | 'EMAIL'
+
 export type ObjectType =
   | 'VESSEL'
   | 'PROJECT'
@@ -86,6 +96,7 @@ export type ObjectType =
   | 'OWNER_APPROVAL'
   | 'DOCUMENT'
   | 'SUBCONTRACTOR'
+  | 'MESSAGE'
 
 // ─── Core Objects ─────────────────────────────────────────────────────────────
 
@@ -283,6 +294,26 @@ export interface WorldModelEvent {
   triggered_by_name: string
   triggered_at: string
   cascade_from_event_id: string | null // if auto-triggered
+}
+
+/**
+ * Project conversation. Append-only by construction: no Action edits or deletes
+ * a message, and neither `anon` nor `authenticated` holds UPDATE or DELETE on
+ * the table. What was said stays said.
+ */
+export interface Message {
+  id: string
+  project_id: string
+  body: string
+  kind: MessageKind
+  source: MessageSource
+  author_id: string | null
+  author_name: string
+  author_role: UserRole | null
+  linked_object_type: ObjectType | null
+  linked_object_id: string | null
+  meeting_ref: string | null
+  created_at: string
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────

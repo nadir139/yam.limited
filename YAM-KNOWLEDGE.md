@@ -807,3 +807,62 @@ no longer asks for a role, because it was never the user's to choose.
 `usePermissions()` exposes `can('action_x')`, used to hide controls a role
 cannot use. That is courtesy, not security: every Action re-checks, and a client
 that skips the check is refused by Postgres.
+
+---
+
+## 20. Conversation, and immutability (migration 013)
+
+### TRUNCATE was open
+
+Migration 008 revoked `INSERT`/`UPDATE`/`DELETE` from `anon` and
+`authenticated` and missed `TRUNCATE`, which Supabase grants by default.
+`TRUNCATE` **bypasses row-level security entirely** — a holder of the public
+anon key could have emptied `defect_records` in one statement and no policy
+would have been consulted. Closed, along with `TRIGGER` and `REFERENCES`, and
+`ALTER DEFAULT PRIVILEGES` now stops new tables picking the grants back up —
+which is exactly how 009's registry tables ended up writable.
+
+Both roles now hold `SELECT` and nothing else, on all 15 tables. The check is in
+the README; run it after any schema change.
+
+### Messages
+
+`messages` uses the same polymorphic link documents use, so a thread hangs off
+the object it concerns. That is the whole point: "what did the yard say about
+the chiller" is answerable because the conversation is attached to the chiller's
+work package rather than filed in a room called `#general`.
+
+Registered in `ontology_object_types` as MESSAGE, which means the agent's
+`list_objects MESSAGE` and `get_object` tools are **generated, not written** —
+the payoff from building the tool manifest off the registry. Conversation
+therefore enters the world model rather than sitting beside it.
+
+**Append-only by construction.** No Action edits or deletes a message, and
+neither role holds `UPDATE` or `DELETE` on the table. A message is a statement
+someone made at a time; unmaking it would make the record a worse witness than a
+notebook. `action_post_message` is permitted to all seven roles — excluding
+anyone would leave a hole exactly where the site knowledge lives.
+
+### `kind`, and learning from side quests
+
+`UNPLANNED_WORK` is the load-bearing one. The extra half-day someone spends
+re-bedding a flange "while we were in there" is invisible in every system that
+only tracks the plan, and it is precisely what you want to know before scoping
+the next survey. Tagged, it collects on `/app/messages` under **Unplanned
+work**, with the object it happened against, as a list you can read at the end
+of a job.
+
+The others: `DECISION` so the reason survives the person who took it,
+`MEETING_NOTE`, `HANDOVER`, `NOTE`.
+
+### The hook for meetings
+
+`source` is `APP | MEETING | EMAIL`, and `meeting_ref` groups an import. A
+transcript arrives as messages with `source = MEETING` sharing a ref, and lands
+in the same thread as what people typed. The column and the read path exist; the
+video integration does not.
+
+### Where threads appear
+
+Work package and change order detail pages (a Conversation tab), the NCR page (a
+card), and `/app/messages` for the project channel plus the unplanned-work view.

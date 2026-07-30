@@ -11,6 +11,7 @@ import {
   useApprovals,
 } from '@/lib/query-hooks'
 import ObjectHistory from '@/components/ObjectHistory'
+import MessageThread from '@/components/MessageThread'
 
 const eur = (n: number) =>
   new Intl.NumberFormat('en-IE', {
@@ -188,10 +189,19 @@ export default function ChangeOrderDetail() {
         </Card>
       )}
 
-      <Tabs defaultValue="history">
+      <Tabs defaultValue="conversation">
         <TabsList>
+          <TabsTrigger value="conversation">Conversation</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="conversation">
+          <Card>
+            <CardContent className="p-5">
+              <MessageThread objectType="CHANGE_ORDER" objectId={co.id} title="" />
+            </CardContent>
+          </Card>
+        </TabsContent>
         <TabsContent value="history">
           <Card>
             <CardContent className="p-5">
