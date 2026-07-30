@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import * as db from './db'
-import type { DefectRecord, InspectionEvent } from './types'
+import type { DefectRecord, InspectionEvent, ObjectType } from './types'
 
 export const QUERY_KEYS = {
   vessel: ['vessel'],
@@ -251,4 +251,40 @@ export function usePermissions() {
     !isLoading && role !== null && matrix.some((p) => p.action_key === actionKey && p.role === role)
 
   return { role, can, isLoading }
+}
+
+// ─── Messages ─────────────────────────────────────────────────────────────────
+
+export type MessageInput = db.MessageInput
+
+export const MESSAGE_KEYS = {
+  project: ['messages', 'project'],
+  object: (t: string, id: string) => ['messages', t, id],
+  unplanned: ['messages', 'unplanned'],
+}
+
+export const useProjectMessages = () =>
+  useQuery({ queryKey: MESSAGE_KEYS.project, queryFn: db.fetchProjectMessages })
+
+export const useObjectMessages = (objectType: ObjectType, objectId: string | undefined) =>
+  useQuery({
+    queryKey: MESSAGE_KEYS.object(objectType, objectId ?? ''),
+    queryFn: () => db.fetchObjectMessages(objectType, objectId!),
+    enabled: !!objectId,
+  })
+
+/** Work recorded as outside the agreed scope, across the whole project. */
+export const useUnplannedWork = () =>
+  useQuery({ queryKey: MESSAGE_KEYS.unplanned, queryFn: db.fetchUnplannedWork })
+
+export function usePostMessage() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: MessageInput) => db.postMessage(input),
+    onSuccess: () => {
+      // Every message view is a filter over the same table, so refresh all of
+      // them rather than guessing which one the caller is looking at.
+      qc.invalidateQueries({ queryKey: ['messages'] })
+    },
+  })
 }

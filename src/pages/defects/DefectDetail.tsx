@@ -17,6 +17,7 @@ import {
 import { useDefect, useChangeOrders, useApprovals, useUpdateDefectStatus, useDocuments } from '@/lib/query-hooks'
 import UploadDocumentForm from '@/components/actions/UploadDocumentForm'
 import ObjectHistory from '@/components/ObjectHistory'
+import MessageThread from '@/components/MessageThread'
 import type { DefectSeverity } from '@/lib/types'
 
 const SEVERITY_STYLES: Record<DefectSeverity, { bg: string; text: string }> = {
@@ -418,6 +419,13 @@ export default function DefectDetail() {
           </Card>
         )
       })()}
+
+      {/* Conversation */}
+      <Card>
+        <CardContent className="p-5">
+          <MessageThread objectType="DEFECT_RECORD" objectId={defect.id} />
+        </CardContent>
+      </Card>
 
       {/* History */}
       <Card>
