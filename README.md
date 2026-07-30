@@ -8,9 +8,21 @@ both halves of [yam.limited](https://yam.limited):
 | `/` | Public marketing site | No |
 | `/ontology` | Public refit-process ontology (credibility artifact) | No |
 | `/login`, `/auth/callback` | Supabase magic-link sign-in | Yes |
-| `/app/*` | **Project ZERO** — the authenticated world model: work packages, inspections, NCRs, change orders, owner approvals, documents, team | Yes |
+| `/app/*` | The authenticated world model — work packages, inspections, NCRs, change orders, owner approvals, documents, team — for whichever of your projects is selected | Yes |
 
 The public pages render with no backend configured. Only `/app/*` needs Supabase.
+
+`/app/*` is multi-project: the top bar switches between every project you are a
+member of and can start a new one. A project is not necessarily a vessel —
+`PROPERTY` projects model buildings with the same work packages, findings,
+change orders and approvals, minus the vessel, the class society and the haul-out.
+
+The interface speaks English, Italian, French, Spanish and German, chosen from
+the top bar and remembered per browser. Translation covers the application
+chrome and every enum that appears across screens — navigation, project types,
+phases, roles, statuses, severities, disciplines. Page prose is still English;
+the language menu shows each language's measured coverage rather than implying
+it is complete.
 
 For architecture, the object ontology, and the session log, see
 [`YAM-KNOWLEDGE.md`](YAM-KNOWLEDGE.md).
@@ -104,6 +116,7 @@ applied by hand in the Supabase SQL editor, in this order:
 15. `supabase-migration-013-messages-and-immutability.sql` — conversation, and nothing gets deleted
 16. `supabase-migration-014-multi-project.sql` — reads scoped to project membership; Actions stop guessing the project
 17. `supabase-migration-015-closure-notes-and-corrections.sql` — closing an NCR requires a reason; a closed NCR can still be corrected
+18. `supabase-migration-016-actions-take-a-project.sql` — every Action takes an explicit project and checks the role held *on it*
 
 Migrations 006–008 are the important ones. After 008 the `authenticated` and
 `anon` roles hold **zero** `INSERT`/`UPDATE`/`DELETE` grants on the domain

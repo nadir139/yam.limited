@@ -19,37 +19,54 @@ import type {
   ObjectType,
 } from './types'
 
-// Fixed project ID for Project ZERO — matches seed data
-export const PROJECT_ID = 'a1b2c3d4-0002-0000-0000-000000000001'
-export const VESSEL_ID = 'a1b2c3d4-0001-0000-0000-000000000001'
-
 // ─── Reads ────────────────────────────────────────────────────────────────────
+//
+// Every read takes the project explicitly. It used to be a module constant
+// (`PROJECT_ID`) referenced by eleven queries, which made a second project
+// impossible to add without touching all of them and made "which project is
+// this?" a question with no answer at the type level. Row-level security
+// enforces membership regardless; passing the id is what decides *which* of the
+// caller's projects they are looking at.
 
-export async function fetchVessel(): Promise<Vessel> {
+/** Every project the caller belongs to. RLS does the filtering. */
+export async function fetchMyProjects(): Promise<Project[]> {
+  const { data, error } = await supabase
+    .from('projects')
+    .select('*')
+    .order('created_at')
+  if (error) throw error
+  return (data ?? []) as Project[]
+}
+
+/** A project's vessel, or null — a property project has none. */
+export async function fetchVessel(vesselId: string | null): Promise<Vessel | null> {
+  if (!vesselId) return null
   const { data, error } = await supabase
     .from('vessels')
     .select('*')
-    .eq('id', VESSEL_ID)
-    .single()
+    .eq('id', vesselId)
+    .maybeSingle()
   if (error) throw error
   return data
 }
 
-export async function fetchProject(): Promise<Project & { vessel: Vessel }> {
+export async function fetchProject(
+  projectId: string,
+): Promise<Project & { vessel: Vessel | null }> {
   const { data, error } = await supabase
     .from('projects')
     .select('*, vessel:vessels(*)')
-    .eq('id', PROJECT_ID)
+    .eq('id', projectId)
     .single()
   if (error) throw error
   return data
 }
 
-export async function fetchWorkPackages(): Promise<WorkPackage[]> {
+export async function fetchWorkPackages(projectId: string): Promise<WorkPackage[]> {
   const { data, error } = await supabase
     .from('work_packages')
     .select('*')
-    .eq('project_id', PROJECT_ID)
+    .eq('project_id', projectId)
     .order('wp_number')
   if (error) throw error
   return data ?? []
@@ -65,21 +82,21 @@ export async function fetchWorkPackage(id: string): Promise<WorkPackage> {
   return data
 }
 
-export async function fetchInspections(): Promise<InspectionEvent[]> {
+export async function fetchInspections(projectId: string): Promise<InspectionEvent[]> {
   const { data, error } = await supabase
     .from('inspection_events')
     .select('*')
-    .eq('project_id', PROJECT_ID)
+    .eq('project_id', projectId)
     .order('scheduled_date')
   if (error) throw error
   return data ?? []
 }
 
-export async function fetchDefects(): Promise<DefectRecord[]> {
+export async function fetchDefects(projectId: string): Promise<DefectRecord[]> {
   const { data, error } = await supabase
     .from('defect_records')
     .select('*')
-    .eq('project_id', PROJECT_ID)
+    .eq('project_id', projectId)
     .order('discovered_date', { ascending: false })
   if (error) throw error
   return data ?? []
@@ -95,11 +112,11 @@ export async function fetchDefect(id: string): Promise<DefectRecord> {
   return data
 }
 
-export async function fetchChangeOrders(): Promise<ChangeOrder[]> {
+export async function fetchChangeOrders(projectId: string): Promise<ChangeOrder[]> {
   const { data, error } = await supabase
     .from('change_orders')
     .select('*')
-    .eq('project_id', PROJECT_ID)
+    .eq('project_id', projectId)
     .order('raised_date', { ascending: false })
   if (error) throw error
   return data ?? []
@@ -115,40 +132,40 @@ export async function fetchChangeOrder(id: string): Promise<ChangeOrder> {
   return data
 }
 
-export async function fetchApprovals(): Promise<OwnerApproval[]> {
+export async function fetchApprovals(projectId: string): Promise<OwnerApproval[]> {
   const { data, error } = await supabase
     .from('owner_approvals')
     .select('*')
-    .eq('project_id', PROJECT_ID)
+    .eq('project_id', projectId)
     .order('requested_date', { ascending: false })
   if (error) throw error
   return data ?? []
 }
 
-export async function fetchDocuments(): Promise<Document[]> {
+export async function fetchDocuments(projectId: string): Promise<Document[]> {
   const { data, error } = await supabase
     .from('documents')
     .select('*')
-    .eq('project_id', PROJECT_ID)
+    .eq('project_id', projectId)
     .order('uploaded_date', { ascending: false })
   if (error) throw error
   return data ?? []
 }
 
-export async function fetchTeam(): Promise<ProjectMember[]> {
+export async function fetchTeam(projectId: string): Promise<ProjectMember[]> {
   const { data, error } = await supabase
     .from('project_members')
     .select('*')
-    .eq('project_id', PROJECT_ID)
+    .eq('project_id', projectId)
   if (error) throw error
   return data ?? []
 }
 
-export async function fetchEvents(): Promise<WorldModelEvent[]> {
+export async function fetchEvents(projectId: string): Promise<WorldModelEvent[]> {
   const { data, error } = await supabase
     .from('world_model_events')
     .select('*')
-    .eq('project_id', PROJECT_ID)
+    .eq('project_id', projectId)
     .order('triggered_at', { ascending: false })
     .limit(20)
   if (error) throw error
@@ -210,8 +227,12 @@ export interface CascadeResult {
  * the Change Order and Owner Approval it implies — server-side, in one
  * transaction, so the chain can never be left half-built.
  */
-export async function raiseDefect(input: DefectInput): Promise<CascadeResult> {
+export async function raiseDefect(
+  projectId: string,
+  input: DefectInput,
+): Promise<CascadeResult> {
   const { data, error } = await supabase.rpc('action_raise_defect', {
+    p_project_id: projectId,
     p_title: input.title,
     p_description: input.description,
     p_location_on_vessel: input.location_on_vessel,
@@ -330,8 +351,10 @@ export async function decideApproval(
 }
 
 /** The next phase is derived server-side, so it can't be driven off stale client state. */
-export async function advanceProjectPhase(): Promise<Project> {
-  const { data, error } = await supabase.rpc('action_advance_project_phase', {})
+export async function advanceProjectPhase(projectId: string): Promise<Project> {
+  const { data, error } = await supabase.rpc('action_advance_project_phase', {
+    p_project_id: projectId,
+  })
   return unwrap(data, error, 'Advance phase') as Project
 }
 
@@ -340,6 +363,7 @@ export async function advanceProjectPhase(): Promise<Project> {
  * resulting Document through an Action so it lands in the event log.
  */
 export async function uploadDocument(
+  projectId: string,
   file: File,
   meta: {
     title: string
@@ -350,7 +374,7 @@ export async function uploadDocument(
   },
 ): Promise<Document> {
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-  const path = `${PROJECT_ID}/${meta.linkedObjectType ?? 'general'}/${Date.now()}_${safeName}`
+  const path = `${projectId}/${meta.linkedObjectType ?? 'general'}/${Date.now()}_${safeName}`
 
   const { error: storageError } = await supabase.storage
     .from('project-documents')
@@ -363,6 +387,7 @@ export async function uploadDocument(
   if (signedError) throw new Error(`Could not get signed URL: ${signedError.message}`)
 
   const { data, error } = await supabase.rpc('action_register_document', {
+    p_project_id: projectId,
     p_title: meta.title,
     p_doc_type: meta.docType,
     p_file_url: signedData.signedUrl,
@@ -395,8 +420,12 @@ export interface WorkPackageInput {
 }
 
 /** Adds scope. The WP number is assigned server-side from the discipline. */
-export async function createWorkPackage(input: WorkPackageInput): Promise<WorkPackage> {
+export async function createWorkPackage(
+  projectId: string,
+  input: WorkPackageInput,
+): Promise<WorkPackage> {
   const { data, error } = await supabase.rpc('action_create_work_package', {
+    p_project_id: projectId,
     p_title: input.title,
     p_discipline: input.discipline,
     p_description: input.description,
@@ -464,8 +493,12 @@ export interface InspectionInput {
 }
 
 /** Books an attendance. Result stays PENDING until recordInspectionResult. */
-export async function scheduleInspection(input: InspectionInput): Promise<InspectionEvent> {
+export async function scheduleInspection(
+  projectId: string,
+  input: InspectionInput,
+): Promise<InspectionEvent> {
   const { data, error } = await supabase.rpc('action_schedule_inspection', {
+    p_project_id: projectId,
     p_title: input.title,
     p_inspector_role: input.inspector_role,
     p_work_package_id: input.work_package_id,
@@ -524,14 +557,47 @@ export async function fetchObjectEvents(
 // console, and read by nothing server-side. It is now resolved from
 // project_members by the verified JWT email (migration 012).
 
+export interface ProjectInput {
+  name: string
+  projectType: Project['project_type']
+  yardName: string | null
+  yardLocation: string | null
+  plannedStart: string | null
+  plannedDelivery: string | null
+  budgetLocked: number | null
+  classSociety: string | null
+}
+
+/**
+ * Starts a project. The creator is enrolled as its owner's representative in
+ * the same transaction — without a membership row the read policies would hide
+ * the project from the person who just made it.
+ */
+export async function createProject(input: ProjectInput): Promise<Project> {
+  const { data, error } = await supabase.rpc('action_create_project', {
+    p_name: input.name,
+    p_project_type: input.projectType,
+    p_yard_name: input.yardName,
+    p_yard_location: input.yardLocation,
+    p_planned_start: input.plannedStart,
+    p_planned_delivery: input.plannedDelivery,
+    p_budget_locked: input.budgetLocked ?? 0,
+    p_class_society: input.classSociety,
+  })
+  const result = unwrap(data, error, 'Create project') as { project: Project }
+  return result.project
+}
+
 export interface ActionPermission {
   action_key: string
   role: UserRole
 }
 
 /** The caller's project role, or null when their email is not a member. */
-export async function fetchMyRole(): Promise<UserRole | null> {
-  const { data, error } = await supabase.rpc('current_actor_role')
+export async function fetchMyRole(projectId: string): Promise<UserRole | null> {
+  const { data, error } = await supabase.rpc('current_actor_role', {
+    p_project_id: projectId,
+  })
   if (error) throw error
   return (data as UserRole | null) ?? null
 }
@@ -558,10 +624,11 @@ export async function fetchActionPermissions(): Promise<ActionPermission[]> {
 // package, not sitting in a room called #general.
 
 /** The project-wide channel: messages attached to no particular object. */
-export async function fetchProjectMessages(): Promise<Message[]> {
+export async function fetchProjectMessages(projectId: string): Promise<Message[]> {
   const { data, error } = await supabase
     .from('messages')
     .select('*')
+    .eq('project_id', projectId)
     .is('linked_object_type', null)
     .order('created_at', { ascending: true })
   if (error) throw error
@@ -584,10 +651,11 @@ export async function fetchObjectMessages(
 }
 
 /** Everything logged as work outside the agreed scope, newest first. */
-export async function fetchUnplannedWork(): Promise<Message[]> {
+export async function fetchUnplannedWork(projectId: string): Promise<Message[]> {
   const { data, error } = await supabase
     .from('messages')
     .select('*')
+    .eq('project_id', projectId)
     .eq('kind', 'UNPLANNED_WORK')
     .order('created_at', { ascending: false })
   if (error) throw error
@@ -603,8 +671,12 @@ export interface MessageInput {
   meetingRef?: string | null
 }
 
-export async function postMessage(input: MessageInput): Promise<Message> {
+export async function postMessage(
+  projectId: string,
+  input: MessageInput,
+): Promise<Message> {
   const { data, error } = await supabase.rpc('action_post_message', {
+    p_project_id: projectId,
     p_body: input.body,
     p_kind: input.kind ?? 'NOTE',
     p_linked_object_type: input.linkedObjectType ?? null,

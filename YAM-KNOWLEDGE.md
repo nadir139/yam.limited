@@ -985,3 +985,145 @@ chat panel (the select no longer fires straight into a refusal). "Correct
 impact" opens `AmendDefectImpact` — a dialog on the NCR page, expanded in place
 in the chat. `ObjectHistory` pulls `reason` out of the diff and renders it as a
 quote, because it is why the other fields moved, not another field that moved.
+
+---
+
+## 23. Finishing multi-project (migration 016, and the client)
+
+§21 scoped the reads and rewrote the object-scoped Actions, then stopped. This
+is the rest, and it turned up two holes that were invisible from the interface.
+
+### `resolve_project` trusted its argument
+
+```sql
+if p_explicit is not null then
+  return p_explicit;    -- no membership check
+end if;
+```
+
+Unreachable with one project. With two it is an escalation: name any project's
+uuid and the Action writes into it. It now verifies membership before returning.
+
+### Six Actions asked the wrong question
+
+`action_raise_defect`, `action_register_document`,
+`action_advance_project_phase`, `action_create_work_package`,
+`action_schedule_inspection` and `action_post_message` all called the
+one-argument `require_permission(key)` — "does this caller hold a permitting
+role *anywhere*". A YARD_PM on the ketch could have raised NCRs against
+somebody else's property. It is the same bug §21 fixed for the object-scoped
+Actions and never applied to the creating ones.
+
+Each now takes `p_project_id`, defaulting to null so a single-project user is
+unaffected, and guards with `require_permission(key, resolve_project(p_project_id))`.
+The one-argument `require_permission(text)` is **dropped**, not merely unused:
+leaving it would let the next Action written pick the wrong one by autocomplete.
+
+### The probe found what review did not
+
+Dropping `current_actor_role()` broke two callers the `action\_%` scan missed,
+because neither is an Action:
+
+- `action_post_message` declared `v_role user_role := current_actor_role()` in
+  its DECLARE block, which the rewrite left alone.
+- `require_approval_authority` — the Tier-3 owner gate called from
+  `action_decide_approval`. Between one migration and the next, **every owner
+  approval failed outright.**
+
+Both were caught by running the Actions inside a rolled-back transaction with
+a faked JWT claim, not by reading the diff. Changing anything underneath an
+Action means exercising the Action.
+
+```sql
+begin;
+create temp table probe(t text, outcome text);
+grant all on probe to authenticated;
+-- set up rows as superuser, then:
+set local role authenticated;
+set local request.jwt.claims = '{"email":"...","sub":"...","role":"authenticated"}';
+-- ... do $$ begin perform action_x(...); ... exception when others then ...
+select * from probe;
+rollback;
+```
+
+Six probes, all passing: writing into a project you are not in is refused;
+reading one returns zero rows; posting without naming a project when you are on
+two is refused; naming the second project files it there with the role you hold
+*there*; NCR numbering restarts per project (`NCR-2026-001` on a fresh project,
+not `-013`); work packages likewise.
+
+### PROPERTY
+
+`project_type` gained `PROPERTY`. A building has no vessel, no class society
+and no haul-out, but it carries exactly the same work packages, findings,
+change orders and approvals — which is the argument for one ontology rather
+than a second product. `projects.vessel_id` stopped being `NOT NULL` in §21;
+this is what makes use of it.
+
+### The client
+
+`PROJECT_ID` was a module constant in `db.ts` referenced by eleven queries.
+Every read now takes the project explicitly and every cache key carries it:
+`['defects', projectId]`. That last part is not cosmetic — without it, React
+Query would serve the ketch's NCRs under the property's heading for the moment
+between switching and refetching.
+
+- `ProjectContext` holds the list (RLS-filtered) and the selection, persisted
+  per user email rather than globally, and falls back to the first project when
+  the stored one is no longer readable.
+- `useMyRole()` asks about the **active** project. `AuthUser` no longer carries
+  a role at all: a role is held on a project, not by a person, and storing one
+  would have to pick.
+- "Signed in, member of nothing" is a real state and gets its own screen
+  (`NoProjects`) rather than eleven empty tables.
+
+### The agent
+
+The system prompt hardcoded "Project ZERO, a 55m sailing ketch undergoing a
+RINA 5-year special survey at Pendennis Shipyard". It is now built from the
+project row, and told explicitly that not every project is a boat.
+
+The client sends `projectId`; the function does not trust it, but neither does
+it need a branch to check it — `projects` is read through the caller's own JWT
+under a membership-scoped policy, so a project that is not theirs simply
+returns no row. Every read tool filters on the project, and `p_project_id` is
+injected by the dispatcher and **hidden from the tool schema**: exposing it
+would offer the model a decision it has no basis for.
+
+`action_create_project` is registered but `is_agent_usable = false`. An agent
+that can create a project can create somewhere to hide work.
+
+---
+
+## 24. Language
+
+Five languages — English, Italian, French, Spanish, German — with no i18n
+framework. i18next brings a plugin system, a resource loader and a backend;
+what this needs is a flat dictionary per language, a lookup that falls back to
+English, and `{placeholder}` interpolation. That is about forty lines in
+`src/lib/i18n.tsx`.
+
+**English is the fallback, not the key.** A missing Italian string renders the
+English sentence, never `project.emptyTitle` — a half-translated app should
+look unfinished, not broken.
+
+Coverage is **measured, not claimed**: `translationCoverage()` counts how many
+of English's keys each dictionary actually has, and the language menu shows a
+percentage for anything under 95%. Nobody picks German expecting the whole app
+and quietly gets half of it.
+
+What is translated: the application chrome and every enum that appears across
+screens — navigation, project types, phases, roles, statuses, severities,
+disciplines. Those carry the most weight per string, because they appear on
+nearly every page. Page prose and form copy are still English.
+
+Terminology follows trade usage rather than dictionaries: *non conformità* for
+NCR in Italian, *varo/alaggio* for haul out, *pruebas de mar* in Spanish,
+*Klassifikationsgesellschaft* in German. For the Italian property vertical,
+*difformità* is the word a technician actually uses for an unpermitted
+balcony — not *difetto*.
+
+Detection order: stored choice → `navigator.languages` → English. Read in an
+effect rather than a `useState` initialiser, because this module is imported by
+the marketing bundle and touching `localStorage` during module evaluation
+breaks any environment without it.

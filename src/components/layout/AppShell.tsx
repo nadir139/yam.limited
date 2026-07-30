@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
+import { NoProjects } from './ProjectSwitcher'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
+import { useActiveProject } from '@/contexts/ProjectContext'
 
 interface AppShellProps {
   children: React.ReactNode
@@ -10,6 +12,10 @@ interface AppShellProps {
 export default function AppShell({ children }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  // Signed in but a member of nothing is a real state, not an error: reads are
+  // scoped to membership, so every page would render an empty shell of itself.
+  // Better to say so once and offer the way out.
+  const { hasNoProjects } = useActiveProject()
   useRealtimeSync()
 
   useEffect(() => {
@@ -40,7 +46,7 @@ export default function AppShell({ children }: AppShellProps) {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
         <Topbar onMenuClick={() => setSidebarOpen(true)} />
         <main style={{ flex: 1, overflowY: 'auto', padding: '1.5rem' }}>
-          {children}
+          {hasNoProjects ? <NoProjects /> : children}
         </main>
       </div>
     </div>

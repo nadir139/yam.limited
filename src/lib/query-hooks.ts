@@ -1,30 +1,63 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import * as db from './db'
+import { useActiveProject, useProjectId } from '@/contexts/ProjectContext'
 import type { DefectRecord, InspectionEvent, ObjectType } from './types'
 
+/** Re-exported so a page needs one import to reach the active project. */
+export { useActiveProject, useProjectId }
+
+// The active project is part of every cache key.
+//
+// That is what makes switching project safe: React Query treats
+// `['defects', A]` and `['defects', B]` as different queries, so nothing from
+// the ketch can be shown for a moment under the property's heading while a
+// refetch is in flight. Getting this wrong is subtle and looks like a rendering
+// glitch rather than the data-integrity bug it is.
 export const QUERY_KEYS = {
-  vessel: ['vessel'],
-  project: ['project'],
-  workPackages: ['work-packages'],
-  workPackage: (id: string) => ['work-packages', id],
-  inspections: ['inspections'],
-  defects: ['defects'],
-  defect: (id: string) => ['defects', id],
-  changeOrders: ['change-orders'],
-  approvals: ['approvals'],
-  documents: ['documents'],
-  team: ['team'],
-  events: ['events'],
+  vessel: (p: string) => ['vessel', p],
+  project: (p: string) => ['project', p],
+  workPackages: (p: string) => ['work-packages', p],
+  workPackage: (id: string) => ['work-package', id],
+  inspections: (p: string) => ['inspections', p],
+  defects: (p: string) => ['defects', p],
+  defect: (id: string) => ['defect', id],
+  changeOrders: (p: string) => ['change-orders', p],
+  changeOrder: (id: string) => ['change-order', id],
+  approvals: (p: string) => ['approvals', p],
+  documents: (p: string) => ['documents', p],
+  team: (p: string) => ['team', p],
+  events: (p: string) => ['events', p],
 }
 
-export const useVessel = () =>
-  useQuery({ queryKey: QUERY_KEYS.vessel, queryFn: db.fetchVessel })
+export const useProject = () => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: QUERY_KEYS.project(projectId),
+    queryFn: () => db.fetchProject(projectId),
+    enabled: !!projectId,
+  })
+}
 
-export const useProject = () =>
-  useQuery({ queryKey: QUERY_KEYS.project, queryFn: db.fetchProject })
+export const useVessel = () => {
+  const projectId = useProjectId()
+  const { data: project } = useProject()
+  const vesselId = project?.vessel_id ?? null
+  return useQuery({
+    queryKey: QUERY_KEYS.vessel(projectId),
+    queryFn: () => db.fetchVessel(vesselId),
+    // A property project has no vessel; that is a null result, not a failure.
+    enabled: !!projectId && project !== undefined,
+  })
+}
 
-export const useWorkPackages = () =>
-  useQuery({ queryKey: QUERY_KEYS.workPackages, queryFn: db.fetchWorkPackages })
+export const useWorkPackages = () => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: QUERY_KEYS.workPackages(projectId),
+    queryFn: () => db.fetchWorkPackages(projectId),
+    enabled: !!projectId,
+  })
+}
 
 export const useWorkPackage = (id: string) =>
   useQuery({
@@ -33,11 +66,23 @@ export const useWorkPackage = (id: string) =>
     enabled: !!id,
   })
 
-export const useInspections = () =>
-  useQuery({ queryKey: QUERY_KEYS.inspections, queryFn: db.fetchInspections })
+export const useInspections = () => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: QUERY_KEYS.inspections(projectId),
+    queryFn: () => db.fetchInspections(projectId),
+    enabled: !!projectId,
+  })
+}
 
-export const useDefects = () =>
-  useQuery({ queryKey: QUERY_KEYS.defects, queryFn: db.fetchDefects })
+export const useDefects = () => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: QUERY_KEYS.defects(projectId),
+    queryFn: () => db.fetchDefects(projectId),
+    enabled: !!projectId,
+  })
+}
 
 export const useDefect = (id: string) =>
   useQuery({
@@ -46,20 +91,50 @@ export const useDefect = (id: string) =>
     enabled: !!id,
   })
 
-export const useChangeOrders = () =>
-  useQuery({ queryKey: QUERY_KEYS.changeOrders, queryFn: db.fetchChangeOrders })
+export const useChangeOrders = () => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: QUERY_KEYS.changeOrders(projectId),
+    queryFn: () => db.fetchChangeOrders(projectId),
+    enabled: !!projectId,
+  })
+}
 
-export const useApprovals = () =>
-  useQuery({ queryKey: QUERY_KEYS.approvals, queryFn: db.fetchApprovals })
+export const useApprovals = () => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: QUERY_KEYS.approvals(projectId),
+    queryFn: () => db.fetchApprovals(projectId),
+    enabled: !!projectId,
+  })
+}
 
-export const useDocuments = () =>
-  useQuery({ queryKey: QUERY_KEYS.documents, queryFn: db.fetchDocuments })
+export const useDocuments = () => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: QUERY_KEYS.documents(projectId),
+    queryFn: () => db.fetchDocuments(projectId),
+    enabled: !!projectId,
+  })
+}
 
-export const useTeam = () =>
-  useQuery({ queryKey: QUERY_KEYS.team, queryFn: db.fetchTeam })
+export const useTeam = () => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: QUERY_KEYS.team(projectId),
+    queryFn: () => db.fetchTeam(projectId),
+    enabled: !!projectId,
+  })
+}
 
-export const useEvents = () =>
-  useQuery({ queryKey: QUERY_KEYS.events, queryFn: db.fetchEvents })
+export const useEvents = () => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: QUERY_KEYS.events(projectId),
+    queryFn: () => db.fetchEvents(projectId),
+    enabled: !!projectId,
+  })
+}
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
 //
@@ -68,17 +143,30 @@ export const useEvents = () =>
 // writes fired from the browser, with no transaction around them — now happens
 // inside the database. If a later step fails, nothing is left half-applied.
 
-/** Invalidates everything an Action's cascade could plausibly have touched. */
+/**
+ * Invalidates everything an Action's cascade could plausibly have touched.
+ *
+ * Keys are matched by prefix, so `['defects']` still reaches
+ * `['defects', projectId]`. Invalidating across every project rather than only
+ * the active one is deliberate: it is a handful of stale entries, and the
+ * alternative — reasoning about which project each Action touched — is the kind
+ * of cleverness that eventually shows one project's numbers under another's
+ * name.
+ */
 function useCascadeInvalidation() {
   const qc = useQueryClient()
   return () => {
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.defects })
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.changeOrders })
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.approvals })
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.inspections })
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.documents })
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.project })
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.events })
+    qc.invalidateQueries({ queryKey: ['defects'] })
+    qc.invalidateQueries({ queryKey: ['defect'] })
+    qc.invalidateQueries({ queryKey: ['change-orders'] })
+    qc.invalidateQueries({ queryKey: ['change-order'] })
+    qc.invalidateQueries({ queryKey: ['approvals'] })
+    qc.invalidateQueries({ queryKey: ['inspections'] })
+    qc.invalidateQueries({ queryKey: ['documents'] })
+    qc.invalidateQueries({ queryKey: ['work-packages'] })
+    qc.invalidateQueries({ queryKey: ['work-package'] })
+    qc.invalidateQueries({ queryKey: ['project'] })
+    qc.invalidateQueries({ queryKey: ['events'] })
     // Some Actions post to an object's thread — closing an NCR files its reason
     // there, and correcting one files what changed. Without this the note the
     // user just wrote does not appear until a reload, which reads exactly like
@@ -97,8 +185,9 @@ export type CascadeResult = db.CascadeResult
  */
 export function useCreateDefectWithCascade() {
   const invalidate = useCascadeInvalidation()
+  const projectId = useProjectId()
   return useMutation<CascadeResult, Error, DefectFormInput>({
-    mutationFn: (input) => db.raiseDefect(input),
+    mutationFn: (input) => db.raiseDefect(projectId, input),
     onSuccess: invalidate,
   })
 }
@@ -167,17 +256,19 @@ export function useDecideApproval() {
   })
 }
 
-/** Takes no argument — the server reads the current phase and derives the next. */
+/** The next phase is derived server-side from the current one. */
 export function useAdvancePhase() {
   const invalidate = useCascadeInvalidation()
+  const projectId = useProjectId()
   return useMutation({
-    mutationFn: () => db.advanceProjectPhase(),
+    mutationFn: () => db.advanceProjectPhase(projectId),
     onSuccess: invalidate,
   })
 }
 
 export function useUploadDocument() {
   const invalidate = useCascadeInvalidation()
+  const projectId = useProjectId()
   return useMutation({
     mutationFn: (params: {
       file: File
@@ -187,7 +278,7 @@ export function useUploadDocument() {
       linkedObjectId: string | null
       isClassDocument: boolean
     }) =>
-      db.uploadDocument(params.file, {
+      db.uploadDocument(projectId, params.file, {
         title: params.title,
         docType: params.docType,
         linkedObjectType: params.linkedObjectType,
@@ -206,8 +297,9 @@ export type InspectionInput = db.InspectionInput
 
 export function useCreateWorkPackage() {
   const invalidate = useCascadeInvalidation()
+  const projectId = useProjectId()
   return useMutation({
-    mutationFn: (input: WorkPackageInput) => db.createWorkPackage(input),
+    mutationFn: (input: WorkPackageInput) => db.createWorkPackage(projectId, input),
     onSuccess: invalidate,
   })
 }
@@ -224,8 +316,9 @@ export function useUpdateWorkPackage() {
 
 export function useScheduleInspection() {
   const invalidate = useCascadeInvalidation()
+  const projectId = useProjectId()
   return useMutation({
-    mutationFn: (input: InspectionInput) => db.scheduleInspection(input),
+    mutationFn: (input: InspectionInput) => db.scheduleInspection(projectId, input),
     onSuccess: invalidate,
   })
 }
@@ -252,8 +345,23 @@ export const useObjectEvents = (
 
 // ─── Permissions ──────────────────────────────────────────────────────────────
 
-export const useMyRole = () =>
-  useQuery({ queryKey: ['my-role'], queryFn: db.fetchMyRole, staleTime: 5 * 60_000 })
+/**
+ * The caller's role **on the active project**.
+ *
+ * A person is not one role. The same email can be OWNERS_REP on the ketch and
+ * nothing at all on somebody else's property, so asking for "my role" without
+ * naming a project was always answering a different question than the one the
+ * UI meant.
+ */
+export const useMyRole = () => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: ['my-role', projectId],
+    queryFn: () => db.fetchMyRole(projectId),
+    enabled: !!projectId,
+    staleTime: 5 * 60_000,
+  })
+}
 
 /**
  * `can('action_create_work_package')` — for hiding controls the role cannot use.
@@ -282,13 +390,19 @@ export function usePermissions() {
 export type MessageInput = db.MessageInput
 
 export const MESSAGE_KEYS = {
-  project: ['messages', 'project'],
+  project: (p: string) => ['messages', 'project', p],
   object: (t: string, id: string) => ['messages', t, id],
-  unplanned: ['messages', 'unplanned'],
+  unplanned: (p: string) => ['messages', 'unplanned', p],
 }
 
-export const useProjectMessages = () =>
-  useQuery({ queryKey: MESSAGE_KEYS.project, queryFn: db.fetchProjectMessages })
+export const useProjectMessages = () => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: MESSAGE_KEYS.project(projectId),
+    queryFn: () => db.fetchProjectMessages(projectId),
+    enabled: !!projectId,
+  })
+}
 
 export const useObjectMessages = (objectType: ObjectType, objectId: string | undefined) =>
   useQuery({
@@ -298,17 +412,47 @@ export const useObjectMessages = (objectType: ObjectType, objectId: string | und
   })
 
 /** Work recorded as outside the agreed scope, across the whole project. */
-export const useUnplannedWork = () =>
-  useQuery({ queryKey: MESSAGE_KEYS.unplanned, queryFn: db.fetchUnplannedWork })
+export const useUnplannedWork = () => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: MESSAGE_KEYS.unplanned(projectId),
+    queryFn: () => db.fetchUnplannedWork(projectId),
+    enabled: !!projectId,
+  })
+}
 
 export function usePostMessage() {
   const qc = useQueryClient()
+  const projectId = useProjectId()
   return useMutation({
-    mutationFn: (input: MessageInput) => db.postMessage(input),
+    mutationFn: (input: MessageInput) => db.postMessage(projectId, input),
     onSuccess: () => {
       // Every message view is a filter over the same table, so refresh all of
       // them rather than guessing which one the caller is looking at.
       qc.invalidateQueries({ queryKey: ['messages'] })
+    },
+  })
+}
+
+// ─── Starting a project ───────────────────────────────────────────────────────
+
+export type ProjectInput = db.ProjectInput
+
+/**
+ * Creates a project and switches to it.
+ *
+ * Landing on the new project rather than staying on the old one is the whole
+ * point of having just made it, and the membership row the Action writes is
+ * what makes it readable at all.
+ */
+export function useCreateProject() {
+  const qc = useQueryClient()
+  const { setActiveProjectId } = useActiveProject()
+  return useMutation({
+    mutationFn: (input: ProjectInput) => db.createProject(input),
+    onSuccess: (project) => {
+      qc.invalidateQueries({ queryKey: ['my-projects'] })
+      setActiveProjectId(project.id)
     },
   })
 }

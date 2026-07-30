@@ -119,9 +119,20 @@ export interface Vessel {
 
 export interface Project {
   id: string
-  vessel_id: string
+  /** Null on a property project — the column stopped being NOT NULL in 014. */
+  vessel_id: string | null
   name: string
-  project_type: 'FIVE_YEAR_SURVEY' | 'REFIT' | 'NEWBUILD' | 'ANNUAL_SURVEY' | 'DAMAGE_REPAIR'
+  // PROPERTY was added in migration 016. A building has no vessel, no class
+  // society and no haul out, but it carries exactly the same work packages,
+  // findings, change orders and approvals — which is the argument for one
+  // ontology rather than a second product.
+  project_type:
+    | 'FIVE_YEAR_SURVEY'
+    | 'REFIT'
+    | 'NEWBUILD'
+    | 'ANNUAL_SURVEY'
+    | 'DAMAGE_REPAIR'
+    | 'PROPERTY'
   phase: ProjectPhase
   yard_name: string
   yard_location: string
@@ -132,7 +143,7 @@ export interface Project {
   budget_locked: number // EUR
   budget_spent: number
   budget_contingency: number
-  class_society: ClassSociety
+  class_society: ClassSociety | null
   survey_due_date: string | null
   created_at: string
   vessel?: Vessel
@@ -318,14 +329,16 @@ export interface Message {
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
+/**
+ * Deliberately carries no role.
+ *
+ * A role is held on a project, not by a person: the same email can be
+ * OWNERS_REP on the ketch and a member of nothing on a property. Storing one
+ * here would have to pick, and picking wrongly hides or offers controls that
+ * the database then contradicts. `useMyRole()` asks about the active project.
+ */
 export interface AuthUser {
   id: string
   email: string
   name: string
-  /**
-   * Null when the signed-in email is not in project_members. Such a user can
-   * read the project but call no Action — the database refuses them, so the UI
-   * must not pretend otherwise.
-   */
-  role: UserRole | null
 }
