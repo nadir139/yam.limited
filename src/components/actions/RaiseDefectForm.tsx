@@ -1,3 +1,4 @@
+import { eur } from '@/lib/format'
 import React, { useState } from 'react'
 import { GitBranch, AlertTriangle, CheckCircle2, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -29,8 +30,6 @@ const SEVERITY_COLORS: Record<DefectRecord['severity'], string> = {
   CRITICAL: 'hsl(var(--destructive))',
 }
 
-const eur = (n: number) =>
-  new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
 
 interface Props {
   workPackageId?: string

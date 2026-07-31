@@ -1,3 +1,4 @@
+import { eur } from '@/lib/format'
 import React, { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
@@ -43,8 +44,6 @@ const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
   DISPUTED: { bg: 'hsl(var(--muted))', text: 'hsl(var(--muted-foreground))' },
 }
 
-const eur = (n: number) =>
-  new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
 
 function PropRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (

@@ -1,3 +1,4 @@
+import { at, eur, percent, sinceNow } from '@/lib/format'
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { formatDistanceToNow } from 'date-fns'
@@ -59,8 +60,6 @@ function getEventDescription(event: WorldModelEvent): string {
   }
 }
 
-const eur = (amount: number) =>
-  new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(amount)
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -108,12 +107,10 @@ export default function Dashboard() {
 
   const currentPhaseIndex = PHASES.indexOf(project.phase)
   const completedPhases = currentPhaseIndex
-  // 0/0 is NaN, and a project created today has no budget yet — so the very
-  // first thing a new project showed was "NaN% used".
-  const budgetPct =
-    project.budget_locked > 0
-      ? Math.round((project.budget_spent / project.budget_locked) * 100)
-      : null
+  // Null rather than 0 when no budget is set — a project created today has
+  // none, and a bar sitting at 0% implies a budget nobody has agreed. This
+  // shipped once as "NaN% used"; `percent` is where that lives now.
+  const budgetPct = percent(project.budget_spent, project.budget_locked)
   const openDefects = defects.filter((d) => d.status !== 'CLOSED')
   const pendingApprovals = approvals.filter((a) => a.status === 'PENDING')
   const onHoldWPs = workPackages.filter((wp) => wp.status === 'ON_HOLD')
@@ -376,7 +373,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="flex flex-col gap-0 p-4 pt-0">
             {[...events]
-              .sort((a, b) => new Date(b.triggered_at).getTime() - new Date(a.triggered_at).getTime())
+              .sort((a, b) => at(b.triggered_at) - at(a.triggered_at))
               .map((event, idx) => (
                 <div key={event.id} className="flex gap-3 relative">
                   {/* Timeline line */}
@@ -396,7 +393,7 @@ export default function Dashboard() {
                   <div className="flex-1 pb-4">
                     <div className="text-sm">{getEventDescription(event)}</div>
                     <div className="text-xs mt-0.5" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                      {formatDistanceToNow(new Date(event.triggered_at), { addSuffix: true })}
+                      {sinceNow(event.triggered_at)}
                     </div>
                   </div>
                 </div>

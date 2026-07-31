@@ -1,3 +1,4 @@
+import { day } from '@/lib/format'
 import { format } from 'date-fns'
 import { CornerDownRight, Dot } from 'lucide-react'
 import { useObjectEvents } from '@/lib/query-hooks'
@@ -136,7 +137,7 @@ function EventRow({ event, isLast }: { event: WorldModelEvent; isLast: boolean }
           </span>
           <Dot size={12} style={{ color: 'hsl(var(--muted-foreground))' }} />
           <span className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
-            {format(new Date(event.triggered_at), 'd MMM yyyy, HH:mm')}
+            {day(event.triggered_at, 'd MMM yyyy, HH:mm')}
           </span>
         </div>
 

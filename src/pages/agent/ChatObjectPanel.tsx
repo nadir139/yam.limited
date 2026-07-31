@@ -1,3 +1,4 @@
+import { eur } from '@/lib/format'
 import { useNavigate } from 'react-router-dom'
 import { X, ExternalLink, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -30,14 +31,6 @@ import { useState } from 'react'
 // many at a time as you like, so reading a record and acting on it never costs
 // you the conversation that led there.
 
-const eur = (n: number | null | undefined) =>
-  n == null
-    ? '—'
-    : new Intl.NumberFormat('en-IE', {
-        style: 'currency',
-        currency: 'EUR',
-        maximumFractionDigits: 0,
-      }).format(n)
 
 const DEFECT_STATUSES: DefectRecord['status'][] = [
   'OPEN',

@@ -1,3 +1,4 @@
+import { eur } from '@/lib/format'
 import React, { useState } from 'react'
 import { format, formatDistanceToNow, isPast } from 'date-fns'
 import { CheckCircle, XCircle } from 'lucide-react'
@@ -22,8 +23,6 @@ const TIER_STYLES: Record<string, { bg: string; text: string; label: string }> =
   TIER_3: { bg: 'hsl(0 72% 51% / 0.12)', text: 'hsl(var(--destructive))', label: 'Tier 3 (>€50k)' },
 }
 
-const eur = (n: number) =>
-  new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
 
 function DeadlineDisplay({ deadline }: { deadline: string | null }) {
   if (!deadline) return null

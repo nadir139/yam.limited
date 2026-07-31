@@ -1,3 +1,4 @@
+import { eur } from '@/lib/format'
 import { useParams, useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { ArrowLeft, ArrowRight, AlertTriangle, CheckCircle2 } from 'lucide-react'
@@ -13,12 +14,6 @@ import {
 import ObjectHistory from '@/components/ObjectHistory'
 import MessageThread from '@/components/MessageThread'
 
-const eur = (n: number) =>
-  new Intl.NumberFormat('en-IE', {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 0,
-  }).format(n)
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   DRAFT: { bg: 'hsl(var(--muted))', text: 'hsl(var(--muted-foreground))' },

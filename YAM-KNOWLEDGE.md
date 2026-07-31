@@ -1389,3 +1389,65 @@ it calls things follow the same registry.
 change, or the type checker is quietly grading itself against last week's
 schema. Generating `src/lib/types.ts` from the database — Supabase can do this —
 would remove the class entirely and is the right long-term fix.
+
+---
+
+## 29. Types are generated now
+
+§28's lesson, acted on. `src/lib/database.types.ts` is generated from the live
+schema; `src/lib/types.ts` derives from it:
+
+```ts
+export type Discipline = Database['public']['Enums']['discipline']
+export type WorkPackage = Database['public']['Tables']['work_packages']['Row']
+```
+
+`Discipline` *is* the Postgres enum rather than a copy that drifts. What stays
+hand-written is what has no row behind it: `AuthUser`, assembled from the JWT,
+and the `vessel?` join shape on `Project`.
+
+Proved rather than assumed, with a throwaway file of `@ts-expect-error`
+assertions — all four fire:
+
+```ts
+const d: Discipline = 'CADASTRAL'                 // now valid
+// @ts-expect-error not a discipline
+const bad: Discipline = 'MARITIME'
+// @ts-expect-error yard_name is nullable in Postgres
+const yard: string = ({} as Project).yard_name
+// @ts-expect-error missing PLANNING, CADASTRAL, ENERGY, LANDSCAPE
+const partial: Record<Discipline, string> = { STRUCTURAL: '', /* …9 keys */ }
+```
+
+### `strict` was off, and that mattered
+
+Switching to generated types produced **zero** errors, which was suspicious —
+the schema is full of nullable columns the UI treated as present. The reason
+was `"strict": false` in `tsconfig.app.json`: the nullability was there in the
+types and simply not checked.
+
+Turning it on cost **31 errors**, all `strictNullChecks`, in exactly two shapes:
+
+```ts
+Math.round((actual / planned) * 100)   // NaN when both are null or 0
+format(new Date(planned_start), …)     // "Invalid Date" when null
+```
+
+The first had already shipped once, by hand, as "NaN% used" on the dashboard of
+every newly created project — §25. The compiler found the other nine instances
+in WorkPackageList, WorkPackageDetail and ProjectOverview. The second would have
+printed "Invalid Date" all over the Sardinia project, since every date field on
+a new project is empty.
+
+Generated types without `strict` are decoration. The two go together.
+
+### `src/lib/format.ts`
+
+Nine copies of the same `eur()` existed, each typed `(n: number)` — nine places
+a nullable column could be passed. They are now one helper that takes
+`number | null` and renders an em dash, alongside `percent` (null, not 0, when
+there is nothing to divide by — those are different facts), `day`, `sinceNow`,
+`at` and `num`.
+
+An em dash is the right answer for a project that has no budget yet. A zero is
+a claim.

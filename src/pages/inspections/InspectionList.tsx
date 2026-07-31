@@ -1,3 +1,4 @@
+import { day, num } from '@/lib/format'
 import React, { useState } from 'react'
 import { format } from 'date-fns'
 import { CheckCircle2 } from 'lucide-react'
@@ -141,7 +142,7 @@ export default function InspectionList() {
                   <span>
                     {insp.actual_date
                       ? `Completed ${format(new Date(insp.actual_date), 'd MMM yyyy')}`
-                      : `Scheduled ${format(new Date(insp.scheduled_date), 'd MMM yyyy')}`}
+                      : `Scheduled ${day(insp.scheduled_date)}`}
                   </span>
                 </div>
 
@@ -154,7 +155,7 @@ export default function InspectionList() {
                   </div>
                 )}
 
-                {insp.defect_count > 0 && (
+                {num(insp.defect_count) > 0 && (
                   <div className="mt-2 text-xs font-medium" style={{ color: 'hsl(var(--destructive))' }}>
                     {insp.defect_count} defect{insp.defect_count !== 1 ? 's' : ''} recorded
                   </div>
