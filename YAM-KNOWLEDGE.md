@@ -1333,3 +1333,59 @@ a backwards transition. The code was correct: the real project is in
 from my assumption about the data, not from the data.** Checking the row before
 believing the probe is the habit; a probe is only as good as the state you
 verified it against.
+
+---
+
+## 28. The crash §27 shipped
+
+Reported from the live site within minutes of deploying the vocabulary work:
+
+```
+Uncaught TypeError: Cannot read properties of undefined (reading 'bg')
+  at WorkPackageList
+```
+
+Creating a work package on the Sardinia project with discipline `CADASTRAL`
+white-screened the whole Work Packages page.
+
+### Why the compiler did not catch it
+
+`DISCIPLINE_COLORS` is typed `Record<Discipline, {bg, text}>` — exactly the
+construct that should have failed to compile the moment a discipline was added.
+It did not, because **migration 018 added the values to the Postgres enum and
+nobody added them to the TypeScript union.** With `Discipline` still listing
+nine values, a nine-key record satisfied `Record<Discipline, …>` perfectly.
+
+The type system was pointed at a stale copy of the truth. It was not weak
+typing that failed here; it was two sources of truth for one enum, with no link
+between them.
+
+### The two-part fix
+
+1. **The unions now match the database.** `Discipline`, `RootCause`,
+   `ProjectPhase` and a new `DocType` carry every value migration 018 added.
+   Adding the four disciplines immediately produced the compile error the crash
+   should have been — which is the point: the next omission is a build failure.
+2. **The lookups no longer trust their key.** `?? NEUTRAL` on the discipline,
+   status and document-type maps. A missing colour is a grey badge; it must
+   never be a blank page. Defence in depth, because part 1 relies on a human
+   remembering.
+
+Verified both directions: with the pre-fix code the harness rendered an empty
+page on a `CADASTRAL` work package; with the fix it renders the row, labelled
+"Cadastral" rather than `CADASTRAL`.
+
+### The related bug that was already there
+
+Filters and badges rendered raw enum values (`CADASTRAL`, `VISURA_CATASTALE`)
+and the discipline filter listed the marine set on a property project. Both now
+read `useVocabulary` and the i18n dictionary, so what a project offers and what
+it calls things follow the same registry.
+
+### The lesson
+
+**A generated enum and a hand-written union are two sources of truth.** Every
+`ALTER TYPE … ADD VALUE` must be paired with the TypeScript union in the same
+change, or the type checker is quietly grading itself against last week's
+schema. Generating `src/lib/types.ts` from the database — Supabase can do this —
+would remove the class entirely and is the right long-term fix.

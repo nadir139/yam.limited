@@ -8,6 +8,13 @@ export type ProjectPhase =
   | 'INTERIOR'
   | 'SEA_TRIALS'
   | 'DELIVERED'
+  // Migration 018 — a building's ladder. The sequence a given project walks
+  // comes from ontology_vocabulary, not from the order of this union.
+  | 'DOCUMENT_GATHERING'
+  | 'SURVEY'
+  | 'COMPLIANCE_REVIEW'
+  | 'REMEDIATION'
+  | 'CERTIFICATION'
 
 export type WorkPackageStatus =
   | 'DRAFT'
@@ -27,6 +34,12 @@ export type Discipline =
   | 'PAINT'
   | 'CLASS'
   | 'SAFETY'
+  // Added for PROPERTY projects in migration 018. Which of these a project may
+  // actually use is decided per type by ontology_vocabulary.
+  | 'PLANNING'
+  | 'CADASTRAL'
+  | 'ENERGY'
+  | 'LANDSCAPE'
 
 export type DefectSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
 
@@ -46,6 +59,11 @@ export type RootCause =
   | 'DESIGN_DEFICIENCY'
   | 'MOISTURE_INGRESS'
   | 'OTHER'
+  // Migration 018 — why a finding exists on a building.
+  | 'UNPERMITTED_WORKS'
+  | 'CADASTRAL_MISMATCH'
+  | 'MISSING_CERTIFICATE'
+  | 'EXPIRED_PERMIT'
 
 export type Disposition = 'REPAIR' | 'REPLACE' | 'MONITOR' | 'ACCEPT_AS_IS' | 'PENDING'
 
@@ -75,6 +93,28 @@ export type UserRole =
 export type InspectionResult = 'PASS' | 'CONDITIONAL_PASS' | 'FAIL' | 'PENDING'
 
 export type DocumentStatus = 'DRAFT' | 'UNDER_REVIEW' | 'APPROVED' | 'SUPERSEDED'
+
+export type DocType =
+  | 'SURVEY_REPORT'
+  | 'CLASS_CERTIFICATE'
+  | 'DRAWING'
+  | 'SPECIFICATION'
+  | 'NCR'
+  | 'CHANGE_ORDER'
+  | 'APPROVAL'
+  | 'CORRESPONDENCE'
+  | 'PHOTO'
+  | 'OTHER'
+  // Migration 018 — the Italian property set, named in the originals.
+  | 'VISURA_CATASTALE'
+  | 'PLANIMETRIA_CATASTALE'
+  | 'DEED'
+  | 'BUILDING_PERMIT'
+  | 'AMNESTY'
+  | 'LANDSCAPE_CLEARANCE'
+  | 'COMPLIANCE_DECLARATION'
+  | 'HABITABILITY'
+  | 'ENERGY_CERTIFICATE'
 
 export type MessageKind =
   | 'NOTE'
@@ -256,17 +296,7 @@ export interface Document {
   project_id: string
   doc_number: string
   title: string
-  doc_type:
-    | 'SURVEY_REPORT'
-    | 'CLASS_CERTIFICATE'
-    | 'DRAWING'
-    | 'SPECIFICATION'
-    | 'NCR'
-    | 'CHANGE_ORDER'
-    | 'APPROVAL'
-    | 'CORRESPONDENCE'
-    | 'PHOTO'
-    | 'OTHER'
+  doc_type: DocType
   revision: string
   status: DocumentStatus
   file_url: string | null

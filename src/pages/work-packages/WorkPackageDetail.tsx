@@ -14,6 +14,7 @@ import {
   useDefects,
   useDocuments,
 } from '@/lib/query-hooks'
+import { useTranslation } from '@/lib/i18n'
 import RaiseDefectForm from '@/components/actions/RaiseDefectForm'
 import UploadDocumentForm from '@/components/actions/UploadDocumentForm'
 import ScheduleInspectionForm from '@/components/actions/ScheduleInspectionForm'
@@ -48,6 +49,7 @@ const RESULT_STYLES: Record<string, { bg: string; text: string }> = {
 }
 
 export default function WorkPackageDetail() {
+  const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
@@ -117,7 +119,7 @@ export default function WorkPackageDetail() {
               </p>
               <div className="flex flex-wrap gap-2">
                 <Badge style={{ backgroundColor: 'hsl(var(--primary)/0.12)', color: 'hsl(var(--primary))', border: 'none' }}>
-                  {wp.discipline}
+                  {t(`discipline.${wp.discipline}`)}
                 </Badge>
                 <Badge style={{ backgroundColor: 'hsl(var(--accent)/0.15)', color: 'hsl(var(--accent))', border: 'none' }}>
                   {wp.status.replace(/_/g, ' ')}
@@ -277,7 +279,7 @@ export default function WorkPackageDetail() {
                   <TableRow key={doc.id}>
                     <TableCell className="font-mono text-xs">{doc.doc_number}</TableCell>
                     <TableCell className="text-sm">{doc.title}</TableCell>
-                    <TableCell className="text-sm">{doc.doc_type.replace(/_/g, ' ')}</TableCell>
+                    <TableCell className="text-sm">{t(`docType.${doc.doc_type}`)}</TableCell>
                     <TableCell className="text-sm">{doc.status.replace(/_/g, ' ')}</TableCell>
                   </TableRow>
                 ))}

@@ -5,7 +5,8 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table'
-import { useDocuments } from '@/lib/query-hooks'
+import { useDocuments, useVocabulary } from '@/lib/query-hooks'
+import { useTranslation } from '@/lib/i18n'
 import UploadDocumentForm from '@/components/actions/UploadDocumentForm'
 
 const DOC_TYPE_STYLES: Record<string, { bg: string; text: string }> = {
@@ -19,7 +20,20 @@ const DOC_TYPE_STYLES: Record<string, { bg: string; text: string }> = {
   CORRESPONDENCE:   { bg: 'hsl(var(--muted))',        text: 'hsl(var(--muted-foreground))' },
   PHOTO:            { bg: 'hsl(330 60% 50% / 0.1)',  text: 'hsl(330 60% 45%)' },
   OTHER:            { bg: 'hsl(var(--muted))',        text: 'hsl(var(--muted-foreground))' },
+  // Migration 018 — the property set. Keyed by string rather than by the union,
+  // so a value added in SQL renders neutral instead of crashing the page.
+  VISURA_CATASTALE:      { bg: 'hsl(280 50% 45% / 0.12)', text: 'hsl(280 50% 42%)' },
+  PLANIMETRIA_CATASTALE: { bg: 'hsl(280 50% 45% / 0.08)', text: 'hsl(280 50% 42%)' },
+  DEED:                  { bg: 'hsl(215 50% 23% / 0.12)', text: 'hsl(var(--primary))' },
+  BUILDING_PERMIT:       { bg: 'hsl(215 60% 45% / 0.12)', text: 'hsl(215 60% 40%)' },
+  AMNESTY:               { bg: 'hsl(38 92% 50% / 0.14)',  text: 'hsl(38 80% 38%)' },
+  LANDSCAPE_CLEARANCE:   { bg: 'hsl(170 50% 38% / 0.14)', text: 'hsl(170 50% 30%)' },
+  COMPLIANCE_DECLARATION:{ bg: 'hsl(158 64% 40% / 0.12)', text: 'hsl(var(--success))' },
+  HABITABILITY:          { bg: 'hsl(158 64% 40% / 0.18)', text: 'hsl(var(--success))' },
+  ENERGY_CERTIFICATE:    { bg: 'hsl(90 55% 40% / 0.14)',  text: 'hsl(90 55% 30%)' },
 }
+
+const NEUTRAL = { bg: 'hsl(var(--muted))', text: 'hsl(var(--muted-foreground))' }
 
 const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
   DRAFT:        { bg: 'hsl(var(--muted))',        text: 'hsl(var(--muted-foreground))' },
@@ -41,6 +55,8 @@ function formatBytes(bytes: number | null): string {
 }
 
 export default function DocumentLibrary() {
+  const { t } = useTranslation()
+  const DOC_TYPES = useVocabulary('DOC_TYPE')
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('ALL')
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
@@ -89,7 +105,7 @@ export default function DocumentLibrary() {
       <div className="flex flex-wrap gap-3 items-center">
         <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} style={selectStyle}>
           <option value="ALL">All Types</option>
-          {DOC_TYPES.map((t) => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
+          {DOC_TYPES.map((d) => <option key={d} value={d}>{t(`docType.${d}`)}</option>)}
         </select>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={selectStyle}>
           <option value="ALL">All Statuses</option>
@@ -126,8 +142,8 @@ export default function DocumentLibrary() {
           </TableHeader>
           <TableBody>
             {filtered.map((doc) => {
-              const dt = DOC_TYPE_STYLES[doc.doc_type]
-              const ds = STATUS_STYLES[doc.status]
+              const dt = DOC_TYPE_STYLES[doc.doc_type] ?? NEUTRAL
+              const ds = STATUS_STYLES[doc.status] ?? NEUTRAL
               return (
                 <TableRow key={doc.id}>
                   <TableCell className="font-mono text-xs font-medium">{doc.doc_number}</TableCell>
@@ -141,7 +157,7 @@ export default function DocumentLibrary() {
                   </TableCell>
                   <TableCell>
                     <Badge style={{ backgroundColor: dt.bg, color: dt.text, border: 'none', fontSize: '11px' }}>
-                      {doc.doc_type.replace(/_/g, ' ')}
+                      {t(`docType.${doc.doc_type}`)}
                     </Badge>
                   </TableCell>
                   <TableCell className="font-mono text-xs">{doc.revision}</TableCell>
