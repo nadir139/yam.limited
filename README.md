@@ -59,6 +59,29 @@ Without a `.env` the dev server still runs — you get the public pages, and
 | `npm run typecheck` | `tsc -p tsconfig.app.json --noEmit` |
 | `npm run lint` | ESLint |
 
+### Types are generated, not written
+
+`src/lib/database.types.ts` is generated from the live schema and **must not be
+edited by hand**. `src/lib/types.ts` derives every enum and row type from it, so
+`Discipline` *is* the Postgres enum rather than a copy of it.
+
+Regenerate after any migration:
+
+```sh
+supabase gen types typescript --project-id xgpdfefxarllgykjbppn \
+  > src/lib/database.types.ts
+```
+
+Skipping this is not cosmetic. Migration 018 added four values to the
+`discipline` enum, the hand-written union did not learn about them,
+`Record<Discipline, …>` still typechecked with nine keys, and the first property
+work package white-screened the Work Packages page.
+
+`strict` is on. It was off until the generated types landed, which hid the
+nullability the schema actually declares — thirty-one sites divided by or
+formatted a nullable column, and one had already shipped as "NaN% used" on every
+newly created project. `src/lib/format.ts` is where that now lives.
+
 > **Use `npm run typecheck`, never a bare `tsc --noEmit`.** The root
 > `tsconfig.json` is a solution file (`"files": []` plus project references), so
 > `tsc --noEmit` type-checks *nothing* and always exits 0. Duplicate exports

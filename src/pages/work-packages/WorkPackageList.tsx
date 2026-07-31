@@ -1,3 +1,4 @@
+import { eur, percentValue } from '@/lib/format'
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CheckCircle2 } from 'lucide-react'
@@ -11,8 +12,6 @@ import { useTranslation } from '@/lib/i18n'
 import CreateWorkPackageForm from '@/components/actions/CreateWorkPackageForm'
 import type { Discipline, WorkPackageStatus } from '@/lib/types'
 
-const eur = (amount: number) =>
-  new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(amount)
 
 const DISCIPLINE_COLORS: Record<Discipline, { bg: string; text: string }> = {
   CLASS: { bg: 'hsl(215 50% 23% / 0.12)', text: 'hsl(var(--primary))' },
@@ -136,9 +135,7 @@ export default function WorkPackageList() {
           </TableHeader>
           <TableBody>
             {filtered.map((wp) => {
-              const hoursPct = wp.planned_hours > 0
-                ? Math.round((wp.actual_hours / wp.planned_hours) * 100)
-                : 0
+              const hoursPct = percentValue(wp.actual_hours, wp.planned_hours)
               const dc = DISCIPLINE_COLORS[wp.discipline] ?? NEUTRAL
               const sc = STATUS_COLORS[wp.status] ?? NEUTRAL
               return (

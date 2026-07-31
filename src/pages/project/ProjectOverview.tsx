@@ -1,3 +1,4 @@
+import { day, eur } from '@/lib/format'
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
@@ -14,8 +15,6 @@ import {
   useTeam,
 } from '@/lib/query-hooks'
 
-const eur = (amount: number) =>
-  new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(amount)
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -132,8 +131,8 @@ export default function ProjectOverview() {
             </div>
             <DetailRow label="Yard" value={project.yard_name} />
             <DetailRow label="Location" value={project.yard_location} />
-            <DetailRow label="Planned Start" value={format(new Date(project.planned_start), 'd MMM yyyy')} />
-            <DetailRow label="Planned Delivery" value={format(new Date(project.planned_delivery), 'd MMM yyyy')} />
+            <DetailRow label="Planned Start" value={day(project.planned_start)} />
+            <DetailRow label="Planned Delivery" value={day(project.planned_delivery)} />
             <DetailRow label="Budget Locked" value={eur(project.budget_locked)} />
             <DetailRow label="Budget Spent" value={eur(project.budget_spent)} />
             <DetailRow label="Contingency" value={eur(project.budget_contingency)} />

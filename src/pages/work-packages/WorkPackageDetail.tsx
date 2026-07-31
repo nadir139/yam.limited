@@ -1,3 +1,4 @@
+import { day, eur, percentLabel, percentValue } from '@/lib/format'
 import React from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, CheckCircle2 } from 'lucide-react'
@@ -22,8 +23,6 @@ import WorkPackageStatusControl from '@/components/actions/WorkPackageStatusCont
 import ObjectHistory from '@/components/ObjectHistory'
 import MessageThread from '@/components/MessageThread'
 
-const eur = (n: number) =>
-  new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -81,8 +80,8 @@ export default function WorkPackageDetail() {
     (d) => d.linked_object_type === 'WORK_PACKAGE' && d.linked_object_id === wp.id,
   )
 
-  const hoursPct = wp.planned_hours > 0 ? Math.round((wp.actual_hours / wp.planned_hours) * 100) : 0
-  const costPct = wp.planned_cost > 0 ? Math.round((wp.actual_cost / wp.planned_cost) * 100) : 0
+  const hoursPct = percentValue(wp.actual_hours, wp.planned_hours)
+  const costPct = percentValue(wp.actual_cost, wp.planned_cost)
 
   return (
     <div className="flex flex-col gap-6 max-w-5xl mx-auto">
@@ -137,7 +136,7 @@ export default function WorkPackageDetail() {
               <div>
                 <div className="flex justify-between text-xs mb-1">
                   <span style={{ color: 'hsl(var(--muted-foreground))' }}>Cost</span>
-                  <span>{eur(wp.actual_cost)} / {eur(wp.planned_cost)} ({costPct}%)</span>
+                  <span>{eur(wp.actual_cost)} / {eur(wp.planned_cost)} ({percentLabel(wp.actual_cost, wp.planned_cost)})</span>
                 </div>
                 <Progress value={costPct} className="h-1.5" />
               </div>
@@ -150,11 +149,11 @@ export default function WorkPackageDetail() {
             </div>
             <div>
               <div style={{ color: 'hsl(var(--muted-foreground))' }}>Planned Start</div>
-              <div className="font-medium">{format(new Date(wp.planned_start), 'd MMM yyyy')}</div>
+              <div className="font-medium">{day(wp.planned_start)}</div>
             </div>
             <div>
               <div style={{ color: 'hsl(var(--muted-foreground))' }}>Planned End</div>
-              <div className="font-medium">{format(new Date(wp.planned_end), 'd MMM yyyy')}</div>
+              <div className="font-medium">{day(wp.planned_end)}</div>
             </div>
             {wp.class_item_ref && (
               <div>
@@ -204,7 +203,7 @@ export default function WorkPackageDetail() {
                       <TableCell className="font-mono text-xs">{i.inspection_number}</TableCell>
                       <TableCell className="text-sm">{i.title}</TableCell>
                       <TableCell className="text-sm">{i.inspector_name}</TableCell>
-                      <TableCell className="text-sm">{format(new Date(i.scheduled_date), 'd MMM yyyy')}</TableCell>
+                      <TableCell className="text-sm">{day(i.scheduled_date)}</TableCell>
                       <TableCell>
                         <Badge style={{ backgroundColor: rs.bg, color: rs.text, border: 'none', fontSize: '11px' }}>
                           {i.result}

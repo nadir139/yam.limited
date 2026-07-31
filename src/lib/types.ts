@@ -1,385 +1,88 @@
+import type { Database } from './database.types'
+
+// The domain vocabulary, derived from the database rather than restated.
+//
+// This file used to hand-write every enum as a string union. That is two
+// sources of truth for one thing, and it failed exactly the way two sources of
+// truth fail: migration 018 added four values to the `discipline` enum in
+// Postgres, nobody added them here, `Record<Discipline, …>` still typechecked
+// with its nine keys, and the first property work package white-screened the
+// Work Packages page with "Cannot read properties of undefined".
+//
+// Now `Discipline` *is* the Postgres enum. Regenerating `database.types.ts`
+// after a migration turns that class of mistake into a compile error at every
+// exhaustive lookup — which is what a type checker is for.
+//
+//   supabase gen types typescript --project-id xgpdfefxarllgykjbppn \
+//     > src/lib/database.types.ts
+//
+// What stays hand-written is what has no row behind it: `AuthUser`, assembled
+// from the JWT, and the join shape on `Project`.
+
+type Enums = Database['public']['Enums']
+type Tables = Database['public']['Tables']
+type Row<T extends keyof Tables> = Tables[T]['Row']
+
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
-export type ProjectPhase =
-  | 'PRE_SURVEY'
-  | 'HAUL_OUT'
-  | 'STRUCTURAL'
-  | 'SYSTEMS'
-  | 'INTERIOR'
-  | 'SEA_TRIALS'
-  | 'DELIVERED'
-  // Migration 018 — a building's ladder. The sequence a given project walks
-  // comes from ontology_vocabulary, not from the order of this union.
-  | 'DOCUMENT_GATHERING'
-  | 'SURVEY'
-  | 'COMPLIANCE_REVIEW'
-  | 'REMEDIATION'
-  | 'CERTIFICATION'
-
-export type WorkPackageStatus =
-  | 'DRAFT'
-  | 'SCOPED'
-  | 'ACTIVE'
-  | 'EXPANDED'
-  | 'ON_HOLD'
-  | 'COMPLETE'
-
-export type Discipline =
-  | 'STRUCTURAL'
-  | 'HULL'
-  | 'MECHANICAL'
-  | 'ELECTRICAL'
-  | 'RIGGING'
-  | 'INTERIOR'
-  | 'PAINT'
-  | 'CLASS'
-  | 'SAFETY'
-  // Added for PROPERTY projects in migration 018. Which of these a project may
-  // actually use is decided per type by ontology_vocabulary.
-  | 'PLANNING'
-  | 'CADASTRAL'
-  | 'ENERGY'
-  | 'LANDSCAPE'
-
-export type DefectSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
-
-export type DefectStatus =
-  | 'OPEN'
-  | 'IN_PROGRESS'
-  | 'PENDING_APPROVAL'
-  | 'CLOSED'
-  | 'DISPUTED'
-
-export type RootCause =
-  | 'WEAR'
-  | 'CORROSION'
-  | 'IMPACT'
-  | 'FATIGUE'
-  | 'INSTALLATION_ERROR'
-  | 'DESIGN_DEFICIENCY'
-  | 'MOISTURE_INGRESS'
-  | 'OTHER'
-  // Migration 018 — why a finding exists on a building.
-  | 'UNPERMITTED_WORKS'
-  | 'CADASTRAL_MISMATCH'
-  | 'MISSING_CERTIFICATE'
-  | 'EXPIRED_PERMIT'
-
-export type Disposition = 'REPAIR' | 'REPLACE' | 'MONITOR' | 'ACCEPT_AS_IS' | 'PENDING'
-
-export type ChangeOrderTrigger =
-  | 'CLASS_REQUIREMENT'
-  | 'OWNER_REQUEST'
-  | 'DEFECT_DISCOVERY'
-  | 'SCOPE_GROWTH'
-  | 'REGULATORY'
-
-export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'ESCALATED'
-
-// Tier 1 < €10k, Tier 2 €10k–€50k, Tier 3 > €50k
-export type ApprovalTier = 'TIER_1' | 'TIER_2' | 'TIER_3'
-
-export type ClassSociety = 'LLOYDS' | 'BV' | 'RINA' | 'DNV' | 'ABS' | 'OTHER'
-
-export type UserRole =
-  | 'OWNERS_REP'
-  | 'OWNER'
-  | 'CAPTAIN'
-  | 'YARD_PM'
-  | 'CLASS_SURVEYOR'
-  | 'SUBCONTRACTOR'
-  | 'NAVAL_ARCHITECT'
-
-export type InspectionResult = 'PASS' | 'CONDITIONAL_PASS' | 'FAIL' | 'PENDING'
-
-export type DocumentStatus = 'DRAFT' | 'UNDER_REVIEW' | 'APPROVED' | 'SUPERSEDED'
-
-export type DocType =
-  | 'SURVEY_REPORT'
-  | 'CLASS_CERTIFICATE'
-  | 'DRAWING'
-  | 'SPECIFICATION'
-  | 'NCR'
-  | 'CHANGE_ORDER'
-  | 'APPROVAL'
-  | 'CORRESPONDENCE'
-  | 'PHOTO'
-  | 'OTHER'
-  // Migration 018 — the Italian property set, named in the originals.
-  | 'VISURA_CATASTALE'
-  | 'PLANIMETRIA_CATASTALE'
-  | 'DEED'
-  | 'BUILDING_PERMIT'
-  | 'AMNESTY'
-  | 'LANDSCAPE_CLEARANCE'
-  | 'COMPLIANCE_DECLARATION'
-  | 'HABITABILITY'
-  | 'ENERGY_CERTIFICATE'
-
-export type MessageKind =
-  | 'NOTE'
-  | 'DECISION'
-  /** Work done outside the agreed scope — the signal worth learning from. */
-  | 'UNPLANNED_WORK'
-  | 'MEETING_NOTE'
-  | 'HANDOVER'
-
-export type MessageSource = 'APP' | 'MEETING' | 'EMAIL'
-
-export type ObjectType =
-  | 'VESSEL'
-  | 'PROJECT'
-  | 'WORK_PACKAGE'
-  | 'CHANGE_ORDER'
-  | 'INSPECTION_EVENT'
-  | 'DEFECT_RECORD'
-  | 'OWNER_APPROVAL'
-  | 'DOCUMENT'
-  | 'SUBCONTRACTOR'
-  | 'MESSAGE'
-  | 'PROJECT_MEMBER'
-
-// ─── Core Objects ─────────────────────────────────────────────────────────────
-
-export interface Vessel {
-  id: string
-  name: string
-  hull_id: string
-  vessel_type: string
-  loa: number // metres
-  beam: number
-  draft: number
-  gross_tonnage: number
-  flag_state: string
-  class_society: ClassSociety
-  class_number: string
-  year_built: number
-  build_yard: string
-  created_at: string
-}
-
-export interface Project {
-  id: string
-  /** Null on a property project — the column stopped being NOT NULL in 014. */
-  vessel_id: string | null
-  name: string
-  // PROPERTY was added in migration 016. A building has no vessel, no class
-  // society and no haul out, but it carries exactly the same work packages,
-  // findings, change orders and approvals — which is the argument for one
-  // ontology rather than a second product.
-  project_type:
-    | 'FIVE_YEAR_SURVEY'
-    | 'REFIT'
-    | 'NEWBUILD'
-    | 'ANNUAL_SURVEY'
-    | 'DAMAGE_REPAIR'
-    | 'PROPERTY'
-  phase: ProjectPhase
-  yard_name: string
-  yard_location: string
-  planned_start: string
-  planned_delivery: string
-  actual_start: string | null
-  actual_delivery: string | null
-  budget_locked: number // EUR
-  budget_spent: number
-  budget_contingency: number
-  class_society: ClassSociety | null
-  survey_due_date: string | null
-  created_at: string
-  vessel?: Vessel
-}
-
-export interface WorkPackage {
-  id: string
-  project_id: string
-  wp_number: string // WP-STRUCT-001
-  title: string
-  discipline: Discipline
-  description: string
-  status: WorkPackageStatus
-  planned_hours: number
-  actual_hours: number
-  planned_cost: number
-  actual_cost: number
-  trade_contractor: string | null
-  planned_start: string
-  planned_end: string
-  actual_start: string | null
-  actual_end: string | null
-  is_class_item: boolean
-  class_society: ClassSociety | null
-  class_item_ref: string | null
-  created_at: string
-}
-
-export interface InspectionEvent {
-  id: string
-  project_id: string
-  work_package_id: string | null
-  inspection_number: string // INSP-HULL-001
-  title: string
-  inspector_role: 'CLASS_SURVEYOR' | 'OWNERS_REP' | 'YARD_QC' | 'FLAG_STATE'
-  inspector_name: string
-  scheduled_date: string
-  actual_date: string | null
-  result: InspectionResult
-  notes: string | null
-  is_class_inspection: boolean
-  class_item_ref: string | null
-  defect_count: number
-  created_at: string
-}
-
-export interface DefectRecord {
-  id: string
-  project_id: string
-  inspection_event_id: string | null
-  work_package_id: string | null
-  ncr_number: string // NCR-2026-001
-  title: string
-  description: string
-  location_on_vessel: string
-  severity: DefectSeverity
-  status: DefectStatus
-  root_cause: RootCause
-  disposition: Disposition
-  is_class_defect: boolean
-  class_item_ref: string | null
-  discovered_by: string
-  discovered_date: string
-  closed_date: string | null
-  cost_impact: number | null
-  schedule_impact_days: number | null
-  change_order_id: string | null
-  created_at: string
-}
-
-export interface ChangeOrder {
-  id: string
-  project_id: string
-  co_number: string // CO-2026-001
-  title: string
-  description: string
-  trigger_type: ChangeOrderTrigger
-  status: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'IMPLEMENTED'
-  cost_delta: number
-  schedule_delta_days: number
-  raised_by: string
-  raised_date: string
-  defect_record_id: string | null
-  approval_id: string | null
-  created_at: string
-}
-
-export interface OwnerApproval {
-  id: string
-  project_id: string
-  approval_number: string // APPR-2026-001
-  title: string
-  description: string
-  tier: ApprovalTier
-  status: ApprovalStatus
-  requested_by: string
-  requested_date: string
-  approver_name: string | null
-  decision_date: string | null
-  decision_notes: string | null
-  change_order_id: string | null
-  cost_amount: number
-  deadline: string | null
-  created_at: string
-}
-
-export interface Document {
-  id: string
-  project_id: string
-  doc_number: string
-  title: string
-  doc_type: DocType
-  revision: string
-  status: DocumentStatus
-  file_url: string | null
-  file_size: number | null
-  mime_type: string | null
-  uploaded_by: string
-  uploaded_date: string
-  linked_object_type: ObjectType | null
-  linked_object_id: string | null
-  is_class_document: boolean
-  created_at: string
-}
-
+export type ProjectPhase = Enums['project_phase']
+export type ProjectType = Enums['project_type']
+export type WorkPackageStatus = Enums['work_package_status']
+export type Discipline = Enums['discipline']
+export type DefectSeverity = Enums['defect_severity']
+export type DefectStatus = Enums['defect_status']
+export type RootCause = Enums['root_cause']
+export type Disposition = Enums['disposition']
+export type ChangeOrderTrigger = Enums['change_order_trigger']
+export type ChangeOrderStatus = Enums['change_order_status']
+export type ApprovalStatus = Enums['approval_status']
+/** Tier 1 under €10k, Tier 2 €10k–€50k, Tier 3 over €50k. */
+export type ApprovalTier = Enums['approval_tier']
+export type ClassSociety = Enums['class_society']
+export type UserRole = Enums['user_role']
+export type InspectionResult = Enums['inspection_result']
+export type DocumentStatus = Enums['document_status']
+export type DocType = Enums['doc_type']
+export type MessageKind = Enums['message_kind']
+export type MessageSource = Enums['message_source']
+export type ObjectType = Enums['object_type']
 /**
- * Membership is a lifecycle, not a fact.
- *
  * INVITED until they first open the project, then ACTIVE. LEFT is how someone
- * is removed — the row is never deleted, so every message, finding and approval
- * they authored keeps an author.
+ * is removed — the row is never deleted, so everything they authored keeps an
+ * author.
  */
-export type MembershipStatus = 'INVITED' | 'ACTIVE' | 'LEFT'
+export type MembershipStatus = Enums['membership_status']
 
-export interface ProjectMember {
-  id: string
-  project_id: string
-  user_id: string | null
-  role: UserRole
-  name: string
-  email: string
-  company: string | null
-  created_at: string
-  status: MembershipStatus
-  invited_at: string | null
-  invited_by: string | null
-  invited_by_name: string | null
-  /** When they first actually reached it. Null means never — the nudge signal. */
-  first_seen_at: string | null
-  last_seen_at: string | null
-  left_at: string | null
-  left_reason: string | null
-}
+// ─── Core objects ─────────────────────────────────────────────────────────────
+//
+// One per table. Nullability comes from the column definitions, so a column
+// that can be null is `| null` here whether or not the UI expected it — which
+// is the point.
 
-// Event log (world model audit trail)
-export interface WorldModelEvent {
-  id: string
-  project_id: string
-  event_type: string
-  object_type: ObjectType
-  object_id: string
-  before_state: Record<string, unknown> | null
-  after_state: Record<string, unknown>
-  triggered_by: string // user id, from auth.uid() server-side
-  // Display name resolved from project_members at write time, so the history
-  // still reads correctly if someone later leaves the project.
-  triggered_by_name: string
-  triggered_at: string
-  cascade_from_event_id: string | null // if auto-triggered
-}
+export type Vessel = Row<'vessels'>
+export type WorkPackage = Row<'work_packages'>
+export type InspectionEvent = Row<'inspection_events'>
+export type DefectRecord = Row<'defect_records'>
+export type ChangeOrder = Row<'change_orders'>
+export type OwnerApproval = Row<'owner_approvals'>
+export type Document = Row<'documents'>
+export type ProjectMember = Row<'project_members'>
+export type WorldModelEvent = Row<'world_model_events'>
+export type Message = Row<'messages'>
 
 /**
- * Project conversation. Append-only by construction: no Action edits or deletes
- * a message, and neither `anon` nor `authenticated` holds UPDATE or DELETE on
- * the table. What was said stays said.
+ * A project, optionally carrying the vessel it refits.
+ *
+ * The bare row has only `vessel_id`; `vessel` appears when a query asks
+ * PostgREST to embed it, and is absent otherwise — a property project has no
+ * vessel at all.
  */
-export interface Message {
-  id: string
-  project_id: string
-  body: string
-  kind: MessageKind
-  source: MessageSource
-  author_id: string | null
-  author_name: string
-  author_role: UserRole | null
-  linked_object_type: ObjectType | null
-  linked_object_id: string | null
-  meeting_ref: string | null
-  created_at: string
-}
+export type Project = Row<'projects'> & { vessel?: Vessel | null }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 /**
- * Deliberately carries no role.
+ * Deliberately carries no role, and has no row behind it.
  *
  * A role is held on a project, not by a person: the same email can be
  * OWNERS_REP on the ketch and a member of nothing on a property. Storing one

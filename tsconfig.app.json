@@ -14,8 +14,13 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
-    /* Linting */
-    "strict": false,
+    /* Linting.
+       `strict` was false until the generated types landed. With it off, the
+       nullability the schema actually declares was invisible: thirty-one sites
+       divided by or formatted a nullable column, and one of them had already
+       shipped as "NaN% used" on the dashboard of every newly created project.
+       Turning it on is what makes database-derived types worth having. */
+    "strict": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noImplicitAny": false,
