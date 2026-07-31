@@ -117,7 +117,12 @@ export default function Dashboard() {
 
   const currentPhaseIndex = PHASES.indexOf(project.phase)
   const completedPhases = currentPhaseIndex
-  const budgetPct = Math.round((project.budget_spent / project.budget_locked) * 100)
+  // 0/0 is NaN, and a project created today has no budget yet — so the very
+  // first thing a new project showed was "NaN% used".
+  const budgetPct =
+    project.budget_locked > 0
+      ? Math.round((project.budget_spent / project.budget_locked) * 100)
+      : null
   const openDefects = defects.filter((d) => d.status !== 'CLOSED')
   const pendingApprovals = approvals.filter((a) => a.status === 'PENDING')
   const onHoldWPs = workPackages.filter((wp) => wp.status === 'ON_HOLD')
@@ -172,7 +177,7 @@ export default function Dashboard() {
             Dashboard
           </h1>
           <p className="text-sm mt-1" style={{ color: 'hsl(var(--muted-foreground))' }}>
-            Project ZERO — World Model Overview
+            {[project.vessel?.name, project.name].filter(Boolean).join(' — ')}
           </p>
         </div>
         {!isLastPhase && (
@@ -226,11 +231,13 @@ export default function Dashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-bold mb-1">{budgetPct}% used</div>
+            <div className="text-xl font-bold mb-1">
+              {budgetPct === null ? 'Not set' : `${budgetPct}% used`}
+            </div>
             <div className="text-xs mb-2" style={{ color: 'hsl(var(--muted-foreground))' }}>
               {eur(project.budget_spent)} / {eur(project.budget_locked)}
             </div>
-            <Progress value={budgetPct} className="h-1.5" />
+            <Progress value={budgetPct ?? 0} className="h-1.5" />
           </CardContent>
         </Card>
 

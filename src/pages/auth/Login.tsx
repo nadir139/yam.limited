@@ -150,7 +150,7 @@ export default function Login() {
         )}
 
         <p className="text-center text-xs mt-6" style={{ color: 'hsl(var(--muted-foreground))' }}>
-          Maritime intelligence platform for Project ZERO
+          Maritime intelligence platform
         </p>
       </div>
     </div>

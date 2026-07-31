@@ -1127,3 +1127,58 @@ Detection order: stored choice → `navigator.languages` → English. Read in an
 effect rather than a `useState` initialiser, because this module is imported by
 the marketing bundle and touching `localStorage` during module evaluation
 breaks any environment without it.
+
+---
+
+## 25. What rendering the app caught that building it did not
+
+The multi-project rewrite type-checked and built cleanly, and was still wrong in
+three places. All three were found by putting the authenticated shell in a
+browser with stubbed data — none is the kind of thing a compiler can see.
+
+### `Project ZERO — World Model Overview`
+
+Hard-coded as the Dashboard subtitle, and on the login page. Correct for the
+demo, wrong for every project after it. Now `vessel name — project name`.
+
+### `NaN% used`
+
+`Math.round((budget_spent / budget_locked) * 100)` is `NaN` when both are zero,
+and `action_create_project` defaults the budget to zero. So the very first
+thing a newly created project showed was **NaN% used** — the Sardinia property
+would have opened on it. Now reads "Not set" until a budget exists.
+
+### The switcher named the wrong thing
+
+The project row is called "5-Year Survey 2026"; everyone working on it calls it
+"Project ZERO", which is the *vessel*. A switcher showing only the project name
+would have been accurate and unrecognisable. `fetchMyProjects` now joins the
+vessel name and the subtitle leads with it.
+
+### Two harness artifacts that were NOT bugs
+
+The first run also showed "Phase 0 of 7" and a blank phase label. Both came
+from the stub returning a JSON array where PostgREST returns a bare object for
+`.single()` — so every field was `undefined`. Worth recording because the
+temptation was to "fix" the app. **A test double that is wrong about the
+protocol manufactures bugs that do not exist.** The stub now honours the
+`Accept: application/vnd.pgrst.object+json` header.
+
+### Why there is no test harness checked in
+
+Simulating a Supabase session from the outside does not work: planting a
+session in `localStorage` or calling `setSession()` makes supabase-js hang
+before it issues a single request, and chasing that is testing supabase-js
+rather than this app. The harness that worked mounted the tree with a supplied
+auth context, which needed `AuthContext` exported. That export was reverted
+with the harness — an unused export added for a deleted test is exactly the
+kind of thing that rots. Re-add it the same way when this is needed again.
+
+### Known limitation: the phases are vessel-shaped
+
+A PROPERTY project still shows the vessel phase ladder — Pre-Survey, **Haul
+Out**, Structural, Systems, Interior, **Sea Trials**, Delivered — and offers
+"Advance to Haul Out" on a building. `project_phase` is one enum for every
+project type. Making it per-type changes the enum, `action_advance_project_phase`
+and the timeline component together, so it is deliberately not smuggled in
+here. It is the first thing to fix for the property vertical.

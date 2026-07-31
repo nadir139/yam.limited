@@ -19,6 +19,9 @@ import type {
   ObjectType,
 } from './types'
 
+/** A project row carrying just enough of its vessel to name it. */
+export type ProjectWithVessel = Project & { vessel: { name: string } | null }
+
 // ─── Reads ────────────────────────────────────────────────────────────────────
 //
 // Every read takes the project explicitly. It used to be a module constant
@@ -28,14 +31,21 @@ import type {
 // enforces membership regardless; passing the id is what decides *which* of the
 // caller's projects they are looking at.
 
-/** Every project the caller belongs to. RLS does the filtering. */
-export async function fetchMyProjects(): Promise<Project[]> {
+/**
+ * Every project the caller belongs to. RLS does the filtering.
+ *
+ * The vessel's name comes along because it is usually the name people actually
+ * use: this project is called "5-Year Survey 2026" and everyone on it calls it
+ * "Project ZERO", which is the ketch. A switcher that showed only the project
+ * name would be correct and unrecognisable.
+ */
+export async function fetchMyProjects(): Promise<ProjectWithVessel[]> {
   const { data, error } = await supabase
     .from('projects')
-    .select('*')
+    .select('*, vessel:vessels(name)')
     .order('created_at')
   if (error) throw error
-  return (data ?? []) as Project[]
+  return (data ?? []) as ProjectWithVessel[]
 }
 
 /** A project's vessel, or null — a property project has none. */

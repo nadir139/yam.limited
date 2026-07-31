@@ -1,8 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { fetchMyProjects } from '@/lib/db'
+import { fetchMyProjects, type ProjectWithVessel } from '@/lib/db'
 import { useAuth } from '@/contexts/AuthContext'
-import type { Project } from '@/lib/types'
 
 // Which project the app is looking at.
 //
@@ -18,9 +17,9 @@ import type { Project } from '@/lib/types'
 // browser should not inherit each other's last project.
 
 interface ProjectContextValue {
-  projects: Project[]
+  projects: ProjectWithVessel[]
   activeProjectId: string | null
-  activeProject: Project | null
+  activeProject: ProjectWithVessel | null
   setActiveProjectId: (id: string) => void
   isLoading: boolean
   /** Signed in, but a member of nothing — a real state, not an error. */
