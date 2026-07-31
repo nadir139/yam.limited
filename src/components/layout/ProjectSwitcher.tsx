@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { useActiveProject } from '@/contexts/ProjectContext'
 import { useTranslation } from '@/lib/i18n'
 import CreateProjectForm from '@/components/actions/CreateProjectForm'
+import type { ProjectWithVessel } from '@/lib/db'
 import type { Project } from '@/lib/types'
 
 // Which project you are in, and how to leave it.
@@ -29,6 +30,19 @@ function projectIcon(type: Project['project_type']) {
   return Ship
 }
 
+/**
+ * The vessel first, because that is the name people say.
+ *
+ * This project is recorded as "5-Year Survey 2026" and everyone on it calls it
+ * "Project ZERO" — the ketch. Showing only the project name would be accurate
+ * and unrecognisable.
+ */
+function describe(p: ProjectWithVessel, t: (k: string) => string) {
+  return [p.vessel?.name, t(`projectType.${p.project_type}`), p.yard_location || p.yard_name]
+    .filter(Boolean)
+    .join(' · ')
+}
+
 export default function ProjectSwitcher() {
   const { projects, activeProject, setActiveProjectId, isLoading } = useActiveProject()
   const { t } = useTranslation()
@@ -43,14 +57,7 @@ export default function ProjectSwitcher() {
   }
 
   const Icon = activeProject ? projectIcon(activeProject.project_type) : Ship
-  const subtitle = activeProject
-    ? [
-        t(`projectType.${activeProject.project_type}`),
-        activeProject.yard_location || activeProject.yard_name,
-      ]
-        .filter(Boolean)
-        .join(' · ')
-    : ''
+  const subtitle = activeProject ? describe(activeProject, t) : ''
 
   return (
     <>
@@ -99,7 +106,7 @@ export default function ProjectSwitcher() {
                     className="block truncate text-[11px]"
                     style={{ color: 'hsl(var(--muted-foreground))' }}
                   >
-                    {t(`projectType.${p.project_type}`)} · {t(`phase.${p.phase}`)}
+                    {describe(p, t)} · {t(`phase.${p.phase}`)}
                   </span>
                 </span>
                 {active && <Check size={14} style={{ flexShrink: 0 }} />}
