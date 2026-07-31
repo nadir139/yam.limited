@@ -1266,3 +1266,70 @@ migration file. The ones that matter: a LEFT member reads 0 projects, 0 NCRs
 and 0 messages and cannot post; a subcontractor cannot invite or remove; nobody
 can invite into a project they are not on; and the last member cannot be
 removed.
+
+---
+
+## 27. The vocabulary is per project type (migration 018)
+
+Every enum in this system was named by someone looking at a boat. Adding
+`PROPERTY` in §23 made that visible rather than creating it: a farmhouse
+outside Olbia walked Pre-Survey → **Haul Out** → … → **Sea Trials**, was
+offered `RIGGING` and `PAINT` as disciplines, and had nowhere to file a visura
+catastale except `OTHER`.
+
+All of it worked. All of it was wrong about the thing it described, which is
+the one thing an ontology cannot afford to be — a system whose whole pitch is
+that the model matches reality cannot offer to haul out a house.
+
+### The shape of the fix
+
+The enums become the **union** of every vertical's values, and
+`ontology_vocabulary` decides which ones each project type may actually use.
+`applies_to = null` is the shared spine; a row with a project type narrows to
+it.
+
+That keeps enums' type safety — a bad value is still rejected by Postgres —
+while making a new vertical a set of `INSERT`s rather than a schema change. The
+obvious alternative, converting the columns to `text`, was rejected: it trades a
+compile-time guarantee for a convention, on the very columns the cascade rules
+read.
+
+Phases are deliberately **not** shared. A ladder is the one vocabulary where
+the order carries the meaning, so each type gets a complete sequence of its own
+rather than a spine plus extras.
+
+### Property vocabulary
+
+The Italian process is the model: find out what is actually there, gather what
+the state thinks is there, compare them, regularise the difference, certify the
+result. Hence `DOCUMENT_GATHERING → SURVEY → COMPLIANCE_REVIEW → REMEDIATION →
+CERTIFICATION`.
+
+Document types are named in the **Italian originals** — `VISURA_CATASTALE`,
+`PLANIMETRIA_CATASTALE`, `AMNESTY` (sanatoria), `HABITABILITY` (agibilità),
+`ENERGY_CERTIFICATE` (APE), `LANDSCAPE_CLEARANCE` (autorizzazione
+paesaggistica, which matters on a Sardinian coast). A geometra asked for a
+"land registry extract" will not recognise it; the label shown in each language
+comes from the i18n dictionary anyway.
+
+Root causes likewise: `UNPERMITTED_WORKS` (difformità edilizia),
+`CADASTRAL_MISMATCH`, `MISSING_CERTIFICATE`, `EXPIRED_PERMIT`. "Corrosion" is
+rarely the answer on a building.
+
+### Where it lands
+
+`useVocabulary(kind)` filters the registry by the active project's type. The
+dashboard's phase ladder, the work-package discipline select, the NCR root-cause
+select and the document-type select all read from it; every hardcoded list is
+gone. It falls back to **nothing** rather than to every value — a form that
+silently offers "haul out" on a farmhouse is worse than one that briefly offers
+nothing while the registry loads.
+
+### A probe label that was wrong, and the code that was right
+
+One probe read "ketch advances from STRUCTURAL to → HAUL_OUT", which looks like
+a backwards transition. The code was correct: the real project is in
+`PRE_SURVEY`, and `PRE_SURVEY → HAUL_OUT` is the right step. **The label came
+from my assumption about the data, not from the data.** Checking the row before
+believing the probe is the habit; a probe is only as good as the state you
+verified it against.

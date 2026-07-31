@@ -10,21 +10,14 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { useUploadDocument } from '@/lib/query-hooks'
+import { useUploadDocument, useVocabulary } from '@/lib/query-hooks'
+import { useTranslation } from '@/lib/i18n'
 import type { Document, ObjectType } from '@/lib/types'
 
-const DOC_TYPES: { value: Document['doc_type']; label: string }[] = [
-  { value: 'SURVEY_REPORT', label: 'Survey Report' },
-  { value: 'NCR', label: 'NCR / Defect Report' },
-  { value: 'CHANGE_ORDER', label: 'Change Order' },
-  { value: 'APPROVAL', label: 'Approval Document' },
-  { value: 'DRAWING', label: 'Drawing / Plan' },
-  { value: 'SPECIFICATION', label: 'Specification' },
-  { value: 'CLASS_CERTIFICATE', label: 'Class Certificate' },
-  { value: 'PHOTO', label: 'Photo Evidence' },
-  { value: 'CORRESPONDENCE', label: 'Correspondence' },
-  { value: 'OTHER', label: 'Other' },
-]
+// Document types come from ontology_vocabulary, per project type. A property
+// project offers visura catastale, planimetria, concessione edilizia, sanatoria,
+// agibilità and APE; a vessel offers a class certificate. Filing an Italian
+// cadastral extract as "OTHER" is how a record stops being searchable.
 
 const ACCEPTED = '.pdf,.jpg,.jpeg,.png,.webp,.xlsx,.docx,.doc,.xls,.txt'
 
@@ -47,6 +40,8 @@ export default function UploadDocumentForm({
   defaultDocType = 'OTHER',
   label = 'Upload Document',
 }: Props) {
+  const { t } = useTranslation()
+  const DOC_TYPES = useVocabulary('DOC_TYPE')
   const [open, setOpen] = useState(false)
   const [done, setDone] = useState(false)
   const [dragOver, setDragOver] = useState(false)
@@ -217,8 +212,8 @@ export default function UploadDocumentForm({
                       color: 'hsl(var(--foreground))',
                     }}
                   >
-                    {DOC_TYPES.map((t) => (
-                      <option key={t.value} value={t.value}>{t.label}</option>
+                    {DOC_TYPES.map((d) => (
+                      <option key={d} value={d}>{t(`docType.${d}`)}</option>
                     ))}
                   </select>
                 </div>

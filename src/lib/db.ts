@@ -799,3 +799,30 @@ export async function recordProjectAccess(projectId: string): Promise<void> {
   // A failure here must never block the page: it is telemetry, not the point.
   if (error) console.warn('Could not record project access:', error.message)
 }
+
+// ─── Vocabulary ───────────────────────────────────────────────────────────────
+//
+// Which words a project type may use. Every enum in this system was named by
+// someone looking at a boat; a building does not haul out, and a ketch has no
+// visura catastale. The enums are now the union of every vertical and this
+// table decides what each project type is actually offered — so adding a
+// vertical is rows in the registry rather than a schema change.
+
+export type VocabularyKind = 'PHASE' | 'DISCIPLINE' | 'DOC_TYPE' | 'ROOT_CAUSE'
+
+export interface VocabularyEntry {
+  kind: VocabularyKind
+  value: string
+  /** Null means every project type — the shared spine. */
+  applies_to: Project['project_type'] | null
+  display_order: number
+}
+
+export async function fetchVocabulary(): Promise<VocabularyEntry[]> {
+  const { data, error } = await supabase
+    .from('ontology_vocabulary')
+    .select('kind, value, applies_to, display_order')
+    .order('display_order')
+  if (error) throw error
+  return (data ?? []) as VocabularyEntry[]
+}

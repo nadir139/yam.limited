@@ -16,9 +16,14 @@ The public pages render with no backend configured. Only `/app/*` needs Supabase
 member of and can start a new one, and the team page adds people to it by email.
 Someone invited appears on the team immediately, before they have ever signed
 in — the distance between the invitation and their first visit is a fact worth
-keeping. A project is not necessarily a vessel —
-`PROPERTY` projects model buildings with the same work packages, findings,
-change orders and approvals, minus the vessel, the class society and the haul-out.
+keeping. A project is not necessarily a vessel. `PROPERTY` projects model buildings with
+the same work packages, findings, change orders and approvals — and their own
+vocabulary: the phase ladder runs pre-survey → document gathering → survey →
+compliance review → remediation → certification, the disciplines are planning,
+cadastral, energy and landscape, and documents are filed as *visura catastale*,
+*planimetria*, *permesso di costruire*, *sanatoria*, *agibilità* and *APE*
+rather than as "Other". That vocabulary lives in `ontology_vocabulary`, so a new
+vertical is rows in the registry rather than a schema change.
 
 The interface speaks English, Italian, French, Spanish and German, chosen from
 the top bar and remembered per browser. Translation covers the application
@@ -121,6 +126,7 @@ applied by hand in the Supabase SQL editor, in this order:
 17. `supabase-migration-015-closure-notes-and-corrections.sql` — closing an NCR requires a reason; a closed NCR can still be corrected
 18. `supabase-migration-016-actions-take-a-project.sql` — every Action takes an explicit project and checks the role held *on it*
 19. `supabase-migration-017-membership-lifecycle.sql` — projects can be staffed; invited, arrived and departed are all recorded
+20. `supabase-migration-018-vocabulary-per-project-type.sql` — phases, disciplines, document types and root causes become per-vertical
 
 Migrations 006–008 are the important ones. After 008 the `authenticated` and
 `anon` roles hold **zero** `INSERT`/`UPDATE`/`DELETE` grants on the domain

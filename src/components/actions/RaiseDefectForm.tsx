@@ -12,7 +12,14 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
-import { useCreateDefectWithCascade, usePermissions, type DefectFormInput, type CascadeResult } from '@/lib/query-hooks'
+import {
+  useCreateDefectWithCascade,
+  usePermissions,
+  useVocabulary,
+  type DefectFormInput,
+  type CascadeResult,
+} from '@/lib/query-hooks'
+import { useTranslation } from '@/lib/i18n'
 import type { DefectRecord } from '@/lib/types'
 
 const SEVERITY_COLORS: Record<DefectRecord['severity'], string> = {
@@ -32,6 +39,10 @@ interface Props {
 }
 
 export default function RaiseDefectForm({ workPackageId, inspectionEventId, onSuccess }: Props) {
+  const { t } = useTranslation()
+  // Why a finding exists depends on what it is attached to. "Corrosion" is
+  // rarely the answer on a building; "there is a balcony no permit mentions" is.
+  const ROOT_CAUSES = useVocabulary('ROOT_CAUSE')
   const [open, setOpen] = useState(false)
   const [cascadeResult, setCascadeResult] = useState<CascadeResult | null>(null)
   const [form, setForm] = useState<DefectFormInput>({
@@ -283,14 +294,9 @@ export default function RaiseDefectForm({ workPackageId, inspectionEventId, onSu
                       className="flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-sm"
                       style={{ borderColor: 'hsl(var(--border))', backgroundColor: 'hsl(var(--background))', color: 'hsl(var(--foreground))' }}
                     >
-                      <option value="WEAR">Wear</option>
-                      <option value="CORROSION">Corrosion</option>
-                      <option value="IMPACT">Impact</option>
-                      <option value="FATIGUE">Fatigue</option>
-                      <option value="INSTALLATION_ERROR">Installation Error</option>
-                      <option value="DESIGN_DEFICIENCY">Design Deficiency</option>
-                      <option value="MOISTURE_INGRESS">Moisture Ingress</option>
-                      <option value="OTHER">Other</option>
+                      {ROOT_CAUSES.map((rc) => (
+                        <option key={rc} value={rc}>{t(`rootCause.${rc}`)}</option>
+                      ))}
                     </select>
                   </div>
                 </div>

@@ -20,28 +20,14 @@ import {
   useWorkPackages,
   useEvents,
   useAdvancePhase,
+  useVocabulary,
 } from '@/lib/query-hooks'
-import type { ProjectPhase, WorldModelEvent } from '@/lib/types'
+import { useTranslation } from '@/lib/i18n'
+import type { WorldModelEvent } from '@/lib/types'
 
-const PHASES: ProjectPhase[] = [
-  'PRE_SURVEY',
-  'HAUL_OUT',
-  'STRUCTURAL',
-  'SYSTEMS',
-  'INTERIOR',
-  'SEA_TRIALS',
-  'DELIVERED',
-]
-
-const PHASE_LABELS: Record<ProjectPhase, string> = {
-  PRE_SURVEY: 'Pre-Survey',
-  HAUL_OUT: 'Haul Out',
-  STRUCTURAL: 'Structural',
-  SYSTEMS: 'Systems',
-  INTERIOR: 'Interior',
-  SEA_TRIALS: 'Sea Trials',
-  DELIVERED: 'Delivered',
-}
+// The phase ladder is per project type and comes from ontology_vocabulary.
+// It used to be this hardcoded marine sequence, which is why a farmhouse was
+// offered "Advance to Haul Out".
 
 const SEVERITY_COLORS: Record<string, string> = {
   CRITICAL: 'hsl(var(--destructive))',
@@ -87,6 +73,11 @@ export default function Dashboard() {
   const workPackagesQ = useWorkPackages()
   const eventsQ = useEvents()
   const advancePhase = useAdvancePhase()
+  const { t } = useTranslation()
+  // This project type's own ladder, from ontology_vocabulary. A property goes
+  // pre-survey → documents → survey → compliance → remediation → certification,
+  // and is never offered a haul out.
+  const PHASES = useVocabulary('PHASE')
 
   const isLoading =
     projectQ.isLoading ||
@@ -193,7 +184,7 @@ export default function Dashboard() {
             {canAdvancePhase ? (
               <>
                 <ArrowRight size={14} className="mr-1.5" />
-                Advance to {PHASE_LABELS[PHASES[currentPhaseIndex + 1]]}
+                Advance to {t(`phase.${PHASES[currentPhaseIndex + 1]}`)}
               </>
             ) : (
               <>
@@ -215,7 +206,7 @@ export default function Dashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-bold mb-2">{PHASE_LABELS[project.phase]}</div>
+            <div className="text-xl font-bold mb-2">{t(`phase.${project.phase}`)}</div>
             <Progress value={(completedPhases / (PHASES.length - 1)) * 100} className="h-1.5" />
             <div className="text-xs mt-1" style={{ color: 'hsl(var(--muted-foreground))' }}>
               Phase {currentPhaseIndex + 1} of {PHASES.length}
@@ -449,7 +440,7 @@ export default function Dashboard() {
                       fontWeight: isActive ? 600 : 400,
                     }}
                   >
-                    {PHASE_LABELS[phase]}
+                    {t(`phase.${phase}`)}
                   </div>
                 </div>
               )
@@ -462,7 +453,7 @@ export default function Dashboard() {
       <Dialog open={advanceDialogOpen} onOpenChange={setAdvanceDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Advance to {PHASE_LABELS[PHASES[currentPhaseIndex + 1] ?? project.phase]}</DialogTitle>
+            <DialogTitle>Advance to {t(`phase.${PHASES[currentPhaseIndex + 1] ?? project.phase}`)}</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-3 my-2">
             <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
@@ -493,7 +484,7 @@ export default function Dashboard() {
                 advancePhase.mutate(undefined, {
                   onSuccess: (updated) => {
                     setAdvanceDialogOpen(false)
-                    showToast(`Phase advanced to ${PHASE_LABELS[updated.phase]}`)
+                    showToast(`Phase advanced to ${t(`phase.${updated.phase}`)}`)
                   },
                 })
               }
