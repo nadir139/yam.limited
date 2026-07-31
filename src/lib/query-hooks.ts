@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import * as db from './db'
 import { useActiveProject, useProjectId } from '@/contexts/ProjectContext'
@@ -554,4 +554,36 @@ export function useProjectPresence() {
       clearInterval(timer)
     }
   }, [projectId, qc])
+}
+
+// ─── Vocabulary ───────────────────────────────────────────────────────────────
+
+export type VocabularyKind = db.VocabularyKind
+
+/**
+ * The values this project type may use, in the order the registry gives them.
+ *
+ * PHASE is the one where order carries meaning — it is a ladder, and each type
+ * has its own complete sequence rather than a shared spine plus extras.
+ *
+ * Falls back to nothing rather than to every value: a form that silently offers
+ * "haul out" on a farmhouse is worse than one that briefly offers nothing while
+ * the registry loads.
+ */
+export function useVocabulary(kind: VocabularyKind): string[] {
+  const { activeProject } = useActiveProject()
+  const { data: all = [] } = useQuery({
+    queryKey: ['vocabulary'],
+    queryFn: db.fetchVocabulary,
+    staleTime: 30 * 60_000,
+  })
+
+  const type = activeProject?.project_type
+  return useMemo(() => {
+    if (!type) return []
+    return all
+      .filter((v) => v.kind === kind && (v.applies_to === null || v.applies_to === type))
+      .sort((a, b) => a.display_order - b.display_order)
+      .map((v) => v.value)
+  }, [all, kind, type])
 }

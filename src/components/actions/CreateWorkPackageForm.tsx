@@ -11,20 +11,18 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { useCreateWorkPackage, usePermissions, type WorkPackageInput } from '@/lib/query-hooks'
+import {
+  useCreateWorkPackage,
+  usePermissions,
+  useVocabulary,
+  type WorkPackageInput,
+} from '@/lib/query-hooks'
+import { useTranslation } from '@/lib/i18n'
 import type { Discipline, WorkPackage } from '@/lib/types'
 
-const DISCIPLINES: { value: Discipline; label: string }[] = [
-  { value: 'STRUCTURAL', label: 'Structural' },
-  { value: 'HULL', label: 'Hull' },
-  { value: 'MECHANICAL', label: 'Mechanical' },
-  { value: 'ELECTRICAL', label: 'Electrical' },
-  { value: 'RIGGING', label: 'Rigging' },
-  { value: 'INTERIOR', label: 'Interior' },
-  { value: 'PAINT', label: 'Paint' },
-  { value: 'CLASS', label: 'Class' },
-  { value: 'SAFETY', label: 'Safety' },
-]
+// Disciplines come from ontology_vocabulary, per project type: a building gets
+// planning, cadastral, energy and landscape; a vessel gets hull, rigging, paint
+// and class. Both share structural, mechanical, electrical, interior, safety.
 
 const selectStyle = {
   borderColor: 'hsl(var(--border))',
@@ -54,6 +52,8 @@ export default function CreateWorkPackageForm({
 }: {
   onSuccess?: (wp: WorkPackage) => void
 }) {
+  const { t } = useTranslation()
+  const DISCIPLINES = useVocabulary('DISCIPLINE')
   const [open, setOpen] = useState(false)
   const [created, setCreated] = useState<WorkPackage | null>(null)
   const [form, setForm] = useState<WorkPackageInput>(EMPTY)
@@ -144,7 +144,7 @@ export default function CreateWorkPackageForm({
                       style={selectStyle}
                     >
                       {DISCIPLINES.map((d) => (
-                        <option key={d.value} value={d.value}>{d.label}</option>
+                        <option key={d} value={d}>{t(`discipline.${d}`)}</option>
                       ))}
                     </select>
                   </div>
