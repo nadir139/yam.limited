@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import * as db from './db'
 import { useActiveProject, useProjectId } from '@/contexts/ProjectContext'
@@ -370,13 +371,23 @@ export const useMyRole = () => {
  * fails. The Action enforces regardless; this only spares the user a refusal
  * they could not have predicted.
  */
-export function usePermissions() {
-  const { data: role = null, isLoading: roleLoading } = useMyRole()
-  const { data: matrix = [], isLoading: matrixLoading } = useQuery({
+/**
+ * The whole role/action matrix. Public-readable and small.
+ *
+ * Exported because the team page renders it directly: a hand-written table of
+ * "what each role can do" is prose that drifts, and the previous one had — it
+ * omitted two of the seven roles entirely.
+ */
+export const useActionPermissions = () =>
+  useQuery({
     queryKey: ['action-permissions'],
     queryFn: db.fetchActionPermissions,
     staleTime: 5 * 60_000,
   })
+
+export function usePermissions() {
+  const { data: role = null, isLoading: roleLoading } = useMyRole()
+  const { data: matrix = [], isLoading: matrixLoading } = useActionPermissions()
 
   const isLoading = roleLoading || matrixLoading
   const can = (actionKey: string) =>
@@ -455,4 +466,92 @@ export function useCreateProject() {
       setActiveProjectId(project.id)
     },
   })
+}
+
+
+// ─── The team ─────────────────────────────────────────────────────────────────
+
+export type InviteInput = db.InviteInput
+
+/** Invalidates the team list and the events that record what happened to it. */
+function useTeamInvalidation() {
+  const qc = useQueryClient()
+  return () => {
+    qc.invalidateQueries({ queryKey: ['team'] })
+    qc.invalidateQueries({ queryKey: ['events'] })
+    qc.invalidateQueries({ queryKey: ['my-role'] })
+  }
+}
+
+export function useInviteMember() {
+  const invalidate = useTeamInvalidation()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (input: InviteInput) => db.inviteMember(projectId, input),
+    onSuccess: invalidate,
+  })
+}
+
+export function useChangeMemberRole() {
+  const invalidate = useTeamInvalidation()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: ({ memberId, role, reason }: {
+      memberId: string
+      role: import('./types').UserRole
+      reason?: string | null
+    }) => db.changeMemberRole(projectId, memberId, role, reason),
+    onSuccess: invalidate,
+  })
+}
+
+export function useRemoveMember() {
+  const invalidate = useTeamInvalidation()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: ({ memberId, reason }: { memberId: string; reason: string }) =>
+      db.removeMember(projectId, memberId, reason),
+    onSuccess: invalidate,
+  })
+}
+
+/** How long "here now" lasts, and how often the heartbeat fires. */
+export const PRESENCE_WINDOW_MS = 2 * 60_000
+const HEARTBEAT_MS = 60_000
+
+/**
+ * Tells the project you are looking at it.
+ *
+ * Runs while any authenticated page is mounted. The first call is what turns an
+ * invitation into an arrival — it stamps `first_seen_at`, which is the other
+ * half of "you have not opened the link I sent a week ago".
+ *
+ * Deliberately not a websocket presence channel. Presence would give a live
+ * roster, but Realtime channels are not covered by the row-level security that
+ * protects everything else here, so a signed-in non-member who guessed a
+ * project id could watch who is online. A heartbeat is one throttled write, is
+ * protected by the same policies as the rest, and leaves a durable trace.
+ */
+export function useProjectPresence() {
+  const projectId = useProjectId()
+  const qc = useQueryClient()
+
+  useEffect(() => {
+    if (!projectId) return
+    let cancelled = false
+
+    const beat = async () => {
+      await db.recordProjectAccess(projectId)
+      // The first beat can flip INVITED to ACTIVE, which the team page should
+      // show without waiting for a manual refresh.
+      if (!cancelled) qc.invalidateQueries({ queryKey: ['team', projectId] })
+    }
+
+    void beat()
+    const timer = setInterval(beat, HEARTBEAT_MS)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
+  }, [projectId, qc])
 }

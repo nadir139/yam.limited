@@ -1182,3 +1182,87 @@ Out**, Structural, Systems, Interior, **Sea Trials**, Delivered — and offers
 project type. Making it per-type changes the enum, `action_advance_project_phase`
 and the timeline component together, so it is deliberately not smuggled in
 here. It is the first thing to fix for the property vertical.
+
+---
+
+## 26. Staffing a project (migration 017)
+
+Shipping "New project" in §23 without this made a real gap worse: the button
+produced projects **nobody else could ever join**. `action_create_project` was
+the only function that wrote to `project_members`, and it enrolled the creator
+alone. Project ZERO has a team purely because it was seeded.
+
+So on any project made through the app, none of the following was reachable:
+the roles, the permission matrix, the internal conversation, or "naval
+architects and subcontractors should be able to add files". Multi-project
+without multi-person is several private notebooks.
+
+### Invited people appear immediately
+
+The decision worth recording. An invitation creates the member row at once, in
+`INVITED`, before that person has ever signed in.
+
+That is the point, not a shortcut. `invited_at` and `first_seen_at` are
+separate facts, and the distance between them is a sentence an owner's rep
+actually needs: *"I sent you the link a week ago and you still have not opened
+it."* Recorded after the fact it would be a guess; recorded this way it is
+measured. The team page shows it in that voice — "Invited last week · never
+opened it" — rather than as a timestamp.
+
+No auth user is created and no mail is sent from the Action. Membership is
+keyed on the email address, so the moment that address signs in with a magic
+link, `is_project_member` matches and they are in.
+
+### LEFT has to mean gone
+
+`is_project_member` is the predicate behind every read policy on every table.
+Adding a status column without changing it would have made "remove from
+project" a label change while the person kept reading everything.
+
+Four functions now exclude `LEFT`: `is_project_member`, `current_actor_role`,
+`current_actor_name` and `resolve_project`. `INVITED` deliberately still counts
+— someone invited who signs in must be able to see the project, and that first
+read is what flips them to `ACTIVE`.
+
+The row is never deleted. That is what keeps an author on every message, NCR
+and approval they wrote: removing access is not the same as unhappening them.
+Re-inviting someone reuses their original row, so nothing detaches.
+
+### The last-member trap
+
+Removing the final active member would make a project unreachable **forever**:
+nothing can be deleted, and nobody would remain who could invite anyone back.
+`action_remove_member` refuses.
+
+### "Here now" is a heartbeat, not presence
+
+Supabase Realtime Presence would give a live roster, and it was the obvious
+choice. It was rejected: Realtime channels are not covered by the row-level
+security that protects everything else here, so a signed-in non-member who
+guessed a project id could watch who is online.
+
+`action_record_project_access` instead writes `last_seen_at`, throttled
+server-side to one write per 30 seconds, and "here now" is `last_seen_at`
+within two minutes. It is protected by the same policies as the rest, it
+survives a reload, and it leaves a durable trace. What it cannot do is notice
+someone closed their laptop three seconds ago — not a question this product
+needs answered.
+
+The heartbeat writes **no event** except the first one, where `INVITED` becomes
+`ACTIVE`. A `MEMBER_JOINED` row every minute would bury the history the log
+exists to preserve.
+
+### The permissions table was prose, and had drifted
+
+The team page carried a hand-written "what each role can do" table that did not
+list `NAVAL_ARCHITECT` or `SUBCONTRACTOR` at all. It now renders
+`action_permissions` — the same table the Actions check — so it cannot drift
+from what is enforced.
+
+### Verified
+
+Sixteen probes inside rolled-back transactions, listed at the foot of the
+migration file. The ones that matter: a LEFT member reads 0 projects, 0 NCRs
+and 0 messages and cannot post; a subcontractor cannot invite or remove; nobody
+can invite into a project they are not on; and the last member cannot be
+removed.

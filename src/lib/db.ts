@@ -162,11 +162,21 @@ export async function fetchDocuments(projectId: string): Promise<Document[]> {
   return data ?? []
 }
 
+/**
+ * The whole team, including people who were invited and never turned up, and
+ * people who have left.
+ *
+ * Leavers are deliberately returned rather than filtered out here: their rows
+ * are what keep an author on everything they wrote, and hiding them from the
+ * team page would make the record look like they were never there.
+ */
 export async function fetchTeam(projectId: string): Promise<ProjectMember[]> {
   const { data, error } = await supabase
     .from('project_members')
     .select('*')
     .eq('project_id', projectId)
+    .order('status')
+    .order('name')
   if (error) throw error
   return data ?? []
 }
@@ -696,4 +706,96 @@ export async function postMessage(
   })
   const result = unwrap(data, error, 'Post message') as { message: Message }
   return result.message
+}
+
+
+// ─── The team ─────────────────────────────────────────────────────────────────
+//
+// Until migration 017 there was no way to add anyone to a project: the only
+// Action that wrote to project_members was action_create_project, and it only
+// enrolled the creator. Every project made through the app was a room of one,
+// which put the roles, the permissions and the conversation out of reach.
+
+export interface InviteInput {
+  email: string
+  role: UserRole
+  name?: string | null
+  company?: string | null
+}
+
+/**
+ * Adds someone by email. They appear on the team immediately as INVITED.
+ *
+ * No account is created and no mail is sent from here — membership is keyed on
+ * the address, so the moment that person signs in with a magic link they are
+ * in. Recording the invitation before they arrive is the point: the gap between
+ * `invited_at` and `first_seen_at` is what lets you say "I sent you the link a
+ * week ago and you have not opened it."
+ */
+export async function inviteMember(
+  projectId: string,
+  input: InviteInput,
+): Promise<ProjectMember> {
+  const { data, error } = await supabase.rpc('action_invite_member', {
+    p_project_id: projectId,
+    p_email: input.email.trim(),
+    p_role: input.role,
+    p_name: input.name?.trim() || null,
+    p_company: input.company?.trim() || null,
+  })
+  const result = unwrap(data, error, 'Invite') as { member: ProjectMember }
+  return result.member
+}
+
+export async function changeMemberRole(
+  projectId: string,
+  memberId: string,
+  role: UserRole,
+  reason?: string | null,
+): Promise<ProjectMember> {
+  const { data, error } = await supabase.rpc('action_change_member_role', {
+    p_project_id: projectId,
+    p_member_id: memberId,
+    p_role: role,
+    p_reason: reason?.trim() || null,
+  })
+  const result = unwrap(data, error, 'Change role') as { member: ProjectMember }
+  return result.member
+}
+
+/** Ends access. The row is kept as LEFT so their past work keeps its author. */
+export async function removeMember(
+  projectId: string,
+  memberId: string,
+  reason: string,
+): Promise<ProjectMember> {
+  const { data, error } = await supabase.rpc('action_remove_member', {
+    p_project_id: projectId,
+    p_member_id: memberId,
+    p_reason: reason,
+  })
+  const result = unwrap(data, error, 'Remove from project') as { member: ProjectMember }
+  return result.member
+}
+
+/**
+ * Heartbeat: "I am looking at this project."
+ *
+ * Stamps `first_seen_at` once — which is what turns an invitation into an
+ * arrival — and refreshes `last_seen_at`. The Action throttles itself to one
+ * write per 30 seconds and records an event only on the first visit, so a
+ * heartbeat never buries the history it exists to preserve.
+ *
+ * This is how "here now" is derived, rather than a websocket presence channel:
+ * it is protected by the same row-level security as everything else, it
+ * survives a reload, and it leaves a durable last-seen trace. What it cannot do
+ * is tell you someone closed their laptop three seconds ago, which is not a
+ * question this product needs answered.
+ */
+export async function recordProjectAccess(projectId: string): Promise<void> {
+  const { error } = await supabase.rpc('action_record_project_access', {
+    p_project_id: projectId,
+  })
+  // A failure here must never block the page: it is telemetry, not the point.
+  if (error) console.warn('Could not record project access:', error.message)
 }
