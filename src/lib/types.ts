@@ -97,6 +97,7 @@ export type ObjectType =
   | 'DOCUMENT'
   | 'SUBCONTRACTOR'
   | 'MESSAGE'
+  | 'PROJECT_MEMBER'
 
 // ─── Core Objects ─────────────────────────────────────────────────────────────
 
@@ -279,15 +280,33 @@ export interface Document {
   created_at: string
 }
 
+/**
+ * Membership is a lifecycle, not a fact.
+ *
+ * INVITED until they first open the project, then ACTIVE. LEFT is how someone
+ * is removed — the row is never deleted, so every message, finding and approval
+ * they authored keeps an author.
+ */
+export type MembershipStatus = 'INVITED' | 'ACTIVE' | 'LEFT'
+
 export interface ProjectMember {
   id: string
   project_id: string
-  user_id: string
+  user_id: string | null
   role: UserRole
   name: string
   email: string
   company: string | null
   created_at: string
+  status: MembershipStatus
+  invited_at: string | null
+  invited_by: string | null
+  invited_by_name: string | null
+  /** When they first actually reached it. Null means never — the nudge signal. */
+  first_seen_at: string | null
+  last_seen_at: string | null
+  left_at: string | null
+  left_reason: string | null
 }
 
 // Event log (world model audit trail)

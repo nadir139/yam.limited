@@ -61,6 +61,18 @@ export function useRealtimeSync() {
           qc.invalidateQueries({ queryKey: ['work-packages'] })
         },
       )
+      // Membership changes are the one thing everyone should see immediately:
+      // someone accepting an invitation, arriving, or being removed changes who
+      // is in the room while you are looking at the room.
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'project_members' },
+        () => {
+          qc.invalidateQueries({ queryKey: ['team'] })
+          qc.invalidateQueries({ queryKey: ['my-role'] })
+          qc.invalidateQueries({ queryKey: ['my-projects'] })
+        },
+      )
       .subscribe()
 
     return () => {

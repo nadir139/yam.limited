@@ -13,7 +13,10 @@ both halves of [yam.limited](https://yam.limited):
 The public pages render with no backend configured. Only `/app/*` needs Supabase.
 
 `/app/*` is multi-project: the top bar switches between every project you are a
-member of and can start a new one. A project is not necessarily a vessel —
+member of and can start a new one, and the team page adds people to it by email.
+Someone invited appears on the team immediately, before they have ever signed
+in — the distance between the invitation and their first visit is a fact worth
+keeping. A project is not necessarily a vessel —
 `PROPERTY` projects model buildings with the same work packages, findings,
 change orders and approvals, minus the vessel, the class society and the haul-out.
 
@@ -117,6 +120,7 @@ applied by hand in the Supabase SQL editor, in this order:
 16. `supabase-migration-014-multi-project.sql` — reads scoped to project membership; Actions stop guessing the project
 17. `supabase-migration-015-closure-notes-and-corrections.sql` — closing an NCR requires a reason; a closed NCR can still be corrected
 18. `supabase-migration-016-actions-take-a-project.sql` — every Action takes an explicit project and checks the role held *on it*
+19. `supabase-migration-017-membership-lifecycle.sql` — projects can be staffed; invited, arrived and departed are all recorded
 
 Migrations 006–008 are the important ones. After 008 the `authenticated` and
 `anon` roles hold **zero** `INSERT`/`UPDATE`/`DELETE` grants on the domain

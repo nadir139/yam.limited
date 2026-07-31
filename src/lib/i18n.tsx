@@ -98,6 +98,58 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
 export const useTranslation = () => useContext(I18nContext)
 
+const DIVISIONS: [Intl.RelativeTimeFormatUnit, number][] = [
+  ['second', 60],
+  ['minute', 60],
+  ['hour', 24],
+  ['day', 7],
+  ['week', 4.35],
+  ['month', 12],
+  ['year', Infinity],
+]
+
+/**
+ * "7 days ago", "fra 2 ore" — in whatever language is selected.
+ *
+ * Intl.RelativeTimeFormat is built into the platform and already knows every
+ * locale's rules for this, which a hand-rolled "n days ago" would get wrong the
+ * moment it left English.
+ */
+export function useRelativeTime() {
+  const { lang } = useTranslation()
+  return (iso: string | null | undefined): string => {
+    if (!iso) return ''
+    const rtf = new Intl.RelativeTimeFormat(lang, { numeric: 'auto' })
+    let delta = (new Date(iso).getTime() - Date.now()) / 1000
+    for (const [unit, span] of DIVISIONS) {
+      if (Math.abs(delta) < span) return rtf.format(Math.round(delta), unit)
+      delta /= span
+    }
+    return rtf.format(Math.round(delta), 'year')
+  }
+}
+
+/**
+ * How long someone took to turn up, as a plain duration rather than "ago".
+ *
+ * Null when either end is missing — an invitation never accepted has no
+ * duration, and saying "0 days" would read as though they arrived instantly.
+ */
+export function useDuration() {
+  const { lang } = useTranslation()
+  return (fromIso: string | null, toIso: string | null): string | null => {
+    if (!fromIso || !toIso) return null
+    const ms = new Date(toIso).getTime() - new Date(fromIso).getTime()
+    if (ms < 0) return null
+    const fmt = new Intl.NumberFormat(lang, { maximumFractionDigits: 0 })
+    const mins = ms / 60000
+    if (mins < 60) return `${fmt.format(Math.max(1, Math.round(mins)))} min`
+    const hours = mins / 60
+    if (hours < 48) return `${fmt.format(Math.round(hours))} h`
+    return `${fmt.format(Math.round(hours / 24))} d`
+  }
+}
+
 /**
  * How complete each language is, measured rather than claimed.
  *

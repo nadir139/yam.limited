@@ -3,6 +3,7 @@ import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import { NoProjects } from './ProjectSwitcher'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
+import { useProjectPresence } from '@/lib/query-hooks'
 import { useActiveProject } from '@/contexts/ProjectContext'
 
 interface AppShellProps {
@@ -17,6 +18,9 @@ export default function AppShell({ children }: AppShellProps) {
   // Better to say so once and offer the way out.
   const { hasNoProjects } = useActiveProject()
   useRealtimeSync()
+  // Stamps first_seen_at on the first visit and keeps last_seen_at fresh, which
+  // is what "here now" on the team page is derived from.
+  useProjectPresence()
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768)
