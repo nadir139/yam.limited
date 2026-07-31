@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table'
-import { useWorkPackages } from '@/lib/query-hooks'
+import { useWorkPackages, useVocabulary } from '@/lib/query-hooks'
+import { useTranslation } from '@/lib/i18n'
 import CreateWorkPackageForm from '@/components/actions/CreateWorkPackageForm'
 import type { Discipline, WorkPackageStatus } from '@/lib/types'
 
@@ -23,7 +24,23 @@ const DISCIPLINE_COLORS: Record<Discipline, { bg: string; text: string }> = {
   PAINT: { bg: 'hsl(20 80% 50% / 0.12)', text: 'hsl(20 80% 45%)' },
   STRUCTURAL: { bg: 'hsl(0 72% 51% / 0.12)', text: 'hsl(var(--destructive))' },
   SAFETY: { bg: 'hsl(45 93% 47% / 0.12)', text: 'hsl(45 80% 38%)' },
+  PLANNING: { bg: 'hsl(215 50% 23% / 0.12)', text: 'hsl(var(--primary))' },
+  CADASTRAL: { bg: 'hsl(280 50% 45% / 0.12)', text: 'hsl(280 50% 42%)' },
+  ENERGY: { bg: 'hsl(90 55% 40% / 0.14)', text: 'hsl(90 55% 30%)' },
+  LANDSCAPE: { bg: 'hsl(170 50% 38% / 0.14)', text: 'hsl(170 50% 30%)' },
 }
+
+/**
+ * A missing entry must not take the page down.
+ *
+ * It already did: migration 018 added four disciplines to the database enum
+ * without the TypeScript union learning about them, so `Record<Discipline, …>`
+ * still typechecked with nine keys and the first property work package white-
+ * screened the list with "Cannot read properties of undefined". The union is
+ * fixed, which makes the next omission a build failure — this makes it a grey
+ * badge even so.
+ */
+const NEUTRAL = { bg: 'hsl(var(--muted))', text: 'hsl(var(--muted-foreground))' }
 
 const STATUS_COLORS: Record<WorkPackageStatus, { bg: string; text: string }> = {
   DRAFT: { bg: 'hsl(var(--muted))', text: 'hsl(var(--muted-foreground))' },
@@ -34,11 +51,14 @@ const STATUS_COLORS: Record<WorkPackageStatus, { bg: string; text: string }> = {
   COMPLETE: { bg: 'hsl(158 64% 40% / 0.2)', text: 'hsl(var(--success))' },
 }
 
-const DISCIPLINES: Discipline[] = ['STRUCTURAL', 'HULL', 'MECHANICAL', 'ELECTRICAL', 'RIGGING', 'INTERIOR', 'PAINT', 'CLASS', 'SAFETY']
 const STATUSES: WorkPackageStatus[] = ['DRAFT', 'SCOPED', 'ACTIVE', 'EXPANDED', 'ON_HOLD', 'COMPLETE']
 
 export default function WorkPackageList() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
+  // Only the disciplines this project type uses — a property is filtered by
+  // planning and cadastral, not by rigging.
+  const DISCIPLINES = useVocabulary('DISCIPLINE')
   const [search, setSearch] = useState('')
   const [disciplineFilter, setDisciplineFilter] = useState<string>('ALL')
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
@@ -86,7 +106,7 @@ export default function WorkPackageList() {
       <div className="flex flex-wrap gap-3">
         <select value={disciplineFilter} onChange={(e) => setDisciplineFilter(e.target.value)} style={selectStyle}>
           <option value="ALL">All Disciplines</option>
-          {DISCIPLINES.map((d) => <option key={d} value={d}>{d}</option>)}
+          {DISCIPLINES.map((d) => <option key={d} value={d}>{t(`discipline.${d}`)}</option>)}
         </select>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={selectStyle}>
           <option value="ALL">All Statuses</option>
@@ -119,8 +139,8 @@ export default function WorkPackageList() {
               const hoursPct = wp.planned_hours > 0
                 ? Math.round((wp.actual_hours / wp.planned_hours) * 100)
                 : 0
-              const dc = DISCIPLINE_COLORS[wp.discipline]
-              const sc = STATUS_COLORS[wp.status]
+              const dc = DISCIPLINE_COLORS[wp.discipline] ?? NEUTRAL
+              const sc = STATUS_COLORS[wp.status] ?? NEUTRAL
               return (
                 <TableRow
                   key={wp.id}
@@ -133,7 +153,7 @@ export default function WorkPackageList() {
                   </TableCell>
                   <TableCell>
                     <Badge style={{ backgroundColor: dc.bg, color: dc.text, border: 'none', fontSize: '11px' }}>
-                      {wp.discipline}
+                      {t(`discipline.${wp.discipline}`)}
                     </Badge>
                   </TableCell>
                   <TableCell>
