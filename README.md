@@ -96,6 +96,15 @@ every push to `main` (or a manual *Run workflow*). The pipeline is
 
 - The `CNAME` file (`yam.limited`) is copied into `dist/` by the workflow, and
   `.nojekyll` stops Pages running Jekyll over the output.
+- **Settings → Pages → Build and deployment → Source must be "GitHub Actions".**
+  If it is set to "Deploy from a branch" instead, Pages serves the repository
+  root — where `index.html` is the Vite *source* file pointing at
+  `/src/main.tsx`. The browser refuses that with *"Expected a
+  JavaScript-or-Wasm module script but the server responded with a MIME type of
+  application/octet-stream"* and the site is a white page, while every workflow
+  run still reports success. The last step of the deploy job now fetches
+  yam.limited and fails the run if it is not serving the bundle that was just
+  published.
 - `vercel.json` is **not** part of the live deployment. A Vercel project
   (`project-0`) does build this repo, but it has no custom domain attached and
   only serves preview URLs. If it is ever promoted to production it needs its

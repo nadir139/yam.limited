@@ -57,6 +57,19 @@ jobs:
             echo "::warning::VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are not set. Public pages will deploy fine, but /app routes will not load data."
           fi
 
+      # The built index.html must reference a hashed bundle. If it still points
+      # at /src/main.tsx it is the source file, which the browser refuses with
+      # "Expected a JavaScript-or-Wasm module script but the server responded
+      # with a MIME type of application/octet-stream" — a white screen.
+      - name: Check the build produced a real bundle
+        run: |
+          if grep -q '/src/main.tsx' dist/index.html; then
+            echo "::error::dist/index.html references the dev entry point. The build did not transform it."
+            exit 1
+          fi
+          grep -q 'assets/index-' dist/index.html \
+            || { echo "::error::dist/index.html has no hashed bundle."; exit 1; }
+
       - name: Copy CNAME to dist
         run: cp CNAME dist/CNAME
 
@@ -81,3 +94,24 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      # Deploying successfully is not the same as being served. On 1 Aug the
+      # site white-screened while every deploy still reported success: the
+      # artifact was correct and something else was answering for the domain.
+      # This closes that gap — the run fails if the live page is not the page
+      # we just published.
+      - name: Verify the live site serves this build
+        run: |
+          sleep 20
+          for attempt in 1 2 3 4 5; do
+            body=$(curl -fsSL --max-time 30 https://yam.limited/ || true)
+            if printf '%s' "$body" | grep -q 'assets/index-'; then
+              echo "yam.limited is serving the built bundle."
+              exit 0
+            fi
+            echo "Attempt $attempt: not serving the built bundle yet; waiting."
+            sleep 15
+          done
+          echo "::error::yam.limited is not serving this build. If the page references /src/main.tsx, GitHub Pages is serving the repository root instead of the uploaded artifact — check Settings → Pages → Build and deployment → Source is 'GitHub Actions'."
+          printf '%s' "$body" | head -c 600
+          exit 1
