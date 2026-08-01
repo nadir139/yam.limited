@@ -25,6 +25,17 @@ cadastral, energy and landscape, and documents are filed as *visura catastale*,
 rather than as "Other". That vocabulary lives in `ontology_vocabulary`, so a new
 vertical is rows in the registry rather than a schema change.
 
+Every object carries its own conversation, and naming someone in it with `@`
+does something. The mention creates an **action item** for that person in the
+same transaction — assigned to who was named, about the object the thread hangs
+off, due on that object's own planned start date. It appears on their list under
+*My Items* without anybody, including them, typing it there, and it stays open
+until they answer in their own words; the answer is posted back into the thread
+it came from. Only the person named can answer — that gate is identity, not
+role, so an owner's rep cannot tick off somebody else's obligation and neither
+can the agent. `CREW` exists as a role for the same reason: the chef is not the
+captain, and she is exactly the person you want to be able to name.
+
 The interface speaks English, Italian, French, Spanish and German, chosen from
 the top bar and remembered per browser. Translation covers the application
 chrome and every enum that appears across screens — navigation, project types,
@@ -159,6 +170,7 @@ applied by hand in the Supabase SQL editor, in this order:
 18. `supabase-migration-016-actions-take-a-project.sql` — every Action takes an explicit project and checks the role held *on it*
 19. `supabase-migration-017-membership-lifecycle.sql` — projects can be staffed; invited, arrived and departed are all recorded
 20. `supabase-migration-018-vocabulary-per-project-type.sql` — phases, disciplines, document types and root causes become per-vertical
+21. `supabase-migration-019-mentions-and-action-items.sql` — naming someone in a message creates an obligation they have to answer
 
 Migrations 006–008 are the important ones. After 008 the `authenticated` and
 `anon` roles hold **zero** `INSERT`/`UPDATE`/`DELETE` grants on the domain

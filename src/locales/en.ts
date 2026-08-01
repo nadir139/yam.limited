@@ -34,6 +34,7 @@ export const en: Record<string, string> = {
   'nav.approvals': 'Approvals',
   'nav.documents': 'Documents',
   'nav.team': 'Team',
+  'nav.actionItems': 'My Items',
   'nav.messages': 'Messages',
   'nav.agent': 'Agent',
   'nav.signOut': 'Sign out',
@@ -84,6 +85,7 @@ export const en: Record<string, string> = {
   'role.CLASS_SURVEYOR': 'Class Surveyor',
   'role.NAVAL_ARCHITECT': 'Naval Architect',
   'role.SUBCONTRACTOR': 'Subcontractor',
+  'role.CREW': 'Crew',
 
   // ─── Statuses ──────────────────────────────────────────────────────────────
   'status.OPEN': 'Open',

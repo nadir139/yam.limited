@@ -52,6 +52,11 @@ export type ObjectType = Enums['object_type']
  * author.
  */
 export type MembershipStatus = Enums['membership_status']
+/**
+ * OPEN until the person named answers. ACKNOWLEDGED means they said something
+ * back, DECLINED means they said no and why, DONE means it happened.
+ */
+export type ActionItemStatus = Enums['action_item_status']
 
 // ─── Core objects ─────────────────────────────────────────────────────────────
 //
@@ -69,6 +74,17 @@ export type Document = Row<'documents'>
 export type ProjectMember = Row<'project_members'>
 export type WorldModelEvent = Row<'world_model_events'>
 export type Message = Row<'messages'>
+
+/**
+ * An obligation somebody acquired by being named in a message.
+ *
+ * Nobody creates one of these directly — there is no Action that takes an
+ * assignee and a due date. It exists because a person was mentioned, it carries
+ * the object the conversation was already attached to, and its due date is the
+ * linked object's own start date. That is the whole point: the chef gets the
+ * job on her list without anyone, including her, typing it into one.
+ */
+export type ActionItem = Row<'action_items'>
 
 /**
  * A project, optionally carrying the vessel it refits.

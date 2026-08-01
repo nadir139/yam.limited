@@ -1,18 +1,3 @@
-// GENERATED FILE — DO NOT EDIT BY HAND.
-//
-// Regenerate after any schema change:
-//
-//   supabase gen types typescript --project-id xgpdfefxarllgykjbppn > src/lib/database.types.ts
-//
-// (or via the Supabase MCP `generate_typescript_types` tool)
-//
-// Why this exists: migration 018 added four values to the `discipline` enum in
-// Postgres, and the hand-written union in types.ts did not learn about them.
-// `Record<Discipline, …>` still typechecked with nine keys, and the first
-// property work package white-screened the Work Packages page. A generated enum
-// and a hand-written union are two sources of truth; this is the one that is
-// derived from the database, and `src/lib/types.ts` now builds on it.
-
 export type Json =
   | string
   | number
@@ -29,6 +14,100 @@ export type Database = {
   }
   public: {
     Tables: {
+      action_items: {
+        Row: {
+          acknowledged_at: string | null
+          assignee_email: string
+          assignee_member_id: string
+          assignee_name: string
+          body: string
+          completed_at: string | null
+          completion_note: string | null
+          context_label: string | null
+          created_at: string
+          due_date: string | null
+          due_date_source: string | null
+          id: string
+          linked_object_id: string | null
+          linked_object_type: Database["public"]["Enums"]["object_type"] | null
+          message_id: string
+          project_id: string
+          raised_by: string | null
+          raised_by_name: string
+          response: string | null
+          response_message_id: string | null
+          status: Database["public"]["Enums"]["action_item_status"]
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          assignee_email: string
+          assignee_member_id: string
+          assignee_name: string
+          body: string
+          completed_at?: string | null
+          completion_note?: string | null
+          context_label?: string | null
+          created_at?: string
+          due_date?: string | null
+          due_date_source?: string | null
+          id?: string
+          linked_object_id?: string | null
+          linked_object_type?: Database["public"]["Enums"]["object_type"] | null
+          message_id: string
+          project_id: string
+          raised_by?: string | null
+          raised_by_name: string
+          response?: string | null
+          response_message_id?: string | null
+          status?: Database["public"]["Enums"]["action_item_status"]
+        }
+        Update: {
+          acknowledged_at?: string | null
+          assignee_email?: string
+          assignee_member_id?: string
+          assignee_name?: string
+          body?: string
+          completed_at?: string | null
+          completion_note?: string | null
+          context_label?: string | null
+          created_at?: string
+          due_date?: string | null
+          due_date_source?: string | null
+          id?: string
+          linked_object_id?: string | null
+          linked_object_type?: Database["public"]["Enums"]["object_type"] | null
+          message_id?: string
+          project_id?: string
+          raised_by?: string | null
+          raised_by_name?: string
+          response?: string | null
+          response_message_id?: string | null
+          status?: Database["public"]["Enums"]["action_item_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "action_items_assignee_member_id_fkey"
+            columns: ["assignee_member_id"]
+            isOneToOne: false
+            referencedRelation: "project_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "action_items_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "action_items_response_message_id_fkey"
+            columns: ["response_message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       action_permissions: {
         Row: {
           action_key: string
@@ -394,6 +473,7 @@ export type Database = {
           linked_object_id: string | null
           linked_object_type: Database["public"]["Enums"]["object_type"] | null
           meeting_ref: string | null
+          mentions: string[]
           project_id: string
           source: Database["public"]["Enums"]["message_source"]
         }
@@ -408,6 +488,7 @@ export type Database = {
           linked_object_id?: string | null
           linked_object_type?: Database["public"]["Enums"]["object_type"] | null
           meeting_ref?: string | null
+          mentions?: string[]
           project_id: string
           source?: Database["public"]["Enums"]["message_source"]
         }
@@ -422,6 +503,7 @@ export type Database = {
           linked_object_id?: string | null
           linked_object_type?: Database["public"]["Enums"]["object_type"] | null
           meeting_ref?: string | null
+          mentions?: string[]
           project_id?: string
           source?: Database["public"]["Enums"]["message_source"]
         }
@@ -953,6 +1035,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      action_acknowledge_item: {
+        Args: { p_item_id: string; p_project_id: string; p_response: string }
+        Returns: Json
+      }
       action_advance_project_phase: {
         Args: { p_project_id?: string }
         Returns: Json
@@ -975,6 +1061,10 @@ export type Database = {
           p_reason?: string
           p_role: string
         }
+        Returns: Json
+      }
+      action_complete_item: {
+        Args: { p_item_id: string; p_note?: string; p_project_id: string }
         Returns: Json
       }
       action_create_project: {
@@ -1010,6 +1100,10 @@ export type Database = {
         Args: { p_approval_id: string; p_decision: string; p_notes?: string }
         Returns: Json
       }
+      action_decline_item: {
+        Args: { p_item_id: string; p_project_id: string; p_reason: string }
+        Returns: Json
+      }
       action_invite_member: {
         Args: {
           p_company?: string
@@ -1031,6 +1125,7 @@ export type Database = {
           p_linked_object_id?: string
           p_linked_object_type?: string
           p_meeting_ref?: string
+          p_mentions?: string[]
           p_project_id?: string
           p_source?: string
         }
@@ -1146,6 +1241,13 @@ export type Database = {
         Returns: string
       }
       is_project_member: { Args: { p_project_id: string }; Returns: boolean }
+      mention_context: {
+        Args: {
+          p_id: string
+          p_type: Database["public"]["Enums"]["object_type"]
+        }
+        Returns: Record<string, unknown>
+      }
       project_phases: {
         Args: { p_project_type: Database["public"]["Enums"]["project_type"] }
         Returns: string[]
@@ -1169,6 +1271,7 @@ export type Database = {
       resolve_project: { Args: { p_explicit: string }; Returns: string }
     }
     Enums: {
+      action_item_status: "OPEN" | "ACKNOWLEDGED" | "DONE" | "DECLINED"
       approval_status: "PENDING" | "APPROVED" | "REJECTED" | "ESCALATED"
       approval_tier: "TIER_1" | "TIER_2" | "TIER_3"
       change_order_status:
@@ -1248,6 +1351,7 @@ export type Database = {
         | "SUBCONTRACTOR"
         | "MESSAGE"
         | "PROJECT_MEMBER"
+        | "ACTION_ITEM"
       project_phase:
         | "PRE_SURVEY"
         | "HAUL_OUT"
@@ -1289,6 +1393,7 @@ export type Database = {
         | "CLASS_SURVEYOR"
         | "SUBCONTRACTOR"
         | "NAVAL_ARCHITECT"
+        | "CREW"
       work_package_status:
         | "DRAFT"
         | "SCOPED"
@@ -1423,6 +1528,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      action_item_status: ["OPEN", "ACKNOWLEDGED", "DONE", "DECLINED"],
       approval_status: ["PENDING", "APPROVED", "REJECTED", "ESCALATED"],
       approval_tier: ["TIER_1", "TIER_2", "TIER_3"],
       change_order_status: [
@@ -1508,6 +1614,7 @@ export const Constants = {
         "SUBCONTRACTOR",
         "MESSAGE",
         "PROJECT_MEMBER",
+        "ACTION_ITEM",
       ],
       project_phase: [
         "PRE_SURVEY",
@@ -1553,6 +1660,7 @@ export const Constants = {
         "CLASS_SURVEYOR",
         "SUBCONTRACTOR",
         "NAVAL_ARCHITECT",
+        "CREW",
       ],
       work_package_status: [
         "DRAFT",

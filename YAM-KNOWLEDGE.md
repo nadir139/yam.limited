@@ -1539,3 +1539,126 @@ carrying the old €30 and the reason. What the screenshot showed was a panel
 rendered before the refetch landed. Worth checking the database before believing
 a screenshot — the write path and the view are different things, and only one of
 them was wrong.
+
+---
+
+## 32. A mention is an obligation (migration 019)
+
+The request arrived as a screenshot of WP-PAINT-002 — "New Varnish on the
+capping rail", Antigua Varnish, 5–12 August 2026 — with this in its
+conversation:
+
+> Will need to have the chef prepare food for the varnishers - 1 of the 3 is
+> vegetarian so let's make a vegetarian option **@chef**
+
+Three things were wrong with that sentence as stored, and only the first is
+obvious.
+
+**"@chef" named nobody.** It was text. There was no chef on the project, and no
+way to put one there: the seven roles are all decision-making roles, so a cook
+would have had to be enrolled as a captain or a subcontractor. `user_role` now
+has `CREW`.
+
+**Nothing happened.** The request lived in a paragraph on a page the chef had no
+particular reason to open. It would be discovered on the 4th of August, or it
+would not.
+
+**The available fix was a second system.** Her own list — which means the same
+fact typed twice, in two places that immediately begin to disagree. The
+instruction was explicit: *she shouldn't waste time doing an entry in her
+personal joblist, everything should be saved recorded automatically.*
+
+### The shape
+
+Naming a project member creates an `action_items` row **in the same
+transaction** as the message. Same cascade discipline as defect → change order →
+approval: one Action, several objects, no client-side orchestration.
+
+What it inherits is the point:
+
+| Column | Where it comes from |
+| --- | --- |
+| `assignee_member_id` | who was named |
+| `body` | what was said |
+| `linked_object_type/id` | the object the thread already hung off |
+| `context_label` | `WP-PAINT-002 — New Varnish on the capping rail` |
+| `due_date` | **the work package's own `planned_start`** — 5 Aug 2026 |
+| `due_date_source` | `WORK_PACKAGE_PLANNED_START`, so a date nobody typed can be explained |
+
+`mention_context()` does that lookup, and knows about work packages,
+inspections, approvals, NCRs, change orders and documents. Nothing is entered by
+hand, because there is nothing left to enter. **There is deliberately no Action
+that takes an assignee and a due date.** An obligation with no conversation
+behind it is a note to self, and a note to self is exactly the thing that gets
+lost when the person holding it goes ashore.
+
+### The half that makes it not a notification
+
+`OPEN → ACKNOWLEDGED → DONE`, plus `DECLINED`. An item stays `OPEN` until the
+person named **says something back** — `action_acknowledge_item` raises if the
+response trims to empty, and the reply is inserted as a `messages` row linked to
+the same object, so the answer appears in the thread where the question was
+asked. `action_decline_item` requires a reason and files it as a `DECISION`.
+
+That is the difference between having been told and having agreed, and it is the
+whole reason this is an object rather than a badge.
+
+### Identity, not role
+
+The three answering Actions have **no `action_permissions` rows**. Every other
+Action asks "what role do you hold on this project"; these ask "are you the
+person this was asked of", by comparing `assignee_email` to the JWT. A role
+cannot express "the chef", and a permissive matrix would let an owner's rep tick
+off somebody else's obligation — at which point the record stops meaning
+anything.
+
+`is_agent_usable` is `false` on all three for the same reason. The agent can
+raise items by posting a message with mentions; it cannot answer on a human's
+behalf. It waits like everyone else.
+
+### `messages.mentions uuid[]`, not a join table
+
+Messages are immutable and append-only. A join table would never be updated
+after insert, so it would be an array with extra steps and an extra join on
+every read. The array is GIN-indexed.
+
+Storing ids rather than parsing the text is also what makes rendering correct.
+`MentionText` highlights **only the names that actually became obligations** —
+so "@ 3 coats" is not a mention, an email address in the middle of a sentence is
+not a mention, and a mention still renders years later when the person has left
+and their display name has changed.
+
+### Two gotchas worth keeping
+
+**Supabase's default privileges grant `ALL` on new public tables.** A new table
+silently undoes migration 008 unless the migration takes it back:
+
+```sql
+revoke all on action_items from anon, authenticated;
+grant select on action_items to anon, authenticated;
+```
+
+The check from §13 still applies and still passes — `anon` and `authenticated`
+hold `SELECT` and nothing else across the whole schema.
+
+**Adding a defaulted parameter to an existing Action is not additive.**
+`create or replace function` with a different arity creates a *second* function.
+With every parameter defaulted, PostgREST cannot tell them apart, and the old
+one keeps answering some fraction of calls. `action_post_message` is dropped by
+its old signature first.
+
+### Verified before the client was touched
+
+In a rolled-back transaction, as two different signed-in identities:
+
+| Probe | Result |
+| --- | --- |
+| item due date | `2026-08-05` |
+| due date source | `WORK_PACKAGE_PLANNED_START` |
+| context | `WP-PAINT-002 — New Varnish on the capping rail` |
+| the asker answers for the assignee | refused |
+| mention someone on another project | refused |
+| empty answer | refused |
+| the chef answers | `ACKNOWLEDGED`, reply posted, linked to the same WP |
+| answering twice | refused |
+| the chef's job list, never typed into | 1 |

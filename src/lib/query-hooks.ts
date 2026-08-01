@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import * as db from './db'
 import { useActiveProject, useProjectId } from '@/contexts/ProjectContext'
+import { useAuth } from '@/contexts/AuthContext'
 import type { DefectRecord, InspectionEvent, ObjectType } from './types'
 
 /** Re-exported so a page needs one import to reach the active project. */
@@ -441,7 +442,106 @@ export function usePostMessage() {
       // Every message view is a filter over the same table, so refresh all of
       // them rather than guessing which one the caller is looking at.
       qc.invalidateQueries({ queryKey: ['messages'] })
+      // A message with mentions in it has just created obligations. They are
+      // written in the same transaction, so there is nothing to wait for —
+      // but nothing tells the job list that unless we do.
+      qc.invalidateQueries({ queryKey: ['action-items'] })
     },
+  })
+}
+
+
+// ─── Action items ─────────────────────────────────────────────────────────────
+//
+// The list nobody types into. See `db.ts` for why these have no "create" hook:
+// an item exists because somebody was named in a sentence, and the only way to
+// make one is to say the sentence.
+
+export const ITEM_KEYS = {
+  mine: (p: string, email: string) => ['action-items', 'mine', p, email],
+  project: (p: string) => ['action-items', 'project', p],
+  object: (t: string, id: string) => ['action-items', 'object', t, id],
+}
+
+/** What the signed-in person owes on this project. */
+export const useMyActionItems = () => {
+  const projectId = useProjectId()
+  const { user } = useAuth()
+  const email = user?.email ?? ''
+  return useQuery({
+    queryKey: ITEM_KEYS.mine(projectId, email),
+    queryFn: () => db.fetchMyActionItems(projectId, email),
+    enabled: !!projectId && !!email,
+  })
+}
+
+/** What everyone owes — who is waiting on whom, in one place. */
+export const useProjectActionItems = () => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: ITEM_KEYS.project(projectId),
+    queryFn: () => db.fetchProjectActionItems(projectId),
+    enabled: !!projectId,
+  })
+}
+
+/** The items raised in one object's thread, shown next to it. */
+export const useObjectActionItems = (
+  objectType: ObjectType | undefined,
+  objectId: string | undefined,
+) =>
+  useQuery({
+    queryKey: ITEM_KEYS.object(objectType ?? '', objectId ?? ''),
+    queryFn: () => db.fetchObjectActionItems(objectType!, objectId!),
+    enabled: !!objectType && !!objectId,
+  })
+
+/** How many things are still waiting on you. Drives the badge in the sidebar. */
+export function useMyOpenItemCount(): number {
+  const { data = [] } = useMyActionItems()
+  return data.filter((i) => i.status === 'OPEN').length
+}
+
+/**
+ * Answering, declining and completing all invalidate the same three things:
+ * the item lists, the thread the reply was posted into, and the object history.
+ */
+function useItemInvalidation() {
+  const qc = useQueryClient()
+  return () => {
+    qc.invalidateQueries({ queryKey: ['action-items'] })
+    qc.invalidateQueries({ queryKey: ['messages'] })
+    qc.invalidateQueries({ queryKey: ['events'] })
+  }
+}
+
+export function useAcknowledgeItem() {
+  const projectId = useProjectId()
+  const invalidate = useItemInvalidation()
+  return useMutation({
+    mutationFn: ({ itemId, response }: { itemId: string; response: string }) =>
+      db.acknowledgeItem(projectId, itemId, response),
+    onSuccess: invalidate,
+  })
+}
+
+export function useDeclineItem() {
+  const projectId = useProjectId()
+  const invalidate = useItemInvalidation()
+  return useMutation({
+    mutationFn: ({ itemId, reason }: { itemId: string; reason: string }) =>
+      db.declineItem(projectId, itemId, reason),
+    onSuccess: invalidate,
+  })
+}
+
+export function useCompleteItem() {
+  const projectId = useProjectId()
+  const invalidate = useItemInvalidation()
+  return useMutation({
+    mutationFn: ({ itemId, note }: { itemId: string; note?: string | null }) =>
+      db.completeItem(projectId, itemId, note),
+    onSuccess: invalidate,
   })
 }
 
