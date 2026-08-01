@@ -1451,3 +1451,45 @@ there is nothing to divide by — those are different facts), `day`, `sinceNow`,
 
 An em dash is the right answer for a project that has no budget yet. A zero is
 a claim.
+
+---
+
+## 30. Deployed is not the same as served
+
+The site went white with:
+
+```
+Failed to load module script: Expected a JavaScript-or-Wasm module script but
+the server responded with a MIME type of "application/octet-stream".  main.tsx:1
+```
+
+`main.tsx` is the **source** entry point. For a browser to ask for it, the HTML
+it received must be the repository's `index.html`, not the one Vite builds —
+and for the server to answer at all, `/src/main.tsx` must exist on it. Both are
+true only if GitHub Pages is serving the **repository root** rather than the
+uploaded artifact.
+
+What ruled the code out, in order:
+
+- the repo is clean — no `dist/`, no stray HTML committed
+- a clean build from `main` produces `dist/index.html` referencing
+  `/assets/index-*.js`
+- every deploy run succeeded: typecheck, build, upload, deploy
+- **nothing had deployed between the site working and the site breaking**
+
+That last point is the one that matters. A failure that appears with no
+deployment is not in the artifact; it is in what answers for the domain. The
+fix is `Settings → Pages → Build and deployment → Source = GitHub Actions`,
+which is repository configuration and not visible from the code.
+
+### Two guards, because this was silent
+
+1. **Before upload** — the build fails if `dist/index.html` still references
+   `/src/main.tsx` or has no hashed bundle. Verified against both a real
+   artifact (passes) and the source `index.html` (fails).
+2. **After deploy** — the run fetches `https://yam.limited/` and fails if the
+   served page does not contain `assets/index-`, with an error message naming
+   the Pages source setting. Deploying successfully and being served are
+   different facts, and until now nothing checked the second one.
+
+A green pipeline that ships a white page is worse than a red one.

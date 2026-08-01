@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import Logo from '@/assets/logo.svg'
 import { useAuth } from '@/contexts/AuthContext'
 import { useDefects, useApprovals, useMyRole } from '@/lib/query-hooks'
 import { useTranslation } from '@/lib/i18n'
@@ -84,10 +85,28 @@ export default function Sidebar({ onClose }: SidebarProps) {
           justifyContent: 'space-between',
         }}
       >
-        <div>
-          <div style={{ fontSize: '18px', fontWeight: 700, letterSpacing: '-0.02em' }}>YAM</div>
-          <div style={{ fontSize: '10px', opacity: 0.6, letterSpacing: '0.05em' }}>
-            MARITIME INTELLIGENCE
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+          {/* The mark is a black-stroked SVG built for the light marketing page.
+              Loaded through an <img> it cannot inherit currentColor, so it is
+              knocked to white — the sidebar is navy and the logo would
+              otherwise be invisible on it. */}
+          <img
+            src={Logo}
+            alt=""
+            aria-hidden="true"
+            style={{
+              height: '34px',
+              width: 'auto',
+              flexShrink: 0,
+              filter: 'brightness(0) invert(1)',
+              opacity: 0.95,
+            }}
+          />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: '18px', fontWeight: 700, letterSpacing: '-0.02em' }}>YAM</div>
+            <div style={{ fontSize: '10px', opacity: 0.6, letterSpacing: '0.05em' }}>
+              MARITIME INTELLIGENCE
+            </div>
           </div>
         </div>
         {onClose && (
