@@ -1493,3 +1493,49 @@ which is repository configuration and not visible from the code.
    different facts, and until now nothing checked the second one.
 
 A green pipeline that ships a white page is worse than a red one.
+
+---
+
+## 31. A detail page must not wait on things it merely decorates
+
+Opening NCR-2026-012 showed "Loading..." forever, with no error in the console.
+
+Every detail page gated its whole render on the supplementary lists as well as
+on its own record:
+
+```ts
+const isLoading = defectLoading || coLoading || approvalsLoading           // NCR
+const isLoading = wpLoading || inspLoading || defectsLoading || docsLoading // WP
+const isLoading = projectLoading || wpLoading || … || teamLoading           // overview
+```
+
+Under React Query v5, `isLoading = isPending && isFetching`. A request that is
+in flight and has never resolved is both — so **one slow or stuck list holds the
+page on "Loading..." indefinitely**, while the record itself sits fetched in the
+cache, unreachable. `WorkPackageDetail` had four chances to hit this; the
+project overview had seven.
+
+Each page now gates on its own record only. The linked sections all default to
+`[]`, so they render as "nothing linked" and fill in when their data arrives —
+which is the correct behaviour anyway: the NCR is the page, the cascade cards
+are decoration.
+
+Reproduced and verified both ways, with the stub making `change_orders` never
+answer:
+
+| Gate | Result |
+| --- | --- |
+| `defectLoading \|\| coLoading \|\| approvalsLoading` | stuck on "Loading..." |
+| `defectLoading` | full record renders, cost impact €50 |
+
+The negative control matters here. Without it this is a plausible story about a
+loading flag; with it, it is the cause.
+
+### The agent had done its job
+
+The same report said the NCR "didn't really update". It had: the database held
+€50, 3 days and the corrected description, with a `DEFECT_IMPACT_AMENDED` event
+carrying the old €30 and the reason. What the screenshot showed was a panel
+rendered before the refetch landed. Worth checking the database before believing
+a screenshot — the write path and the view are different things, and only one of
+them was wrong.

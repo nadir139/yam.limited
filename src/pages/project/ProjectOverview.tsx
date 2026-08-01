@@ -37,9 +37,14 @@ export default function ProjectOverview() {
   const { data: documents = [], isLoading: docsLoading } = useDocuments()
   const { data: team = [], isLoading: teamLoading } = useTeam()
 
-  const isLoading =
-    projectLoading || wpLoading || inspLoading || defectsLoading ||
-    coLoading || approvalsLoading || docsLoading || teamLoading
+  // Only the record itself gates the page.
+  //
+  // This used to wait on the supplementary lists too, which meant one slow or
+  // stuck list query left the whole page on "Loading..." indefinitely -- with
+  // the record already fetched and sitting in the cache, unreachable. The
+  // sections below all default to an empty array, so they render as "nothing
+  // linked" until their data arrives and fill in when it does.
+  const isLoading = projectLoading
 
   if (isLoading) {
     return <div style={{ padding: '2rem', color: 'hsl(var(--muted-foreground))' }}>Loading...</div>
