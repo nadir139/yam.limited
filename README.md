@@ -119,7 +119,7 @@ exactly what happened here.
 
 | Hook | Script | What it catches |
 | --- | --- | --- |
-| `prebuild` | [`scripts/preflight.mjs`](scripts/preflight.mjs) + `typecheck` | Missing `VITE_*` (warns), and type errors (fails) |
+| `prebuild` | [`scripts/preflight.mjs`](scripts/preflight.mjs) + `typecheck` | Missing `VITE_*` (warns), credentials for the **wrong** Supabase project (warns), a URL and anon key for **different** projects (fails), type errors (fails) |
 | `postbuild` | [`scripts/verify-build.mjs`](scripts/verify-build.mjs) | `index.html` still pointing at `/src/main.tsx`, no hashed bundle, missing `robots.txt`/`sitemap.xml`/`llms.txt`, dropped JSON-LD |
 
 The `/src/main.tsx` check is not hypothetical. On 1 August the live site was a
@@ -151,6 +151,14 @@ is protected by row-level security, not by secrecy.
 
 **Changing a variable does not rebuild the site.** Redeploy for a new value to
 reach production.
+
+**Present is not the same as correct.** The Vercel project carried a URL and key
+for `ihippazqdkwssxnfzlwx` — a Supabase project that does not exist in this
+account — added on 5 April 2026, four months before `yam-limited` was created on
+27 July. A build with those succeeds, the marketing site renders perfectly, and
+every `/app/*` route quietly reaches nothing. `preflight.mjs` therefore decodes
+the `ref` claim out of the anon key and checks it against the host in the URL,
+so a half-updated pair fails the build rather than shipping.
 
 If either is missing the build still succeeds and the public pages deploy
 normally, but every `/app/*` route loads without data and `prebuild` prints a
