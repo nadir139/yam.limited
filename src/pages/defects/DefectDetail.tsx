@@ -14,7 +14,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { useDefect, useChangeOrders, useApprovals, useUpdateDefect } from '@/lib/query-hooks'
+import { useDefect, useChangeOrders, useApprovals, useDocuments, useUpdateDefect } from '@/lib/query-hooks'
+import UploadDocumentForm from '@/components/actions/UploadDocumentForm'
 import type { DefectSeverity } from '@/lib/types'
 
 const SEVERITY_STYLES: Record<DefectSeverity, { bg: string; text: string }> = {
@@ -84,6 +85,7 @@ export default function DefectDetail() {
   const { data: defect, isLoading: defectLoading } = useDefect(id ?? '')
   const { data: changeOrders = [], isLoading: coLoading } = useChangeOrders()
   const { data: approvals = [], isLoading: approvalsLoading } = useApprovals()
+  const { data: allDocuments = [], isLoading: docsLoading } = useDocuments()
   const updateDefect = useUpdateDefect()
 
   const [closeDialogOpen, setCloseDialogOpen] = useState(false)
@@ -95,7 +97,7 @@ export default function DefectDetail() {
     setTimeout(() => setToast(null), 3000)
   }
 
-  const isLoading = defectLoading || coLoading || approvalsLoading
+  const isLoading = defectLoading || coLoading || approvalsLoading || docsLoading
 
   if (isLoading) {
     return <div style={{ padding: '2rem', color: 'hsl(var(--muted-foreground))' }}>Loading...</div>
@@ -114,6 +116,10 @@ export default function DefectDetail() {
 
   const ss = SEVERITY_STYLES[defect.severity]
   const st = STATUS_STYLES[defect.status]
+
+  const evidenceDocs = allDocuments.filter(
+    (d) => d.linked_object_type === 'DEFECT_RECORD' && d.linked_object_id === defect.id,
+  )
 
   const linkedCO = defect.change_order_id
     ? changeOrders.find((co) => co.id === defect.change_order_id)
@@ -303,6 +309,46 @@ export default function DefectDetail() {
                 <GitBranch size={14} className="mr-2" />
                 Raise Change Order
               </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Evidence & Documents */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center justify-between">
+            <span>Evidence & Documents</span>
+            <UploadDocumentForm linkedObjectType="DEFECT_RECORD" linkedObjectId={defect.id} defaultDocType="PHOTO" label="Attach File" />
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-5 pt-0">
+          {evidenceDocs.length === 0 ? (
+            <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
+              No files attached. Upload photos, reports, or drawings as evidence.
+            </p>
+          ) : (
+            <div className="flex flex-col divide-y" style={{ borderColor: 'hsl(var(--border))' }}>
+              {evidenceDocs.map((doc) => (
+                <div key={doc.id} className="flex items-center justify-between py-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded flex items-center justify-center text-xs font-bold"
+                      style={{ backgroundColor: 'hsl(var(--muted))', color: 'hsl(var(--muted-foreground))' }}>
+                      {doc.mime_type?.startsWith('image/') ? 'IMG' : 'PDF'}
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium">{doc.title}</div>
+                      <div className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                        {doc.doc_number} · {doc.doc_type.replace(/_/g, ' ')}
+                        {doc.file_size != null && ` · ${Math.round(doc.file_size / 1024)} KB`}
+                      </div>
+                    </div>
+                  </div>
+                  {doc.file_url
+                    ? <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="text-xs font-medium hover:underline" style={{ color: 'hsl(var(--accent))' }}>Open</a>
+                    : <span className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>No file</span>}
+                </div>
+              ))}
             </div>
           )}
         </CardContent>

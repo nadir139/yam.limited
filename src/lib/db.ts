@@ -266,10 +266,66 @@ export async function updateProject(
   return data
 }
 
+export async function updateInspection(
+  id: string,
+  updates: Partial<InspectionEvent>,
+): Promise<InspectionEvent> {
+  const { data, error } = await supabase
+    .from('inspection_events')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function uploadDocument(
+  file: File,
+  meta: {
+    title: string
+    docType: Document['doc_type']
+    linkedObjectType: Document['linked_object_type'] | null
+    linkedObjectId: string | null
+    isClassDocument: boolean
+  },
+): Promise<Document> {
+  const ext = file.name.split('.').pop() ?? 'bin'
+  const path = `${PROJECT_ID}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+
+  const { error: uploadError } = await supabase.storage
+    .from('project-documents')
+    .upload(path, file)
+  if (uploadError) throw uploadError
+
+  const { data: signed, error: signErr } = await supabase.storage
+    .from('project-documents')
+    .createSignedUrl(path, 60 * 60 * 24 * 365)
+  if (signErr) throw signErr
+
+  const docNumber = await nextNumber('documents', 'DOC')
+  return createDocument({
+    project_id: PROJECT_ID,
+    doc_number: docNumber,
+    title: meta.title,
+    doc_type: meta.docType,
+    revision: 'A',
+    status: 'DRAFT',
+    file_url: signed.signedUrl,
+    file_size: file.size,
+    mime_type: file.type,
+    uploaded_by: 'User',
+    uploaded_date: new Date().toISOString().split('T')[0],
+    linked_object_type: meta.linkedObjectType,
+    linked_object_id: meta.linkedObjectId,
+    is_class_document: meta.isClassDocument,
+  })
+}
+
 /** Returns the next sequential number for a given table, formatted as PREFIX-YYYY-NNN */
 export async function nextNumber(
-  table: 'defect_records' | 'change_orders' | 'owner_approvals',
-  prefix: 'NCR' | 'CO' | 'APPR',
+  table: 'defect_records' | 'change_orders' | 'owner_approvals' | 'documents',
+  prefix: 'NCR' | 'CO' | 'APPR' | 'DOC',
 ): Promise<string> {
   const { count } = await supabase
     .from(table)

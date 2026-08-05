@@ -1,23 +1,11 @@
 import React, { useState } from 'react'
 import { format } from 'date-fns'
-import { Upload } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog'
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table'
 import { useDocuments } from '@/lib/query-hooks'
-import * as db from '@/lib/db'
-import { useQueryClient } from '@tanstack/react-query'
-import { QUERY_KEYS } from '@/lib/query-hooks'
+import UploadDocumentForm from '@/components/actions/UploadDocumentForm'
 import type { Document } from '@/lib/types'
 
 const DOC_TYPE_STYLES: Record<string, { bg: string; text: string }> = {
@@ -53,16 +41,7 @@ export default function DocumentLibrary() {
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('ALL')
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
-  const [uploadOpen, setUploadOpen] = useState(false)
-  const [isUploading, setIsUploading] = useState(false)
-
-  // Upload form state
-  const [newTitle, setNewTitle] = useState('')
-  const [newType, setNewType] = useState<string>('SPECIFICATION')
-  const [newRevision, setNewRevision] = useState('Rev.0')
-
   const { data: docs = [], isLoading } = useDocuments()
-  const qc = useQueryClient()
 
   if (isLoading) {
     return <div style={{ padding: '2rem', color: 'hsl(var(--muted-foreground))' }}>Loading...</div>
@@ -77,35 +56,6 @@ export default function DocumentLibrary() {
     const matchesStatus = statusFilter === 'ALL' || d.status === statusFilter
     return matchesSearch && matchesType && matchesStatus
   })
-
-  const handleUpload = async () => {
-    setIsUploading(true)
-    try {
-      const newDoc: Omit<Document, 'id' | 'created_at'> = {
-        project_id: db.PROJECT_ID,
-        doc_number: `DOC-2026-${String(docs.length + 1).padStart(3, '0')}`,
-        title: newTitle || 'Untitled Document',
-        doc_type: newType as Document['doc_type'],
-        revision: newRevision,
-        status: 'DRAFT',
-        file_url: null,
-        file_size: null,
-        mime_type: null,
-        uploaded_by: 'Nadir',
-        uploaded_date: new Date().toISOString().split('T')[0],
-        linked_object_type: null,
-        linked_object_id: null,
-        is_class_document: false,
-      }
-      await db.createDocument(newDoc)
-      await qc.invalidateQueries({ queryKey: QUERY_KEYS.documents })
-      setUploadOpen(false)
-      setNewTitle('')
-      setNewRevision('Rev.0')
-    } finally {
-      setIsUploading(false)
-    }
-  }
 
   const selectStyle: React.CSSProperties = {
     borderColor: 'hsl(var(--border))',
@@ -127,10 +77,7 @@ export default function DocumentLibrary() {
             {docs.length} documents
           </p>
         </div>
-        <Button onClick={() => setUploadOpen(true)} style={{ backgroundColor: 'hsl(var(--accent))', color: 'white' }}>
-          <Upload size={14} className="mr-2" />
-          Upload Document
-        </Button>
+        <UploadDocumentForm label="Upload Document" />
       </div>
 
       <div className="flex flex-wrap gap-3">
@@ -213,62 +160,6 @@ export default function DocumentLibrary() {
         </Table>
       </Card>
 
-      {/* Upload dialog */}
-      <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Upload Document</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="doc-title">Title</Label>
-              <Input
-                id="doc-title"
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-                placeholder="Document title"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="doc-type">Document Type</Label>
-              <select
-                id="doc-type"
-                value={newType}
-                onChange={(e) => setNewType(e.target.value)}
-                style={{ ...selectStyle, height: 'auto', padding: '0.5rem 0.75rem' }}
-              >
-                {DOC_TYPES.map((t) => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="doc-revision">Revision</Label>
-              <Input
-                id="doc-revision"
-                value={newRevision}
-                onChange={(e) => setNewRevision(e.target.value)}
-                placeholder="Rev.0"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="doc-file">File</Label>
-              <Input id="doc-file" type="file" disabled className="cursor-not-allowed opacity-50" />
-              <p className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                File upload coming soon — document record will be created.
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setUploadOpen(false)}>Cancel</Button>
-            <Button
-              onClick={handleUpload}
-              disabled={isUploading}
-              style={{ backgroundColor: 'hsl(var(--accent))', color: 'white' }}
-            >
-              {isUploading ? 'Creating...' : 'Create Record'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

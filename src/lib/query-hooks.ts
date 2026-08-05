@@ -64,6 +64,32 @@ export const useEvents = () =>
   useQuery({ queryKey: QUERY_KEYS.events, queryFn: db.fetchEvents })
 
 // Mutations
+export function useUpdateInspection() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<import('./types').InspectionEvent> }) =>
+      db.updateInspection(id, updates),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.inspections })
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.events })
+    },
+  })
+}
+
+export function useUploadDocument() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (args: Parameters<typeof db.uploadDocument>[1] & { file: File }) => {
+      const { file, ...meta } = args
+      return db.uploadDocument(file, meta)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.documents })
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.events })
+    },
+  })
+}
+
 export function useUpdateApproval() {
   const qc = useQueryClient()
   return useMutation({

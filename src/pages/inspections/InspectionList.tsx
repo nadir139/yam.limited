@@ -4,6 +4,7 @@ import { CheckCircle2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useInspections, useWorkPackages } from '@/lib/query-hooks'
+import RecordInspectionResult from '@/components/actions/RecordInspectionResult'
 import type { InspectionResult } from '@/lib/types'
 
 const RESULT_STYLES: Record<InspectionResult, { bg: string; text: string }> = {
@@ -56,9 +57,12 @@ export default function InspectionList() {
                     </div>
                     <div className="font-semibold text-sm">{insp.title}</div>
                   </div>
-                  <Badge style={{ backgroundColor: rs.bg, color: rs.text, border: 'none', fontSize: '11px' }}>
-                    {insp.result}
-                  </Badge>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Badge style={{ backgroundColor: rs.bg, color: rs.text, border: 'none', fontSize: '11px' }}>
+                      {insp.result}
+                    </Badge>
+                    {insp.result === 'PENDING' && <RecordInspectionResult inspection={insp} />}
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2 mb-3">
