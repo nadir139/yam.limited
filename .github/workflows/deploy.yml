@@ -1,3 +1,13 @@
+# OUTGOING. yam.limited is moving to Vercel; see README → Deployment.
+#
+# This workflow is kept running only so the domain keeps being served while DNS
+# still points at GitHub Pages. Delete it — together with CNAME, public/404.html
+# and the ?redirect= script in index.html — as soon as `curl -sI
+# https://yam.limited` returns an x-vercel-id header.
+#
+# Its two guards no longer live only here: they moved into scripts/preflight.mjs
+# and scripts/verify-build.mjs so they survive this file being removed.
+
 name: Deploy to GitHub Pages
 
 on:
