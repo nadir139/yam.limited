@@ -5,17 +5,69 @@
     <link rel="icon" type="image/png" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>YAM | Yacht Architectural Management</title>
-    <meta name="description" content="Premium yacht project management and owner representation for discerning clients worldwide." />
+    <meta name="description" content="Owner's representation and refit project management for sailing yachts and superyachts. Every decision, cost and non-conformity recorded against the object it concerns." />
     <meta name="author" content="YAM" />
+    <link rel="canonical" href="https://yam.limited/" />
 
     <meta property="og:title" content="YAM | Yacht Architectural Management" />
-    <meta property="og:description" content="Premium yacht project management and owner representation for discerning clients worldwide." />
+    <meta property="og:description" content="Owner's representation and refit project management for sailing yachts and superyachts. Every decision, cost and non-conformity recorded against the object it concerns." />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="/logo.png" />
+    <meta property="og:url" content="https://yam.limited/" />
+    <meta property="og:site_name" content="YAM" />
+    <meta property="og:image" content="https://yam.limited/logo.png" />
 
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@YAM" />
-    <meta name="twitter:image" content="/logo.png" />
+    <meta name="twitter:image" content="https://yam.limited/logo.png" />
+
+    <!--
+      Structured data, deliberately in the static document rather than injected
+      by React.
+
+      GPTBot, ClaudeBot and PerplexityBot do not execute JavaScript — they fetch
+      the raw HTML and move on without a second attempt. Anything the app
+      renders at runtime is invisible to them. What is written here is the only
+      thing about YAM those crawlers can currently read, so it states the facts
+      we can stand behind and nothing we cannot.
+    -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "ProfessionalService",
+        "@id": "https://yam.limited/#organization",
+        "name": "YAM",
+        "legalName": "Yacht Architectural Management",
+        "url": "https://yam.limited/",
+        "logo": "https://yam.limited/logo.png",
+        "image": "https://yam.limited/logo.png",
+        "email": "info@yam.limited",
+        "telephone": "+39 338 816 2035",
+        "description": "Owner's representation and refit project management for sailing yachts and superyachts. YAM runs refits against a formal model of the work: every decision, cost impact and non-conformity is recorded against the object it concerns, and nothing can be closed without a reason.",
+        "areaServed": {
+          "@type": "Place",
+          "name": "Mediterranean and worldwide"
+        },
+        "knowsAbout": [
+          "Yacht owner's representation",
+          "Superyacht refit project management",
+          "Classification society survey",
+          "Non-conformity reports",
+          "Change orders and variation orders",
+          "Shipyard contract administration"
+        ],
+        "hasOfferCatalog": {
+          "@type": "OfferCatalog",
+          "name": "Services",
+          "itemListElement": [
+            { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Owner Representation", "description": "Advocacy and oversight through construction or refit, so the owner's interest is represented at the yard rather than assumed." } },
+            { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Refit Project Management", "description": "Coordination from specification to delivery: scope, timeline, budget and quality, tracked against the work packages they belong to." } },
+            { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Refit Coordination", "description": "Planning and execution of refits, upgrades and maintenance programmes with minimal downtime." } },
+            { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Racing Program Management", "description": "Management of competitive sailing programmes, from crew coordination to logistics and performance." } },
+            { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Technical Documentation", "description": "Specifications, progress reporting and a project record that survives the people who made it." } },
+            { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "International Coordination", "description": "Work across international shipyards, suppliers and regulatory bodies." } }
+          ]
+        }
+      }
+    </script>
 
     <script>
       // GitHub Pages has no SPA rewrite: it serves 404.html for any deep link,

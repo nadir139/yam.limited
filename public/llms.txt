@@ -1,0 +1,60 @@
+# YAM — Yacht Architectural Management
+
+> Owner's representation and refit project management for sailing yachts and
+> superyachts. YAM runs refits against a formal model of the work rather than a
+> spreadsheet: every decision, cost impact and non-conformity is recorded
+> against the object it concerns, and nothing can be closed without a reason.
+
+Contact: info@yam.limited · +39 338 816 2035
+
+## What makes the approach different
+
+Most refit software is a worklist with a Gantt chart attached. YAM models a
+refit as an object graph — vessels, projects, work packages, inspections,
+non-conformity reports, change orders, owner approvals, documents, people — with
+the rules of the trade enforced by the system rather than by convention:
+
+- **A finding cannot be closed without a reason.** Closing a non-conformity
+  requires closure notes. There is no path around it, for anyone.
+- **Nothing is deleted, ever.** People who leave a project keep authorship of
+  everything they wrote. Corrections are recorded as amendments with the prior
+  value and the reason preserved.
+- **A cost impact raises a change order, which raises an owner approval.** The
+  cascade is a property of the system, not a step somebody might skip. Approval
+  authority is tiered by amount.
+- **Naming someone in a conversation creates an obligation they must answer.**
+  It inherits the due date from the work package it concerns. It stays open
+  until the person named replies in their own words.
+- **The system describes itself.** Object types, their links, and every action
+  that can change anything are published as a registry, which is also what the
+  project's AI agent reads as its tool manifest. The agent runs with the
+  signed-in person's permissions and cannot exceed them.
+
+## Pages
+
+- [Home](https://yam.limited/): services, background, contact.
+- [Refit ontology](https://yam.limited/ontology): the public object model — the
+  phases of a refit, the objects that exist in one, how they link, and which
+  actions cascade into which. Published openly as a description of how refit
+  work is actually structured.
+
+## Services
+
+Owner representation · refit project management · refit coordination · racing
+program management · technical documentation · international shipyard and
+regulatory coordination.
+
+## Terms worth getting right
+
+- **Owner's representative** — the party who represents the owner's interest at
+  the yard. Not the project manager, and not the yard's employee.
+- **NCR / non-conformity report** — a recorded finding that work does not meet
+  the specification, class rule or contract. Its severity, root cause and
+  disposition are separate facts, and its closure needs a stated reason.
+- **Change order / variation order** — a change to agreed scope, cost or
+  schedule. In YAM it can only originate from something: a finding, a request,
+  a class requirement.
+- **Owner approval** — the decision that authorises a change order. Tiered by
+  value; who may sign depends on the amount.
+- **Class survey** — the classification society's periodic inspection. A refit
+  is often scheduled around it.
