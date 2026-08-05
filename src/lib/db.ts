@@ -17,6 +17,7 @@ import type {
   MessageKind,
   MessageSource,
   ObjectType,
+  ActionItem,
 } from './types'
 
 /** A project row carrying just enough of its vessel to name it. */
@@ -689,12 +690,19 @@ export interface MessageInput {
   linkedObjectId?: string | null
   source?: MessageSource
   meetingRef?: string | null
+  /** `project_members.id` of everyone named. Each one becomes an action item. */
+  mentions?: string[]
+}
+
+export interface PostedMessage {
+  message: Message
+  actionItems: ActionItem[]
 }
 
 export async function postMessage(
   projectId: string,
   input: MessageInput,
-): Promise<Message> {
+): Promise<PostedMessage> {
   const { data, error } = await supabase.rpc('action_post_message', {
     p_project_id: projectId,
     p_body: input.body,
@@ -703,9 +711,119 @@ export async function postMessage(
     p_linked_object_id: input.linkedObjectId ?? null,
     p_source: input.source ?? 'APP',
     p_meeting_ref: input.meetingRef ?? null,
+    p_mentions: input.mentions?.length ? input.mentions : null,
   })
-  const result = unwrap(data, error, 'Post message') as { message: Message }
-  return result.message
+  const result = unwrap(data, error, 'Post message') as {
+    message: Message
+    action_items: ActionItem[] | null
+  }
+  return { message: result.message, actionItems: result.action_items ?? [] }
+}
+
+
+// ─── Action items ─────────────────────────────────────────────────────────────
+//
+// The job list nobody fills in.
+//
+// Every other to-do system starts with a form: who, what, when. This one starts
+// with a sentence someone was going to say anyway — "the varnishers need lunch
+// on the 5th, one vegetarian, @Elena" — and the row is what the sentence
+// already contained. The assignee is who was named, the body is what was said,
+// the due date is the work package's own planned start, and the context is the
+// object the thread was hanging off. There is nothing left to type.
+//
+// It is not a notification either. It stays OPEN until the person named answers
+// in their own words, and the answer is posted back into the thread the request
+// came from, so the asker sees it where they asked.
+
+/** Everything owed by the signed-in person on this project. */
+export async function fetchMyActionItems(
+  projectId: string,
+  email: string,
+): Promise<ActionItem[]> {
+  const { data, error } = await supabase
+    .from('action_items')
+    .select('*')
+    .eq('project_id', projectId)
+    .ilike('assignee_email', email)
+    .order('due_date', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return data ?? []
+}
+
+/** Everything owed by anyone on this project — the rep's view of who owes what. */
+export async function fetchProjectActionItems(projectId: string): Promise<ActionItem[]> {
+  const { data, error } = await supabase
+    .from('action_items')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('due_date', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return data ?? []
+}
+
+/** The items raised on one object, shown beside its conversation. */
+export async function fetchObjectActionItems(
+  objectType: ObjectType,
+  objectId: string,
+): Promise<ActionItem[]> {
+  const { data, error } = await supabase
+    .from('action_items')
+    .select('*')
+    .eq('linked_object_type', objectType)
+    .eq('linked_object_id', objectId)
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return data ?? []
+}
+
+/**
+ * Answer something you were asked.
+ *
+ * The response is required by the database, not just by this form. An item
+ * nobody replied to stays open, which is the difference between being told and
+ * having agreed.
+ */
+export async function acknowledgeItem(
+  projectId: string,
+  itemId: string,
+  response: string,
+): Promise<ActionItem> {
+  const { data, error } = await supabase.rpc('action_acknowledge_item', {
+    p_project_id: projectId,
+    p_item_id: itemId,
+    p_response: response,
+  })
+  return (unwrap(data, error, 'Acknowledge') as { item: ActionItem }).item
+}
+
+/** Say no, and why. The reason is required and lands in the thread. */
+export async function declineItem(
+  projectId: string,
+  itemId: string,
+  reason: string,
+): Promise<ActionItem> {
+  const { data, error } = await supabase.rpc('action_decline_item', {
+    p_project_id: projectId,
+    p_item_id: itemId,
+    p_reason: reason,
+  })
+  return (unwrap(data, error, 'Decline') as { item: ActionItem }).item
+}
+
+export async function completeItem(
+  projectId: string,
+  itemId: string,
+  note?: string | null,
+): Promise<ActionItem> {
+  const { data, error } = await supabase.rpc('action_complete_item', {
+    p_project_id: projectId,
+    p_item_id: itemId,
+    p_note: note?.trim() || null,
+  })
+  return (unwrap(data, error, 'Complete') as { item: ActionItem }).item
 }
 
 

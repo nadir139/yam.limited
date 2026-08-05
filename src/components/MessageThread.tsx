@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
+import React, { useMemo, useRef, useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
-import { Send, AlertCircle, Compass, Gavel, Video, ArrowRightLeft, MessageSquare } from 'lucide-react'
+import { Send, AlertCircle, Compass, Gavel, Video, ArrowRightLeft, MessageSquare, AtSign } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -8,8 +8,14 @@ import {
   useProjectMessages,
   usePostMessage,
   usePermissions,
+  useTeam,
+  useObjectActionItems,
+  useProjectActionItems,
 } from '@/lib/query-hooks'
-import type { Message, MessageKind, ObjectType } from '@/lib/types'
+import { useAuth } from '@/contexts/AuthContext'
+import MentionText from '@/components/MentionText'
+import ActionItemCard from '@/components/ActionItemCard'
+import type { ActionItem, Message, MessageKind, ObjectType, ProjectMember } from '@/lib/types'
 
 // The project conversation, attached to the thing it is about.
 //
@@ -17,6 +23,15 @@ import type { Message, MessageKind, ObjectType } from '@/lib/types'
 // in someone's inbox, and when they leave it goes with them. Here a message
 // hangs off the object, so the "why" is stored next to the "what" and the agent
 // can read both.
+//
+// Naming someone with @ goes one step further. "The varnishers need lunch on
+// the 5th, one vegetarian, @Elena" is a request, and a request that only exists
+// as prose is a request somebody has to remember. Mentioning a member creates
+// an action item for them in the same transaction — assigned to who was named,
+// about the object this thread hangs off, due on that object's own start date.
+// The chef never opens a to-do list to put it there, and she cannot make it go
+// away by ignoring it: it stays open until she answers, and her answer is
+// posted back here.
 //
 // Nothing here edits or deletes. There is no Action for it and no grant behind
 // it — a message is a statement someone made at a time, and unmaking it would
@@ -66,11 +81,23 @@ const ROLE_LABEL: Record<string, string> = {
   CLASS_SURVEYOR: 'Class surveyor',
   NAVAL_ARCHITECT: 'Naval architect',
   SUBCONTRACTOR: 'Subcontractor',
+  CREW: 'Crew',
 }
 
-function MessageRow({ message }: { message: Message }) {
+function MessageRow({
+  message,
+  members,
+  items,
+  myEmail,
+}: {
+  message: Message
+  members: ProjectMember[]
+  items: ActionItem[]
+  myEmail: string
+}) {
   const meta = KIND_META[message.kind] ?? KIND_META.NOTE
   const isPlain = message.kind === 'NOTE'
+  const raised = items.filter((i) => i.message_id === message.id)
 
   return (
     <div className="flex flex-col gap-1 py-2.5">
@@ -100,9 +127,46 @@ function MessageRow({ message }: { message: Message }) {
           {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
         </span>
       </div>
-      <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.body}</p>
+
+      <MentionText body={message.body} mentions={message.mentions} members={members} />
+
+      {/* The obligations this message created, right under it. Naming someone
+          did something, and the something should be visible where it happened
+          rather than only on a page they have to know to visit. */}
+      {raised.length > 0 && (
+        <div className="mt-1.5 flex flex-col gap-2">
+          {raised.map((item) => (
+            <ActionItemCard
+              key={item.id}
+              item={item}
+              mine={item.assignee_email.toLowerCase() === myEmail.toLowerCase()}
+              showBody={false}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
+}
+
+/**
+ * The token being typed after an "@", or null.
+ *
+ * Only looks backwards from the caret and stops at whitespace, so an email
+ * address in the middle of a sentence does not open the picker and neither
+ * does an "@" somebody typed and moved away from.
+ */
+function mentionQuery(text: string, caret: number): { query: string; at: number } | null {
+  const before = text.slice(0, caret)
+  const at = before.lastIndexOf('@')
+  if (at === -1) return null
+  if (at > 0 && !/\s/.test(before[at - 1])) return null
+  const query = before.slice(at + 1)
+  if (/\n/.test(query)) return null
+  // A name is at most a few words; anything longer is prose that happens to
+  // follow an "@", not somebody being named.
+  if (query.split(/\s+/).length > 3) return null
+  return { query, at }
 }
 
 export default function MessageThread({
@@ -120,14 +184,75 @@ export default function MessageThread({
   const projectQuery = useProjectMessages()
   const query = scoped ? objectQuery : projectQuery
 
+  // The items raised in this thread. The project-wide channel has no object to
+  // hang them off, so its items are the ones linked to nothing — without this
+  // branch, mentioning someone there would work but show nothing back.
+  const { data: itemsForObject = [] } = useObjectActionItems(
+    scoped ? objectType : undefined,
+    scoped ? objectId : undefined,
+  )
+  const { data: allItems = [] } = useProjectActionItems()
+  const items = scoped
+    ? itemsForObject
+    : allItems.filter((i) => i.linked_object_type === null)
+  const { data: team = [] } = useTeam()
+  const { user } = useAuth()
+
   const post = usePostMessage()
   const { can } = usePermissions()
   const [body, setBody] = useState('')
   const [kind, setKind] = useState<MessageKind>('NOTE')
   const [error, setError] = useState<string | null>(null)
+  const [picker, setPicker] = useState<{ query: string; at: number } | null>(null)
+  const [named, setNamed] = useState<ProjectMember[]>([])
+  const textarea = useRef<HTMLTextAreaElement>(null)
 
   const messages = query.data ?? []
   const mayPost = can('action_post_message')
+
+  // Someone who has left cannot be given new work. They stay on the team page
+  // so everything they wrote keeps an author; they do not stay in this list.
+  const mentionable = useMemo(
+    () => team.filter((m) => m.status !== 'LEFT'),
+    [team],
+  )
+
+  const suggestions = useMemo(() => {
+    if (!picker) return []
+    const q = picker.query.toLowerCase()
+    return mentionable
+      .filter(
+        (m) =>
+          !named.some((n) => n.id === m.id) &&
+          (q === '' ||
+            m.name.toLowerCase().includes(q) ||
+            m.email.toLowerCase().startsWith(q) ||
+            (m.company ?? '').toLowerCase().includes(q)),
+      )
+      .slice(0, 6)
+  }, [picker, mentionable, named])
+
+  const onBodyChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setBody(e.target.value)
+    setPicker(mentionQuery(e.target.value, e.target.selectionStart ?? e.target.value.length))
+  }
+
+  const choose = (member: ProjectMember) => {
+    if (!picker) return
+    const caret = textarea.current?.selectionStart ?? body.length
+    const next = `${body.slice(0, picker.at)}@${member.name} ${body.slice(caret)}`
+    setBody(next)
+    setNamed((prev) => (prev.some((m) => m.id === member.id) ? prev : [...prev, member]))
+    setPicker(null)
+    textarea.current?.focus()
+  }
+
+  // Deleting "@Elena" out of the text is how you take the request back before
+  // sending it. The chip list is a convenience; the text is the truth.
+  const stillNamed = useMemo(
+    () => named.filter((m) => body.includes(`@${m.name}`)),
+    [named, body],
+  )
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -139,11 +264,14 @@ export default function MessageThread({
         kind,
         linkedObjectType: scoped ? objectType : null,
         linkedObjectId: scoped ? objectId : null,
+        mentions: stillNamed.map((m) => m.id),
       },
       {
         onSuccess: () => {
           setBody('')
           setKind('NOTE')
+          setNamed([])
+          setPicker(null)
         },
         onError: (err: Error) => setError(err.message),
       },
@@ -166,7 +294,13 @@ export default function MessageThread({
       ) : (
         <div className="divide-y" style={{ borderColor: 'hsl(var(--border))' }}>
           {messages.map((m) => (
-            <MessageRow key={m.id} message={m} />
+            <MessageRow
+              key={m.id}
+              message={m}
+              members={team}
+              items={items}
+              myEmail={user?.email ?? ''}
+            />
           ))}
         </div>
       )}
@@ -196,14 +330,59 @@ export default function MessageThread({
             {KIND_META[kind].hint}
           </p>
 
-          <div className="flex items-end gap-2">
+          <div className="relative flex items-end gap-2">
+            {picker && suggestions.length > 0 && (
+              <ul
+                className="absolute bottom-full left-0 z-20 mb-1 w-72 overflow-hidden rounded-[var(--radius)] border shadow-md"
+                style={{
+                  backgroundColor: 'hsl(var(--popover))',
+                  borderColor: 'hsl(var(--border))',
+                }}
+              >
+                {suggestions.map((m) => (
+                  <li key={m.id}>
+                    <button
+                      type="button"
+                      // onMouseDown, not onClick: the textarea loses focus on
+                      // blur before a click ever lands, which closes the picker
+                      // and makes the option unselectable by mouse.
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        choose(m)
+                      }}
+                      className="flex w-full flex-col items-start px-3 py-1.5 text-left hover:bg-[hsl(var(--accent)/0.1)]"
+                    >
+                      <span className="text-sm font-medium">{m.name}</span>
+                      <span className="text-[11px]" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                        {ROLE_LABEL[m.role] ?? m.role}
+                        {m.company ? ` · ${m.company}` : ''}
+                        {m.status === 'INVITED' ? ' · not signed in yet' : ''}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
             <Textarea
+              ref={textarea}
               value={body}
-              onChange={(e) => setBody(e.target.value)}
-              placeholder="Say what happened, or why…"
+              onChange={onBodyChange}
+              onBlur={() => setPicker(null)}
+              placeholder="Say what happened, or why… @ someone to ask them for something"
               rows={2}
               className="flex-1 text-sm"
               onKeyDown={(e) => {
+                if (e.key === 'Escape' && picker) {
+                  e.preventDefault()
+                  setPicker(null)
+                  return
+                }
+                if (e.key === 'Enter' && picker && suggestions.length > 0) {
+                  e.preventDefault()
+                  choose(suggestions[0])
+                  return
+                }
                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit(e)
               }}
             />
@@ -211,6 +390,18 @@ export default function MessageThread({
               <Send size={14} />
             </Button>
           </div>
+
+          {stillNamed.length > 0 && (
+            <p
+              className="inline-flex flex-wrap items-center gap-1.5 text-[11px]"
+              style={{ color: 'hsl(var(--muted-foreground))' }}
+            >
+              <AtSign size={12} />
+              This asks {stillNamed.map((m) => m.name).join(', ')} for something.
+              It lands on {stillNamed.length > 1 ? 'their lists' : 'their list'} and
+              stays open until they answer.
+            </p>
+          )}
 
           {error && (
             <p

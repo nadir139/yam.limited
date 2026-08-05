@@ -12,13 +12,14 @@ import {
   Users,
   Sparkles,
   MessagesSquare,
+  ListChecks,
   LogOut,
   X,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import Logo from '@/assets/logo.svg'
 import { useAuth } from '@/contexts/AuthContext'
-import { useDefects, useApprovals, useMyRole } from '@/lib/query-hooks'
+import { useDefects, useApprovals, useMyRole, useMyOpenItemCount } from '@/lib/query-hooks'
 import { useTranslation } from '@/lib/i18n'
 
 interface SidebarProps {
@@ -37,6 +38,7 @@ const NAV_ITEMS = [
   { icon: GitBranch, labelKey: 'nav.changeOrders', path: '/app/change-orders' },
   { icon: CheckCircle2, labelKey: 'nav.approvals', path: '/app/approvals', badge: 'approvals' },
   { icon: FileText, labelKey: 'nav.documents', path: '/app/documents' },
+  { icon: ListChecks, labelKey: 'nav.actionItems', path: '/app/action-items', badge: 'actionItems' },
   { icon: MessagesSquare, labelKey: 'nav.messages', path: '/app/messages' },
   { icon: Users, labelKey: 'nav.team', path: '/app/team' },
 ]
@@ -54,6 +56,10 @@ export default function Sidebar({ onClose }: SidebarProps) {
 
   const { data: defects = [] } = useDefects()
   const { data: approvals = [] } = useApprovals()
+
+  // Things asked of this person by name that they have not answered yet. The
+  // badge is the only reminder there is -- nothing emails them.
+  const myOpenItemCount = useMyOpenItemCount()
 
   const openDefectCount = defects.filter((d) => d.status !== 'CLOSED').length
   const pendingApprovalCount = approvals.filter((a) => a.status === 'PENDING').length
@@ -135,6 +141,8 @@ export default function Sidebar({ onClose }: SidebarProps) {
               ? openDefectCount
               : item.badge === 'approvals'
               ? pendingApprovalCount
+              : item.badge === 'actionItems'
+              ? myOpenItemCount
               : 0
 
           return (

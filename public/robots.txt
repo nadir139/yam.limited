@@ -1,14 +1,88 @@
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
+# YAM — yam.limited
+#
+# Everything public here is meant to be found, including by the model crawlers.
+# The published ontology is the point: if an owner asks an assistant how a refit
+# actually works, the answer should come from us rather than from a brochure.
+#
+# NOTE ON GROUPS: a named user-agent group REPLACES the wildcard group for that
+# crawler — the rules do not merge. So every group below repeats the same three
+# Disallow lines. Adding a crawler without them silently opens /app/ to it.
 
 User-agent: *
 Allow: /
+Disallow: /app/
+Disallow: /auth/
+Disallow: /login
+
+# ─── Assistants, named on purpose ────────────────────────────────────────────
+# These are already covered by the wildcard. They are listed anyway so that
+# "we want to be read by these" is a stated position rather than an accident,
+# and so blocking one later is a deliberate edit rather than a new line.
+
+User-agent: GPTBot
+Allow: /
+Disallow: /app/
+Disallow: /auth/
+Disallow: /login
+
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /app/
+Disallow: /auth/
+Disallow: /login
+
+User-agent: ChatGPT-User
+Allow: /
+Disallow: /app/
+Disallow: /auth/
+Disallow: /login
+
+User-agent: ClaudeBot
+Allow: /
+Disallow: /app/
+Disallow: /auth/
+Disallow: /login
+
+User-agent: Claude-User
+Allow: /
+Disallow: /app/
+Disallow: /auth/
+Disallow: /login
+
+User-agent: Claude-SearchBot
+Allow: /
+Disallow: /app/
+Disallow: /auth/
+Disallow: /login
+
+User-agent: PerplexityBot
+Allow: /
+Disallow: /app/
+Disallow: /auth/
+Disallow: /login
+
+User-agent: Perplexity-User
+Allow: /
+Disallow: /app/
+Disallow: /auth/
+Disallow: /login
+
+User-agent: Google-Extended
+Allow: /
+Disallow: /app/
+Disallow: /auth/
+Disallow: /login
+
+User-agent: Applebot-Extended
+Allow: /
+Disallow: /app/
+Disallow: /auth/
+Disallow: /login
+
+User-agent: meta-externalagent
+Allow: /
+Disallow: /app/
+Disallow: /auth/
+Disallow: /login
+
+Sitemap: https://yam.limited/sitemap.xml

@@ -245,7 +245,7 @@ const Contact = () => {
                       <FormItem>
                         <FormLabel>Phone Number</FormLabel>
                         <FormControl>
-                          <Input placeholder="+1 234 567 8900" {...field} />
+                          <Input placeholder="+39 338 816 2035" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

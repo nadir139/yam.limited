@@ -27,6 +27,7 @@ export const de: Record<string, string> = {
   'nav.approvals': 'Freigaben',
   'nav.documents': 'Dokumente',
   'nav.team': 'Team',
+  'nav.actionItems': 'Meine Aufgaben',
   'nav.messages': 'Nachrichten',
   'nav.agent': 'Agent',
   'nav.signOut': 'Abmelden',
@@ -73,6 +74,7 @@ export const de: Record<string, string> = {
   'role.CLASS_SURVEYOR': 'Klassebesichtiger',
   'role.NAVAL_ARCHITECT': 'Schiffbauingenieur',
   'role.SUBCONTRACTOR': 'Nachunternehmer',
+  'role.CREW': 'Crew',
 
   'status.OPEN': 'Offen',
   'status.IN_PROGRESS': 'In Bearbeitung',

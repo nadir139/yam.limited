@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Only the public routes. /app/*, /login and /auth/callback are behind a login
+  and are disallowed in robots.txt, so listing them here would be a
+  contradiction rather than a shortcut.
+
+  lastmod is maintained by hand. A date that lies is worse than no date: a
+  crawler that learns this file overstates freshness starts discounting it.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://yam.limited/</loc>
+    <lastmod>2026-08-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://yam.limited/ontology</loc>
+    <lastmod>2026-08-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+</urlset>

@@ -44,6 +44,12 @@ const ROLES: UserRole[] = [
   'CLASS_SURVEYOR',
   'NAVAL_ARCHITECT',
   'SUBCONTRACTOR',
+  // The chef is not the captain. Before CREW existed the only way to put a
+  // cook, a stewardess or an engineer on a project was to hand them one of the
+  // decision-making roles, which was wrong on the org chart and wrong on
+  // permissions -- and it is exactly the person you most want to be able to
+  // name in a conversation.
+  'CREW',
 ]
 
 const ROLE_COLOR: Record<UserRole, string> = {
@@ -54,6 +60,7 @@ const ROLE_COLOR: Record<UserRole, string> = {
   CLASS_SURVEYOR: 'hsl(215 60% 50%)',
   NAVAL_ARCHITECT: 'hsl(158 64% 40%)',
   SUBCONTRACTOR: 'hsl(215 15% 45%)',
+  CREW: 'hsl(25 55% 45%)',
 }
 
 const initials = (name: string) =>
