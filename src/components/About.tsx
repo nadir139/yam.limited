@@ -1,22 +1,30 @@
 import { useEffect, useRef, useState } from "react";
-import { Award, Users, Ship, Clock } from "lucide-react";
+import { Award, Compass, Ship, Waves } from "lucide-react";
 import Logo from "@/assets/logo.svg";
+
+// Four facts, each of which survives being checked.
+//
+// This block previously read 25+ years, 100+ projects, 50+ clients and 15+
+// industry awards. None of it was true, it was inherited template copy, and it
+// contradicted the hero section's "10+ years" three screens above. In a market
+// of a few thousand qualified buyers who all know each other, one prospect
+// noticing that is the whole reputation.
 const credentials = [{
-  icon: Clock,
-  value: "25+",
-  label: "Years Experience"
+  icon: Award,
+  value: "First Class Hons",
+  label: "BEng Yacht & Powercraft Design, Southampton Solent"
 }, {
   icon: Ship,
-  value: "100+",
-  label: "Projects Completed"
+  value: "56 m",
+  label: "Ketch new build, technical team — Perini Navi"
 }, {
-  icon: Users,
-  value: "50+",
-  label: "Satisfied Clients"
+  icon: Waves,
+  value: "100,000+",
+  label: "Nautical miles logged"
 }, {
-  icon: Award,
-  value: "15+",
-  label: "Industry Awards"
+  icon: Compass,
+  value: "6",
+  label: "Ocean crossings — five Atlantic, one Pacific"
 }];
 const About = () => {
   const [isVisible, setIsVisible] = useState(false);
@@ -43,26 +51,39 @@ const About = () => {
               About YAM
             </h2>
             <h3 className="text-3xl sm:text-4xl font-bold text-foreground mb-6">
-              Navigating Excellence in Yacht Management
+              A naval architect on your side of the table
             </h3>
             <div className="space-y-4 text-muted-foreground leading-relaxed">
               <p>
-                YAM - Yacht Architectural Management brings over two decades of
-                experience in yacht construction oversight, project management,
-                and owner representation. Our team has successfully managed
-                projects ranging from custom superyachts to competitive racing
-                programs.
+                YAM is led by Nadir Balena — First Class Honours in Yacht &amp;
+                Powercraft Design from Southampton Solent, then a decade spent
+                alternating between the yard and the rail. Project engineer at
+                Perini Navi coordinating the technical team on a 56-metre ketch
+                new build. Project manager for the Aragon 72 refit programme and
+                for SY Sonny. Sailing certification and optimisation on a
+                63-metre sailing yacht.
               </p>
               <p>
-                We understand that each yacht project is unique, requiring
-                personalized attention and expertise. Our approach combines
-                technical knowledge with strategic project management to deliver
-                exceptional results while protecting your investment.
+                That combination is the point. Refits are lost in the details of
+                a variation order, and the person reading it for you should be
+                able to tell whether the work was necessary. Having personally
+                run a complete mast and rigging refit on a J-Class — owning the
+                worklist and the deadline — and brought a 115-footer back from
+                keel structure to rudder bearings, the answer comes from
+                experience rather than from asking the yard.
               </p>
               <p>
-                With a global network of shipyards, designers, and suppliers, we
-                ensure seamless coordination across all aspects of your maritime
-                project, from initial concept through delivery and beyond.
+                The same person still races. Tactics and navigation for first in
+                class at the 2026 St Barth Bucket and the Antigua Superyacht
+                Challenge aboard the 68-metre schooner Adix, and first at the
+                Richard Mille Cup in Scotland aboard SY Sonny; hydraulics for an
+                America's Cup and a SailGP team. A boat that has been optimised
+                properly is a boat that was specified properly, and both
+                conversations happen with the same yards.
+              </p>
+              <p>
+                Working languages: Italian, English and Spanish. Based in
+                Sardinia, working across Mediterranean and Caribbean yards.
               </p>
             </div>
 
@@ -74,7 +95,14 @@ const About = () => {
                   <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-accent/10 mb-3">
                     <credential.icon className="h-6 w-6 text-accent" />
                   </div>
-                  <div className="text-2xl font-bold text-foreground">
+                  {/* A degree classification is not a number and does not want
+                      a number's type size — at 2xl "First Class Hons" wraps to
+                      three lines and unbalances the row. */}
+                  <div
+                    className={`font-bold text-foreground ${
+                      credential.value.length > 8 ? "text-lg leading-tight" : "text-2xl"
+                    }`}
+                  >
                     {credential.value}
                   </div>
                   <div className="text-sm text-muted-foreground">

@@ -100,34 +100,48 @@ newly created project. `src/lib/format.ts` is where that now lives.
 
 ## Deployment
 
-**[yam.limited](https://yam.limited) is served by GitHub Pages**, built and
-published by [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) on
-every push to `main` (or a manual *Run workflow*). The pipeline is
-`typecheck → build → upload → deploy`; the type check gates the build.
+**[yam.limited](https://yam.limited) is served by Vercel**, built from `main` on
+every push. Configuration lives in [`vercel.json`](vercel.json): the SPA
+rewrite, cache policy, and security headers.
 
-- The `CNAME` file (`yam.limited`) is copied into `dist/` by the workflow, and
-  `.nojekyll` stops Pages running Jekyll over the output.
-- **Settings → Pages → Build and deployment → Source must be "GitHub Actions".**
-  If it is set to "Deploy from a branch" instead, Pages serves the repository
-  root — where `index.html` is the Vite *source* file pointing at
-  `/src/main.tsx`. The browser refuses that with *"Expected a
-  JavaScript-or-Wasm module script but the server responded with a MIME type of
-  application/octet-stream"* and the site is a white page, while every workflow
-  run still reports success. The last step of the deploy job now fetches
-  yam.limited and fails the run if it is not serving the bundle that was just
-  published.
-- `vercel.json` is **not** part of the live deployment. A Vercel project
-  (`project-0`) does build this repo, but it has no custom domain attached and
-  only serves preview URLs. If it is ever promoted to production it needs its
-  own copy of the environment variables below.
+It used to be GitHub Pages. The move was made because the marketing site needs
+things Pages cannot give it — response headers, and a path to server-side
+rendering. Assistant crawlers (GPTBot, ClaudeBot, PerplexityBot) do not execute
+JavaScript, so a client-rendered SPA is an empty `<div>` to them, and fixing
+that eventually means rendering HTML at build or request time.
 
-### Required repository secrets
+### The build guards its own output
 
-Vite inlines `VITE_*` variables **at build time**, so they must exist in CI — a
-local `.env` has no effect whatsoever on the deployed bundle. Set both under
-*Settings → Secrets and variables → Actions*:
+`npm run build` is wrapped by two scripts that used to be steps in the Pages
+workflow. They were moved into the build because **a guard that exists only in
+one provider's CI is a guard you lose the day you change provider** — which is
+exactly what happened here.
 
-| Secret | Value |
+| Hook | Script | What it catches |
+| --- | --- | --- |
+| `prebuild` | [`scripts/preflight.mjs`](scripts/preflight.mjs) + `typecheck` | Missing `VITE_*` (warns), credentials for the **wrong** Supabase project (warns), a URL and anon key for **different** projects (fails), type errors (fails) |
+| `postbuild` | [`scripts/verify-build.mjs`](scripts/verify-build.mjs) | `index.html` still pointing at `/src/main.tsx`, no hashed bundle, missing `robots.txt`/`sitemap.xml`/`llms.txt`, dropped JSON-LD |
+
+The `/src/main.tsx` check is not hypothetical. On 1 August the live site was a
+white page for hours while every deploy reported success: Pages was serving the
+repository root — the Vite *source* `index.html` — and the browser refused it
+with *"Expected a JavaScript-or-Wasm module script but the server responded with
+a MIME type of application/octet-stream"*. Vercel's deployments are atomic, so
+the "published but not served" half of that failure mode is gone; the artifact
+half is still worth checking.
+
+The type check runs in `prebuild` rather than only in CI for the same reason.
+Duplicate exports once reached `main` and broke production for four months
+because nothing gated the build.
+
+### Required environment variables
+
+Vite inlines `VITE_*` **at build time**, so they must exist in the build
+environment — a local `.env` has no effect on the deployed bundle. Set both in
+*Vercel → project → Settings → Environment Variables*, for Production, Preview
+and Development:
+
+| Variable | Value |
 | --- | --- |
 | `VITE_SUPABASE_URL` | `https://xgpdfefxarllgykjbppn.supabase.co` |
 | `VITE_SUPABASE_ANON_KEY` | the `anon` key from *Supabase → Project Settings → API* |
@@ -135,11 +149,19 @@ local `.env` has no effect whatsoever on the deployed bundle. Set both under
 The `anon` key is designed to be public — it ships inside the client bundle and
 is protected by row-level security, not by secrecy.
 
-**Changing a secret does not rebuild the site.** Push to `main`, or re-run the
-latest workflow, for a new value to reach production.
+**Changing a variable does not rebuild the site.** Redeploy for a new value to
+reach production.
+
+**Present is not the same as correct.** The Vercel project carried a URL and key
+for `ihippazqdkwssxnfzlwx` — a Supabase project that does not exist in this
+account — added on 5 April 2026, four months before `yam-limited` was created on
+27 July. A build with those succeeds, the marketing site renders perfectly, and
+every `/app/*` route quietly reaches nothing. `preflight.mjs` therefore decodes
+the `ref` claim out of the anon key and checks it against the host in the URL,
+so a half-updated pair fails the build rather than shipping.
 
 If either is missing the build still succeeds and the public pages deploy
-normally, but every `/app/*` route loads without data and the workflow logs a
+normally, but every `/app/*` route loads without data and `prebuild` prints a
 warning. The guard lives in
 [`src/lib/supabase.ts`](src/lib/supabase.ts) (`isSupabaseConfigured`) — without
 it, `createClient` throws at module load and takes down *every* route,
@@ -243,15 +265,42 @@ applies to it unchanged, and `world_model_events` records the human as the
 actor. Swapping in the service-role key would silently remove every one of those
 guarantees.
 
-### Client-side routing on Pages
+### Client-side routing
 
-GitHub Pages has no server-side SPA rewrite — it serves `public/404.html` for
-any path that is not a real file. That page stashes the requested path in
-`?redirect=` and bounces to `/`, where an inline script in `index.html` restores
-it with `history.replaceState` before the router boots.
+`vercel.json` rewrites every unmatched path to `/index.html`, so the router sees
+the real URL and deep links work — including the magic-link `/auth/callback`.
 
-**Both halves are required.** Dropping either one silently sends every deep
-link — including the magic-link `/auth/callback` — to the homepage.
+Vercel checks the filesystem *before* applying rewrites, which is why the
+catch-all does not swallow `/robots.txt`, `/sitemap.xml` or `/llms.txt`. Those
+are real files in `public/`, so they are served as themselves.
+
+`public/404.html` and the `?redirect=` restore script in `index.html` are the
+GitHub Pages version of this, kept until the DNS cutover is confirmed and
+removed immediately after. Pages had no server-side rewrite at all: it served
+`404.html` for any path that was not a file, that page stashed the requested
+path in `?redirect=` and bounced to `/`, and an inline script put it back with
+`history.replaceState` before the router booted. Both halves were required, and
+dropping either silently sent every deep link to the homepage.
+
+### Migrating the domain (one-time, in this order)
+
+Doing these out of order is what causes downtime.
+
+1. **Vercel → Settings → Environment Variables**: add the two `VITE_*` above.
+   Redeploy. Without this the app half of the site ships blank.
+2. **Vercel → Settings → Domains**: add `yam.limited` and `www.yam.limited`.
+   Both will read *Invalid Configuration* until step 3 — that is expected.
+3. **DNS**: point the apex at Vercel (`A 76.76.21.21`) and `www` at
+   `cname.vercel-dns.com`, replacing the GitHub Pages records. Vercel issues the
+   certificate once it sees them.
+4. **Verify**: `curl -sI https://yam.limited | grep -i 'server\|x-vercel'`.
+   A `x-vercel-id` header means Vercel is answering, not Pages.
+5. **Only then**: delete `.github/workflows/deploy.yml`, `CNAME`,
+   `public/404.html` and the `?redirect=` script in `index.html`.
+6. **GitHub → Settings → Pages → Unpublish site.**
+
+Until step 5 both hosts build the same commit, so there is no window where the
+domain has nothing to serve.
 
 ## Performance notes
 

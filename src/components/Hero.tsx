@@ -57,7 +57,8 @@ const Hero = () => {
 
           {/* Subtitle */}
           <p className="animate-fade-up-delay-2 text-xl sm:text-2xl text-primary-foreground/80 mb-8 max-w-2xl mx-auto leading-relaxed">
-            Premium yacht project management and owner representation for discerning clients worldwide.
+            Owner's representation and refit management, run by a naval architect
+            who sails the boats he specifies.
           </p>
 
           {/* CTA Buttons */}
@@ -78,19 +79,24 @@ const Hero = () => {
             </a>
           </div>
 
-          {/* Stats */}
+          {/* Stats
+              Every number here is checkable against a CV and a results sheet.
+              What was here before — "10+ Projects", "+50 Clients" — was neither
+              true nor verifiable, and it contradicted the About section three
+              screens down, which claimed 25 years and 15 industry awards. A
+              prospect who notices that stops reading. */}
           <div className="animate-fade-up-delay-3 mt-16 grid grid-cols-3 gap-8 max-w-lg mx-auto">
             <div className="text-center">
-              <div className="text-3xl sm:text-4xl font-bold text-slate-50">10+</div>
-              <div className="text-sm text-primary-foreground/60 mt-1">Years Experience</div>
+              <div className="text-3xl sm:text-4xl font-bold text-slate-50">100,000+</div>
+              <div className="text-sm text-primary-foreground/60 mt-1">Nautical miles logged</div>
             </div>
             <div className="text-center">
-              <div className="text-3xl sm:text-4xl font-bold text-slate-50">10+</div>
-              <div className="text-sm text-primary-foreground/60 mt-1">Projects</div>
+              <div className="text-3xl sm:text-4xl font-bold text-slate-50">6</div>
+              <div className="text-sm text-primary-foreground/60 mt-1">Ocean crossings</div>
             </div>
             <div className="text-center">
-              <div className="text-3xl sm:text-4xl font-bold text-slate-50">+50</div>
-              <div className="text-sm text-primary-foreground/60 mt-1">Clients</div>
+              <div className="text-3xl sm:text-4xl font-bold text-slate-50">63m</div>
+              <div className="text-sm text-primary-foreground/60 mt-1">Largest yacht optimised</div>
             </div>
           </div>
         </div>
