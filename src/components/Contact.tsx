@@ -21,7 +21,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { toast } from "sonner";
-import { supabase } from "@/lib/supabase";
+import { supabaseConfig, isSupabaseConfigured } from "@/lib/supabase";
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").max(100),
@@ -37,6 +37,11 @@ const formSchema = z.object({
 type FormData = z.infer<typeof formSchema>;
 
 const CONTACT_EMAIL = "info@yam.limited";
+
+// A form that can hang forever is broken even when the network is fine. Fifteen
+// seconds is far longer than a cold edge function needs, and it guarantees the
+// visitor always gets an answer -- success, or the mailto fallback below.
+const REQUEST_TIMEOUT_MS = 15_000;
 // E.164 without '+' or spaces — the format wa.me requires.
 const WHATSAPP_NUMBER = "393388162035";
 const PHONE_DISPLAY = "+39 338 816 2035";
@@ -69,12 +74,51 @@ const Contact = () => {
       data.projectType;
 
     try {
-      // Edge Function stores the lead in Supabase and emails it via Resend.
-      // supabase.functions.invoke handles the auth header for us.
-      const { error } = await supabase.functions.invoke("contact-inquiry", {
-        body: data,
-      });
-      if (error) throw error;
+      if (!isSupabaseConfigured) {
+        throw new Error("Supabase is not configured in this build");
+      }
+
+      // Deliberately a plain fetch rather than supabase.functions.invoke().
+      //
+      // invoke() awaits an access token from auth.getSession() before it sends
+      // anything. If a visitor also has an app session in that browser, the
+      // await can queue behind supabase-js's auth lock, and a token refresh
+      // holding that lock never releases it — the request is then never sent.
+      // Not slow: never sent. No network entry, no error, no rejection, so the
+      // form sat with its button disabled forever and no message either way.
+      //
+      // This form is public. There is no session to attach and no token to
+      // wait for, so it posts the anon key itself and skips auth entirely.
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+      let response: Response;
+      try {
+        response = await fetch(
+          `${supabaseConfig.url}/functions/v1/contact-inquiry`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              apikey: supabaseConfig.anonKey,
+              Authorization: `Bearer ${supabaseConfig.anonKey}`,
+            },
+            body: JSON.stringify(data),
+            signal: controller.signal,
+          }
+        );
+      } finally {
+        // Clear it either way: an uncleared timer would abort a request that
+        // already came back, on a controller nobody is listening to.
+        clearTimeout(timeout);
+      }
+
+      if (!response.ok) {
+        const detail = await response.text().catch(() => "");
+        throw new Error(
+          `contact-inquiry responded ${response.status}${detail ? `: ${detail}` : ""}`
+        );
+      }
 
       toast.success("Message sent", {
         description: "Thanks — we'll get back to you shortly.",
