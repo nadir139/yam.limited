@@ -245,7 +245,7 @@ Supabase project (they are **not** part of the GitHub Pages build):
 
 | Function | Purpose |
 | --- | --- |
-| `contact-inquiry` | Validates the public contact form, writes it to `contact_inquiries`, then sends a notification via Resend |
+| `contact-inquiry` | Validates the public contact form, writes it to `contact_inquiries`, then sends two branded emails via Resend: a notification to `info@yam.limited` and an acknowledgement to the person who wrote in |
 | `agent` | The world-model agent — reads the ontology registry, exposes it to Claude as tools, runs the tool loop |
 
 Both need secrets set under *Supabase → Project Settings → Edge Functions →
@@ -257,6 +257,29 @@ Secrets* (these are server-side and never reach the browser):
 | `ANTHROPIC_API_KEY` | `agent` |
 
 `SUPABASE_URL` and `SUPABASE_ANON_KEY` are injected by the platform.
+
+Edge Functions are **not** deployed by any CI here — neither Vercel nor Actions
+touches them. After editing anything under `supabase/functions/`, deploy it, or
+the repo and the live function drift apart silently.
+
+The templates live in
+[`supabase/functions/contact-inquiry/email.ts`](supabase/functions/contact-inquiry/email.ts)
+and are tables with inline styles on purpose: Gmail strips `<style>` in some
+clients and Outlook renders through Word, so neither flexbox nor grid can be
+relied on. Colours are the site's own HSL tokens converted to hex, and the mark
+sits on a white chip because it is black-stroked — the sidebar knocks it white
+with a CSS `filter`, which no email client supports.
+
+Because the acknowledgement emails an address a stranger typed in, sending is
+throttled: more than 3 from one address or more than 20 overall within an hour
+and the enquiry is still **stored** but no mail goes out. The lead is never the
+thing that gets dropped.
+
+`RESEND_FROM_EMAIL` overrides the sender; without it the From line is
+`YAM Yacht Architectural Management <info@yam.limited>`.
+
+Replies typed by hand are a separate matter — that display name comes from
+Gmail, not from here. See [`docs/gmail-signature.html`](docs/gmail-signature.html).
 
 The `agent` function deliberately builds its Supabase client from **the caller's
 JWT, not the service-role key**. Every tool it runs therefore executes with

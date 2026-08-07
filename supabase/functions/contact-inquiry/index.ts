@@ -1,10 +1,17 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import {
+  acknowledgementEmail,
+  notificationEmail,
+  type Inquiry,
+} from "./email.ts";
 
-// Public contact form -> this function. Two jobs, in order of priority:
+// Public contact form -> this function. Three jobs, in order of priority:
 //   1. Persist the lead in Postgres (the durability guarantee).
 //   2. Best-effort notify info@yam.limited via Resend.
-// A Resend outage must never lose a lead that already made it to the DB.
+//   3. Best-effort acknowledge to the person who wrote in.
+// A Resend outage must never lose a lead that already made it to the DB, so
+// both sends are after the insert and neither can fail the request.
 
 const ALLOWED_ORIGINS = new Set([
   "https://yam.limited",
@@ -39,25 +46,8 @@ function json(body: unknown, status: number, origin: string | null) {
   });
 }
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-interface InquiryInput {
-  name: string;
-  email: string;
-  phone?: string;
-  projectType: string;
-  message: string;
-}
-
 type ValidationResult =
-  | { ok: true; data: InquiryInput }
+  | { ok: true; data: Inquiry }
   | { ok: false; error: string };
 
 function validate(input: unknown): ValidationResult {
@@ -146,7 +136,8 @@ Deno.serve(async (req: Request) => {
   // yam.limited is verified in Resend (DKIM + SPF on the `send` subdomain), so
   // this can send as info@yam.limited directly -- no more shared-address
   // sandbox restriction, no more resend.dev showing up in the inbox.
-  const fromAddress = Deno.env.get("RESEND_FROM_EMAIL") || "YAM <info@yam.limited>";
+  const fromAddress = Deno.env.get("RESEND_FROM_EMAIL") ||
+    "YAM Yacht Architectural Management <info@yam.limited>";
 
   if (!resendApiKey) {
     console.error("RESEND_API_KEY not set -- inquiry saved but no email sent");
@@ -154,35 +145,110 @@ Deno.serve(async (req: Request) => {
   }
 
   const label = PROJECT_TYPE_LABELS[inquiry.projectType] ?? inquiry.projectType;
-  try {
-    const resendRes = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${resendApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: fromAddress,
-        to: [CONTACT_INBOX],
-        reply_to: inquiry.email,
-        subject: `YAM Inquiry: ${label}`,
-        html: `
-          <p><strong>Name:</strong> ${escapeHtml(inquiry.name)}</p>
-          <p><strong>Email:</strong> ${escapeHtml(inquiry.email)}</p>
-          <p><strong>Phone:</strong> ${escapeHtml(inquiry.phone || "Not provided")}</p>
-          <p><strong>Project Type:</strong> ${escapeHtml(label)}</p>
-          <p><strong>Message:</strong></p>
-          <p>${escapeHtml(inquiry.message).replace(/\n/g, "<br>")}</p>
-        `,
-      }),
-    });
 
-    if (!resendRes.ok) {
-      console.error("Resend send failed", resendRes.status, await resendRes.text());
-    }
-  } catch (err) {
-    console.error("Resend request threw", err);
+  // Acknowledging the sender means this function now emails an address a
+  // stranger typed in, which is a mail cannon if left unmetered: point a script
+  // at it and YAM's verified domain delivers unwanted mail to whoever they
+  // name. Two counters, both read off the table we just wrote to, no extra
+  // schema. The lead is stored either way -- only the sending is throttled.
+  const { canSend, reason } = await withinSendingLimits(supabase, inquiry.email);
+  if (!canSend) {
+    console.warn(`Inquiry stored but emails suppressed: ${reason}`, {
+      email: inquiry.email,
+    });
+    return json({ ok: true }, 200, origin);
   }
+
+  const notification = notificationEmail(inquiry, label);
+  const acknowledgement = acknowledgementEmail(inquiry, label);
+
+  // Sent in parallel and awaited together: the acknowledgement is the half the
+  // visitor is waiting on, and neither should queue behind the other.
+  await Promise.allSettled([
+    send(resendApiKey, {
+      from: fromAddress,
+      to: [CONTACT_INBOX],
+      // Hitting Reply in the inbox answers the client, not ourselves.
+      reply_to: inquiry.email,
+      ...notification,
+    }, "notification"),
+    send(resendApiKey, {
+      from: fromAddress,
+      to: [inquiry.email],
+      reply_to: CONTACT_INBOX,
+      ...acknowledgement,
+    }, "acknowledgement"),
+  ]);
 
   return json({ ok: true }, 200, origin);
 });
+
+interface ResendPayload {
+  from: string;
+  to: string[];
+  reply_to: string;
+  subject: string;
+  html: string;
+  text: string;
+}
+
+async function send(apiKey: string, payload: ResendPayload, what: string): Promise<void> {
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      console.error(`Resend ${what} failed`, res.status, await res.text());
+    }
+  } catch (err) {
+    console.error(`Resend ${what} threw`, err);
+  }
+}
+
+/**
+ * Per-address and global throttles on *sending*, not on accepting.
+ *
+ * Per address stops the ordinary case: a double-click, or somebody submitting
+ * five times because nothing seemed to happen. The global ceiling is the one
+ * that matters for abuse — rotating the address defeats a per-address limit,
+ * so a burst of unrelated addresses trips the circuit instead. Both are
+ * deliberately generous; a real business day will not come close.
+ */
+async function withinSendingLimits(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  email: string,
+): Promise<{ canSend: boolean; reason?: string }> {
+  const anHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
+  try {
+    const [{ count: fromThisAddress }, { count: fromEveryone }] = await Promise.all([
+      supabase
+        .from("contact_inquiries")
+        .select("id", { count: "exact", head: true })
+        .ilike("email", email)
+        .gte("created_at", anHourAgo),
+      supabase
+        .from("contact_inquiries")
+        .select("id", { count: "exact", head: true })
+        .gte("created_at", anHourAgo),
+    ]);
+
+    if ((fromThisAddress ?? 0) > 3) {
+      return { canSend: false, reason: "more than 3 from this address in an hour" };
+    }
+    if ((fromEveryone ?? 0) > 20) {
+      return { canSend: false, reason: "more than 20 inquiries in an hour overall" };
+    }
+    return { canSend: true };
+  } catch (err) {
+    // A counting failure must not swallow a genuine enquiry's notification.
+    console.error("Rate-limit check failed; sending anyway", err);
+    return { canSend: true };
+  }
+}
