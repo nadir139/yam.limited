@@ -22,6 +22,23 @@ if (!isSupabaseConfigured && import.meta.env.PROD) {
   )
 }
 
+/**
+ * The raw connection details, for the one caller that must not go through the
+ * client: the public contact form.
+ *
+ * `supabase.functions.invoke()` awaits an access token from `auth.getSession()`
+ * before it issues its fetch. On a page where somebody happens to have an app
+ * session, that await can sit behind supabase-js's auth lock — and if the lock
+ * is held by an in-flight token refresh it never resolves, so the request is
+ * never sent at all. No network entry, no error, no timeout: the promise simply
+ * never settles. A public form has no session and needs no token, so it uses
+ * these directly and skips the entire auth path.
+ */
+export const supabaseConfig = {
+  url: supabaseUrl ?? '',
+  anonKey: supabaseAnonKey ?? '',
+} as const
+
 export const supabase = createClient(
   supabaseUrl || 'https://unconfigured.invalid',
   supabaseAnonKey || 'unconfigured',
