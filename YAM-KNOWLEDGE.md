@@ -1662,3 +1662,85 @@ In a rolled-back transaction, as two different signed-in identities:
 | the chef answers | `ACKNOWLEDGED`, reply posted, linked to the same WP |
 | answering twice | refused |
 | the chef's job list, never typed into | 1 |
+
+---
+
+## 33. The registry is executable, and nothing said so (migration 020)
+
+The agent console said **"Could not reach the agent"**. The browser console said:
+
+```
+Access to fetch at '…/functions/v1/agent' from origin 'https://yam.limited'
+has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is
+present on the requested resource.
+```
+
+None of it was CORS. The edge function logs settled it in one look:
+
+| | |
+| --- | --- |
+| `OPTIONS` | `200` — preflight fine |
+| `POST` | `500`, in 400–680 ms, every time |
+
+400 ms is far too fast for a Claude call, and the function's own `catch`
+returns `json(…, 500, origin)` — *with* CORS headers. So the 500 never reached
+that catch. An unhandled throw makes the platform answer a bare 500, and a 500
+with no `Access-Control-Allow-Origin` is reported by the browser as a CORS
+failure. **The error named the wrong subsystem for days.**
+
+### The cause was migration 019 — mine
+
+`ontology_actions.parameters` is an array of `{name, type, required?, values?}`
+in every row the registry shipped with. Migration 019 rewrote four rows as a
+JSON *object*:
+
+```sql
+parameters = '{"p_body":"text","p_kind":"NOTE|DECISION|…"}'::jsonb
+```
+
+Which is readable, self-documenting, and the wrong shape. The agent generates
+its tool manifest from this table:
+
+```ts
+actions.filter((a) => (a.parameters ?? []).some((p) => p.name === "p_project_id"))
+```
+
+`{}.some` is not a function. `action_post_message` is `is_agent_usable`, so
+every single agent request loaded it and threw. Three of the four bad rows were
+`is_agent_usable = false` and therefore harmless; one was enough.
+
+### What made it expensive
+
+Two things, and neither was the typo.
+
+**The registry is executable data.** `ontology_object_types`, `ontology_links`
+and `ontology_actions` are documentation *and* the agent's tool schema. Editing
+a row there is a code change. It went through as a content edit, in a migration
+whose subject was something else entirely, with no test that ran the agent.
+
+**Nothing enforced the shape.** jsonb accepts anything. The wrong shape sat in
+the table looking fine in every query, and only failed inside a Deno isolate, at
+request time, in an error message about a different protocol.
+
+So the fix is not the four `UPDATE`s:
+
+```sql
+alter table ontology_actions
+  add constraint ontology_actions_parameters_is_array
+  check (jsonb_typeof(parameters) = 'array');
+```
+
+The next migration to get this wrong fails at apply time with the row named.
+Verified with a negative control — writing an object now raises
+`check_violation`.
+
+Enum values in the repaired rows are derived from `pg_enum` rather than typed
+out, for the reason §28 exists: a hand-copied list of enum values is a second
+source of truth waiting to drift.
+
+### Still open
+
+The agent's handler has no outermost `try`, so *any* unhandled throw in it
+still surfaces as a misleading CORS error rather than a readable message. The
+constraint closes this cause; it does not close the class. Worth wrapping the
+next time that function is deployed.

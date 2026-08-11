@@ -193,6 +193,7 @@ applied by hand in the Supabase SQL editor, in this order:
 19. `supabase-migration-017-membership-lifecycle.sql` — projects can be staffed; invited, arrived and departed are all recorded
 20. `supabase-migration-018-vocabulary-per-project-type.sql` — phases, disciplines, document types and root causes become per-vertical
 21. `supabase-migration-019-mentions-and-action-items.sql` — naming someone in a message creates an obligation they have to answer
+22. `supabase-migration-020-repair-action-parameter-shape.sql` — repairs a registry shape 019 broke, and constrains it so it cannot happen again
 
 Migrations 006–008 are the important ones. After 008 the `authenticated` and
 `anon` roles hold **zero** `INSERT`/`UPDATE`/`DELETE` grants on the domain
