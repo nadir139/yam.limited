@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import { useLocation } from 'react-router-dom'
+import ErrorBoundary from '@/components/ErrorBoundary'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import { NoProjects } from './ProjectSwitcher'
@@ -20,7 +22,8 @@ export default function AppShell({ children }: AppShellProps) {
   // Signed in but a member of nothing is a real state, not an error: reads are
   // scoped to membership, so every page would render an empty shell of itself.
   // Better to say so once and offer the way out.
-  const { hasNoProjects } = useActiveProject()
+  const { hasNoProjects, activeProjectId } = useActiveProject()
+  const { pathname } = useLocation()
   useRealtimeSync()
   // Stamps first_seen_at on the first visit and keeps last_seen_at fresh, which
   // is what "here now" on the team page is derived from.
@@ -54,7 +57,14 @@ export default function AppShell({ children }: AppShellProps) {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
         <Topbar onMenuClick={() => setSidebarOpen(true)} />
         <main style={{ flex: 1, overflowY: 'auto', padding: '1.5rem' }}>
-          {hasNoProjects ? <NoProjects /> : children}
+          {/* Scoped to the page: a failure here keeps the sidebar and switcher,
+              and clears itself on navigating away or switching project. The
+              Suspense keeps a lazily loaded page from blanking the shell. */}
+          <ErrorBoundary resetKeys={[pathname, activeProjectId]}>
+            <Suspense fallback={null}>
+              {hasNoProjects ? <NoProjects /> : children}
+            </Suspense>
+          </ErrorBoundary>
         </main>
       </div>
     </div>

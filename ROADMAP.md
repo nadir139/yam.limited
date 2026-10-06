@@ -18,7 +18,7 @@ Ordered by impact over effort. Most items are a day or less.
 2. **Preview before the agent writes in bulk.** For three or more writes, return a proposed list
    ("10 work packages, these disciplines") with Confirm/Edit, then commit. A wrong guess at
    discipline is cheaper to fix before it is in the audit log.
-3. **Error states on every page.** A failed query currently shows "Loading…" or "Project not found".
+3. **Error states on every page.** *Half done:* a page that crashes now shows a retry screen inside the shell instead of a blank app (`ErrorBoundary`). Still open: a failed *query* shows "Loading…" or "Project not found".
    Add one shared `<QueryError retry>` and use it on all list and detail pages.
 4. **Documents: store the path, sign on demand.** `file_url` holds a one-year signed URL. It is a
    bearer link that bypasses membership checks, and every document breaks a year after upload.
