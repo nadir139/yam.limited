@@ -1,11 +1,13 @@
 -- =============================================================================
 -- YAM Migration 023 — A PROJECT'S FILES BELONG TO ITS MEMBERS
 --
--- NOT YET APPLIED. storage.objects is owned by supabase_storage_admin, and
--- `postgres` -- the role both the SQL editor and the MCP connect as -- gets
--- "must be owner of table objects". Apply it in the dashboard instead:
--- Storage → Policies → project-documents, edit each of the four policies and
--- paste the USING / WITH CHECK expression below (update and delete: `false`).
+-- Applied on 2026-10-06 by hand in Storage → Policies, because
+-- storage.objects is owned by supabase_storage_admin and `postgres` (the role
+-- the SQL editor and the MCP connect as) gets "must be owner of table objects".
+-- What was done there: auth_select and auth_upload were edited to the
+-- expressions below, keeping their names; auth_update and auth_delete were
+-- deleted, which denies both. The statements below are the equivalent for a
+-- role that does own the table, and are not what produced the live state.
 --
 -- The four policies on storage.objects (migration 002) checked only the
 -- bucket. Any authenticated account could list, download, overwrite and delete

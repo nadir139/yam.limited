@@ -196,7 +196,7 @@ applied by hand in the Supabase SQL editor, in this order:
 22. `supabase-migration-020-repair-action-parameter-shape.sql` — registry parameters must be arrays (was live, now committed)
 23. `supabase-migration-021-realtime-and-hardening.sql` — tables published to Realtime; advisor fixes; FK indexes
 24. `supabase-migration-022-registry-role-values.sql` — the agent can invite `CREW`
-25. `supabase-migration-023-storage-scoped-to-project.sql` — document files readable only by the project's members. **Not yet applied** — needs the dashboard; see the file header
+25. `supabase-migration-023-storage-scoped-to-project.sql` — document files readable only by the project's members (applied from the dashboard; see the file header)
 
 Migrations 006–008 are the important ones. After 008 the `authenticated` and
 `anon` roles hold **zero** `INSERT`/`UPDATE`/`DELETE` grants on the domain
