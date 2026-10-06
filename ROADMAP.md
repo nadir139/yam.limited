@@ -7,8 +7,7 @@ Ordered by impact over effort. Most items are a day or less.
 
 | | What | Why | Effort |
 |---|---|---|---|
-| 0.1 | Merge this branch so Vercel deploys it | The agent-hang fix is client-side; yam.limited keeps hanging until it ships | 5 min |
-| 0.2 | Apply `supabase-migration-023` from Storage → Policies | Until then any signed-in account can read, overwrite or delete every project's documents | 10 min |
+| 0.1 | ~~Merge and deploy~~ | Done — PR #33, production build READY | — |
 | 0.3 | Re-run the Lucky Bird job list in the agent | It should file ~10 work packages in one parallel turn, with live progress | 2 min |
 
 ## 1. Next — reliability (1–2 weeks)
@@ -63,6 +62,6 @@ Ordered by impact over effort. Most items are a day or less.
   array schema, drops nulls so SQL defaults apply, caches its prompt and files lists in parallel.
 - Realtime never delivered anything (the publication was empty). Fixed in migration 021.
 - Security: `mention_context` was callable by anyone; anon EXECUTE was revoked on definer functions;
-  storage scoping is written (023, pending).
+  storage is scoped to project members (023, applied).
 - Dates: deadlines no longer show OVERDUE from 02:00 on their own day; "today" is local.
 - Login no longer pre-fills a personal email. Sign-out clears cached data.
