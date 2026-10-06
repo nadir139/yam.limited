@@ -850,48 +850,48 @@ export type Database = {
           beam: number | null
           build_yard: string | null
           class_number: string | null
-          class_society: Database["public"]["Enums"]["class_society"]
+          class_society: Database["public"]["Enums"]["class_society"] | null
           created_at: string | null
           draft: number | null
-          flag_state: string
+          flag_state: string | null
           gross_tonnage: number | null
-          hull_id: string
+          hull_id: string | null
           id: string
-          loa: number
+          loa: number | null
           name: string
-          vessel_type: string
+          vessel_type: string | null
           year_built: number | null
         }
         Insert: {
           beam?: number | null
           build_yard?: string | null
           class_number?: string | null
-          class_society: Database["public"]["Enums"]["class_society"]
+          class_society?: Database["public"]["Enums"]["class_society"] | null
           created_at?: string | null
           draft?: number | null
-          flag_state: string
+          flag_state?: string | null
           gross_tonnage?: number | null
-          hull_id: string
+          hull_id?: string | null
           id?: string
-          loa: number
+          loa?: number | null
           name: string
-          vessel_type: string
+          vessel_type?: string | null
           year_built?: number | null
         }
         Update: {
           beam?: number | null
           build_yard?: string | null
           class_number?: string | null
-          class_society?: Database["public"]["Enums"]["class_society"]
+          class_society?: Database["public"]["Enums"]["class_society"] | null
           created_at?: string | null
           draft?: number | null
-          flag_state?: string
+          flag_state?: string | null
           gross_tonnage?: number | null
-          hull_id?: string
+          hull_id?: string | null
           id?: string
-          loa?: number
+          loa?: number | null
           name?: string
-          vessel_type?: string
+          vessel_type?: string | null
           year_built?: number | null
         }
         Relationships: []
@@ -1193,6 +1193,24 @@ export type Database = {
         }
         Returns: Json
       }
+      action_set_project_vessel: {
+        Args: {
+          p_beam?: number
+          p_build_yard?: string
+          p_class_number?: string
+          p_class_society?: string
+          p_draft?: number
+          p_flag_state?: string
+          p_gross_tonnage?: number
+          p_hull_id?: string
+          p_loa?: number
+          p_name?: string
+          p_project_id?: string
+          p_vessel_type?: string
+          p_year_built?: number
+        }
+        Returns: Json
+      }
       action_update_defect_status: {
         Args: {
           p_closed_date?: string
@@ -1416,12 +1434,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1445,11 +1463,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1470,11 +1488,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1495,11 +1513,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1512,11 +1530,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

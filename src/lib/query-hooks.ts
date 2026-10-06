@@ -268,6 +268,26 @@ export function useAdvancePhase() {
   })
 }
 
+export type VesselInput = db.VesselInput
+
+/**
+ * Records which boat the project is about. The vessel name also appears in the
+ * project switcher, so the project list is refreshed too.
+ */
+export function useSetProjectVessel() {
+  const qc = useQueryClient()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (input: VesselInput) => db.setProjectVessel(projectId, input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['project'] })
+      qc.invalidateQueries({ queryKey: ['vessel'] })
+      qc.invalidateQueries({ queryKey: ['my-projects'] })
+      qc.invalidateQueries({ queryKey: ['events'] })
+    },
+  })
+}
+
 export function useUploadDocument() {
   const invalidate = useCascadeInvalidation()
   const projectId = useProjectId()
