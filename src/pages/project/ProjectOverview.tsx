@@ -1,8 +1,12 @@
-import { day, eur } from '@/lib/format'
-import React from 'react'
+import { day, eur, NONE } from '@/lib/format'
+import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Pencil, Plus } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import VesselDetailsForm from '@/components/actions/VesselDetailsForm'
 import {
   useProject,
   useWorkPackages,
@@ -12,7 +16,11 @@ import {
   useApprovals,
   useDocuments,
   useTeam,
+  usePermissions,
 } from '@/lib/query-hooks'
+
+/** A measurement with its unit, or a dash when nobody has recorded it. */
+const measure = (n: number | null | undefined, unit: string) => (n == null ? NONE : `${n}${unit}`)
 
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -26,6 +34,8 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
 
 export default function ProjectOverview() {
   const navigate = useNavigate()
+  const [editingVessel, setEditingVessel] = useState(false)
+  const { can } = usePermissions()
 
   const { data: project, isLoading: projectLoading } = useProject()
   const { data: workPackages = [], isLoading: wpLoading } = useWorkPackages()
@@ -77,8 +87,16 @@ export default function ProjectOverview() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Vessel details */}
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-base">Vessel Details</CardTitle>
+            {/* The Action refuses on a property and for roles without the
+                permission; the button follows the same rules. */}
+            {project.project_type !== 'PROPERTY' && can('action_set_project_vessel') && (
+              <Button size="sm" variant="outline" onClick={() => setEditingVessel(true)}>
+                {vessel ? <Pencil size={13} className="mr-1.5" /> : <Plus size={13} className="mr-1.5" />}
+                {vessel ? 'Edit' : 'Add vessel'}
+              </Button>
+            )}
           </CardHeader>
           <CardContent className="px-4 pb-4 pt-0">
             {vessel && (
@@ -86,38 +104,54 @@ export default function ProjectOverview() {
                 <div className="mb-4">
                   <div className="text-2xl font-bold">{vessel.name}</div>
                   <div className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                    {vessel.vessel_type}
+                    {[vessel.vessel_type, vessel.year_built].filter(Boolean).join(' · ') || NONE}
                   </div>
                 </div>
-                <DetailRow label="Hull ID" value={vessel.hull_id} />
-                <DetailRow label="LOA" value={`${vessel.loa}m`} />
-                <DetailRow label="Beam" value={`${vessel.beam}m`} />
-                <DetailRow label="Draft" value={`${vessel.draft}m`} />
-                <DetailRow label="Gross Tonnage" value={`${vessel.gross_tonnage} GT`} />
-                <DetailRow label="Flag State" value={vessel.flag_state} />
+                <DetailRow label="Hull ID" value={vessel.hull_id ?? NONE} />
+                <DetailRow label="LOA" value={measure(vessel.loa, 'm')} />
+                <DetailRow label="Beam" value={measure(vessel.beam, 'm')} />
+                <DetailRow label="Draft" value={measure(vessel.draft, 'm')} />
+                <DetailRow label="Gross Tonnage" value={measure(vessel.gross_tonnage, ' GT')} />
+                <DetailRow label="Flag State" value={vessel.flag_state ?? NONE} />
                 <DetailRow
                   label="Class Society"
                   value={
-                    <span>
-                      {vessel.class_society}{' '}
-                      <span style={{ color: 'hsl(var(--muted-foreground))' }}>
-                        {vessel.class_number}
+                    vessel.class_society ? (
+                      <span>
+                        {vessel.class_society}{' '}
+                        <span style={{ color: 'hsl(var(--muted-foreground))' }}>
+                          {vessel.class_number}
+                        </span>
                       </span>
-                    </span>
+                    ) : (
+                      NONE
+                    )
                   }
                 />
-                <DetailRow label="Year Built" value={String(vessel.year_built)} />
-                <DetailRow label="Build Yard" value={vessel.build_yard} />
+                <DetailRow label="Year Built" value={vessel.year_built ?? NONE} />
+                <DetailRow label="Build Yard" value={vessel.build_yard ?? NONE} />
               </>
             )}
             {!vessel && (
               <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                No vessel on this project. Property and survey projects carry the
-                same work packages, findings and approvals without one.
+                {project.project_type === 'PROPERTY'
+                  ? 'A property project has no vessel. It carries the same work packages, findings and approvals without one.'
+                  : 'No vessel recorded yet. Add the boat this project is about — a name is enough to start — or tell the agent.'}
               </p>
             )}
           </CardContent>
         </Card>
+
+        <Dialog open={editingVessel} onOpenChange={setEditingVessel}>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{vessel ? 'Edit vessel' : 'Add vessel'}</DialogTitle>
+            </DialogHeader>
+            {editingVessel && (
+              <VesselDetailsForm vessel={vessel ?? null} onDone={() => setEditingVessel(false)} />
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* Project details */}
         <Card>

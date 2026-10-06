@@ -379,6 +379,47 @@ export async function advanceProjectPhase(projectId: string): Promise<Project> {
   return unwrap(data, error, 'Advance phase') as Project
 }
 
+export interface VesselInput {
+  name?: string | null
+  vesselType?: string | null
+  yearBuilt?: number | null
+  buildYard?: string | null
+  loa?: number | null
+  beam?: number | null
+  draft?: number | null
+  grossTonnage?: number | null
+  hullId?: string | null
+  flagState?: string | null
+  classSociety?: Vessel['class_society']
+  classNumber?: string | null
+}
+
+/**
+ * Creates the project's vessel the first time, updates it after that.
+ *
+ * Blank fields are sent as null, and the Action treats null as "leave it as
+ * it is" — so clearing an input in the form never wipes a recorded value.
+ */
+export async function setProjectVessel(projectId: string, input: VesselInput): Promise<Vessel> {
+  const { data, error } = await supabase.rpc('action_set_project_vessel', {
+    p_project_id: projectId,
+    p_name: input.name ?? undefined,
+    p_vessel_type: input.vesselType ?? undefined,
+    p_year_built: input.yearBuilt ?? undefined,
+    p_build_yard: input.buildYard ?? undefined,
+    p_loa: input.loa ?? undefined,
+    p_beam: input.beam ?? undefined,
+    p_draft: input.draft ?? undefined,
+    p_gross_tonnage: input.grossTonnage ?? undefined,
+    p_hull_id: input.hullId ?? undefined,
+    p_flag_state: input.flagState ?? undefined,
+    p_class_society: input.classSociety ?? undefined,
+    p_class_number: input.classNumber ?? undefined,
+  })
+  const result = unwrap(data, error, 'Set vessel details') as unknown as { vessel: Vessel }
+  return result.vessel
+}
+
 /**
  * Uploads the file to Storage (which enforces its own RLS), then registers the
  * resulting Document through an Action so it lands in the event log.
