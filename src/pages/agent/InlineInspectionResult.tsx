@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useRecordInspectionResult, usePermissions } from '@/lib/query-hooks'
 import RaiseDefectForm from '@/components/actions/RaiseDefectForm'
 import type { InspectionEvent, InspectionResult } from '@/lib/types'
+import { localToday } from '@/lib/format'
 
 // Recording an inspection result from inside the conversation.
 //
@@ -44,7 +45,7 @@ const OPTIONS: {
   },
 ]
 
-const today = () => new Date().toISOString().split('T')[0]
+const today = () => localToday()
 
 export default function InlineInspectionResult({
   inspection,

@@ -1,10 +1,10 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { format } from 'date-fns'
 import { GitBranch } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useChangeOrders, useDefects, useApprovals } from '@/lib/query-hooks'
+import { day } from '@/lib/format'
 
 const TRIGGER_COLORS: Record<string, { bg: string; text: string }> = {
   CLASS_REQUIREMENT: { bg: 'hsl(215 50% 23% / 0.1)', text: 'hsl(var(--primary))' },
@@ -113,7 +113,7 @@ export default function ChangeOrderList() {
                 </div>
 
                 <div className="text-xs mt-3" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                  Raised by {co.raised_by} on {format(new Date(co.raised_date), 'd MMM yyyy')}
+                  Raised by {co.raised_by} on {day(co.raised_date)}
                 </div>
               </CardContent>
             </Card>

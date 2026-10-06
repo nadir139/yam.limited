@@ -1,7 +1,6 @@
-import { eur } from '@/lib/format'
+import { eur, localToday, day } from '@/lib/format'
 import React, { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { format } from 'date-fns'
 import { ArrowLeft, ArrowRight, GitBranch } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -214,7 +213,7 @@ export default function DefectDetail() {
             <PropRow label="Discovered By" value={defect.discovered_by} />
             <PropRow
               label="Discovered Date"
-              value={format(new Date(defect.discovered_date), 'd MMM yyyy')}
+              value={day(defect.discovered_date)}
             />
             <PropRow label="Root Cause" value={defect.root_cause.replace(/_/g, ' ')} />
             <PropRow label="Disposition" value={defect.disposition.replace(/_/g, ' ')} />
@@ -499,7 +498,7 @@ export default function DefectDetail() {
                   {
                     id: defect.id,
                     status: 'CLOSED',
-                    closedDate: new Date().toISOString().split('T')[0],
+                    closedDate: localToday(),
                     notes: closeNotes,
                   },
                   {

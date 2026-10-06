@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 
 export default function AuthCallback() {
   const navigate = useNavigate()
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<{ title: string; message: string } | null>(null)
 
   useEffect(() => {
     // Parse error from URL hash (e.g. #error=access_denied&error_code=otp_expired)
@@ -13,9 +13,12 @@ export default function AuthCallback() {
       const params = new URLSearchParams(hash.replace('#', ''))
       const errorCode = params.get('error_code') || params.get('error')
       if (errorCode === 'otp_expired') {
-        setError('This magic link has expired. Please request a new one.')
+        setError({
+          title: 'Link expired',
+          message: 'This magic link has expired or was already used. Please request a new one.',
+        })
       } else {
-        setError('Sign-in failed. Please try again.')
+        setError({ title: 'Sign-in failed', message: 'Sign-in failed. Please try again.' })
       }
       return
     }
@@ -37,11 +40,13 @@ export default function AuthCallback() {
       }
     })
 
-    // Timeout fallback — if nothing fires in 5s, go to login
+    // Timeout fallback. Exchanging the link for a session is a network round
+    // trip; 5s sent people on a slow marina connection back to the login form
+    // with a perfectly valid link already spent.
     const timeout = setTimeout(() => {
       subscription.unsubscribe()
       navigate('/login', { replace: true })
-    }, 5000)
+    }, 15000)
 
     return () => {
       subscription.unsubscribe()
@@ -72,10 +77,10 @@ export default function AuthCallback() {
         >
           <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⚠️</div>
           <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.75rem', color: 'hsl(215 50% 23%)' }}>
-            Link Expired
+            {error.title}
           </h2>
           <p style={{ color: 'hsl(215 15% 45%)', fontSize: '14px', marginBottom: '1.5rem', lineHeight: 1.5 }}>
-            {error}
+            {error.message}
           </p>
           <button
             onClick={() => navigate('/login')}

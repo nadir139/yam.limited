@@ -15,6 +15,7 @@ import {
 import { useRecordInspectionResult, usePermissions } from '@/lib/query-hooks'
 import RaiseDefectForm from './RaiseDefectForm'
 import type { InspectionEvent, InspectionResult } from '@/lib/types'
+import { localToday } from '@/lib/format'
 
 const RESULT_OPTIONS: {
   value: InspectionResult
@@ -56,7 +57,7 @@ export default function RecordInspectionResult({ inspection, onSuccess }: Props)
   const [done, setDone] = useState(false)
   const [result, setResult] = useState<InspectionResult>('PASS')
   const [notes, setNotes] = useState('')
-  const [actualDate, setActualDate] = useState(new Date().toISOString().split('T')[0])
+  const [actualDate, setActualDate] = useState(localToday())
 
   const update = useRecordInspectionResult()
   const { can } = usePermissions()
@@ -86,7 +87,7 @@ export default function RecordInspectionResult({ inspection, onSuccess }: Props)
     setDone(false)
     setResult('PASS')
     setNotes('')
-    setActualDate(new Date().toISOString().split('T')[0])
+    setActualDate(localToday())
     update.reset()
   }
 

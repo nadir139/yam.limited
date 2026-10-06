@@ -1,7 +1,6 @@
-import { eur } from '@/lib/format'
+import { eur, day } from '@/lib/format'
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { format } from 'date-fns'
 import { LayoutGrid, List } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -150,7 +149,7 @@ export default function DefectList() {
                       {d.location_on_vessel}
                     </TableCell>
                     <TableCell className="text-sm">
-                      {format(new Date(d.discovered_date), 'd MMM yyyy')}
+                      {day(d.discovered_date)}
                     </TableCell>
                     <TableCell className="text-sm">
                       {d.cost_impact != null ? eur(d.cost_impact) : '—'}
@@ -198,7 +197,7 @@ export default function DefectList() {
                     {d.location_on_vessel}
                   </div>
                   <div className="flex justify-between text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                    <span>Discovered {format(new Date(d.discovered_date), 'd MMM yyyy')}</span>
+                    <span>Discovered {day(d.discovered_date)}</span>
                     {d.cost_impact != null && (
                       <span style={{ color: 'hsl(var(--destructive))' }}>{eur(d.cost_impact)}</span>
                     )}

@@ -1,4 +1,4 @@
-import { eur } from '@/lib/format'
+import { eur, localToday } from '@/lib/format'
 import { useNavigate } from 'react-router-dom'
 import { X, ExternalLink, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -135,7 +135,7 @@ export default function ChatObjectPanel({
           id: d.id,
           status,
           closedDate:
-            status === 'CLOSED' ? new Date().toISOString().split('T')[0] : null,
+            status === 'CLOSED' ? localToday() : null,
           notes: note,
         })
         setPendingStatus(null)

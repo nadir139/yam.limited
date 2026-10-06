@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, Fragment } from 'react'
-import { Sparkles, Send, Wrench, AlertCircle, User, ArrowRight, Trash2 } from 'lucide-react'
+import { Sparkles, Send, Wrench, AlertCircle, User, ArrowRight, Trash2, Square } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { supabase } from '@/lib/supabase'
+import { callAgent, type AgentStep } from '@/lib/agent-client'
 import { useQueryClient } from '@tanstack/react-query'
 import { useProjectId } from '@/lib/query-hooks'
 import { typeColor } from '@/lib/ontology'
@@ -13,13 +13,12 @@ const INVALIDATE_ON_CHANGE = [
   'defects', 'defect', 'change-orders', 'change-order', 'approvals',
   'inspections', 'documents', 'work-packages', 'work-package',
   'project', 'events', 'messages',
+  // Posting a message with a mention creates action items; inviting someone
+  // changes the team and, for them, the project list.
+  'action-items', 'team', 'my-role', 'my-projects',
 ]
 
-interface ToolCall {
-  tool: string
-  input: { object_type?: string } & Record<string, unknown>
-  ok: boolean
-}
+type ToolCall = AgentStep
 
 /** An object the agent read, keyed in the response by its human number. */
 interface ObjectRef {
@@ -48,11 +47,16 @@ const SUGGESTIONS = [
   'What needs my attention right now?',
   'Summarise the open NCRs by severity and total cost impact.',
   'Which change orders are waiting on an owner decision, and for how long?',
-  'Walk me through what NCR-2026-001 triggered.',
+  // Was "Walk me through what NCR-2026-001 triggered" — a number that exists
+  // on one project and nowhere else.
+  'What changed on this project in the last week?',
 ]
 
 /** How many prior turns to replay. The function bounds this again server-side. */
 const HISTORY_TURNS = 12
+
+/** The Edge Function refuses longer prompts; say so before sending, not after. */
+const MAX_PROMPT_CHARS = 2000
 
 /**
  * The conversation survives leaving the page.
@@ -62,11 +66,16 @@ const HISTORY_TURNS = 12
  * where you were. Per-tab and cleared when the tab closes, which is the right
  * lifetime for a working conversation.
  */
-const STORAGE_KEY = 'yam.agent.turns'
+//
+// Keyed by project. One key for every project meant switching from the ketch to
+// the property kept the ketch's thread on screen — and replayed it to the agent
+// as history for the property, where its NCR numbers mean nothing.
+const storageKey = (projectId: string) => `yam.agent.turns.${projectId}`
 
-function loadTurns(): Turn[] {
+function loadTurns(projectId: string): Turn[] {
+  if (!projectId) return []
   try {
-    const raw = sessionStorage.getItem(STORAGE_KEY)
+    const raw = sessionStorage.getItem(storageKey(projectId))
     const parsed = raw ? JSON.parse(raw) : null
     return Array.isArray(parsed) ? parsed : []
   } catch {
@@ -219,17 +228,27 @@ function CascadeChain({
 }) {
   if (changed.length === 0) return null
 
+  // An arrow means "which created", so it only goes before an object the
+  // cascade produced. Ten work packages filed from one job list are ten
+  // separate records, not a chain of ten — drawing them joined claimed each
+  // one had caused the next.
+  const anyCascade = changed.some((c) => c.cascaded)
+
   return (
     <div className="mb-3 rounded-[var(--radius)] border border-accent/30 bg-accent/[0.04] p-3">
       <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-        {changed.length === 1 ? 'Recorded' : 'Recorded, and what followed'}
+        {anyCascade
+          ? 'Recorded, and what followed'
+          : changed.length === 1
+            ? 'Recorded'
+            : `Recorded · ${changed.length}`}
       </p>
       <div className="flex flex-wrap items-center gap-1.5">
         {changed.map((c, i) => (
           // Arrow and the node it points at wrap together, so a line break can
           // never leave an arrow dangling at the end of a row.
           <span key={c.id} className="inline-flex items-center gap-1.5">
-            {i > 0 && (
+            {i > 0 && c.cascaded && (
               <ArrowRight
                 className="h-3.5 w-3.5 flex-shrink-0 text-accent"
                 aria-label="which created"
@@ -256,24 +275,43 @@ function CascadeChain({
 }
 
 export default function AgentConsole() {
-  const [turns, setTurns] = useState<Turn[]>(loadTurns)
+  const projectId = useProjectId()
+  const [turns, setTurns] = useState<Turn[]>(() => loadTurns(projectId))
+  const [turnsFor, setTurnsFor] = useState(projectId)
   const [prompt, setPrompt] = useState('')
   const [busy, setBusy] = useState(false)
+  // What the agent has done so far on the request in flight, shown live.
+  const [progress, setProgress] = useState<ToolCall[]>([])
+  const abortRef = useRef<AbortController | null>(null)
   // Objects opened inline, keyed by the turn they were opened from, so a panel
   // appears where you clicked rather than somewhere you have to go looking.
   const [openPanels, setOpenPanels] = useState<Record<number, string[]>>({})
   const qc = useQueryClient()
-  const projectId = useProjectId()
   const endRef = useRef<HTMLDivElement>(null)
   const restored = useRef(turns.length > 0)
 
+  // Switching project swaps in that project's own conversation. Done during
+  // render rather than in an effect, so the old thread never paints under the
+  // new project's name.
+  if (turnsFor !== projectId) {
+    setTurnsFor(projectId)
+    setTurns(loadTurns(projectId))
+    setOpenPanels({})
+    restored.current = true
+  }
+
+  // Leaving the page stops waiting for the reply. The function finishes what
+  // it started either way; this only stops a dead component updating.
+  useEffect(() => () => abortRef.current?.abort(), [])
+
   useEffect(() => {
+    if (!turnsFor) return
     try {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(turns))
+      sessionStorage.setItem(storageKey(turnsFor), JSON.stringify(turns))
     } catch {
       // A full storage quota must not take down the conversation.
     }
-  }, [turns])
+  }, [turns, turnsFor])
 
   useEffect(() => {
     // Don't yank a restored conversation to the bottom before it has painted;
@@ -283,7 +321,7 @@ export default function AgentConsole() {
       return
     }
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [turns, busy])
+  }, [turns, busy, progress.length])
 
   const togglePanel = (turnIndex: number) => (number: string, _target: ObjectRef) => {
     setOpenPanels((prev) => {
@@ -300,12 +338,17 @@ export default function AgentConsole() {
   const clearConversation = () => {
     setTurns([])
     setOpenPanels({})
-    sessionStorage.removeItem(STORAGE_KEY)
+    try {
+      sessionStorage.removeItem(storageKey(projectId))
+    } catch {
+      // Storage unavailable; the in-memory thread is already cleared.
+    }
   }
 
   const ask = async (question: string) => {
     const text = question.trim()
-    if (!text || busy) return
+    if (!text || busy || !projectId) return
+    if (text.length > MAX_PROMPT_CHARS) return
 
     // Captured before the optimistic user turn is appended, so what goes up is
     // exactly the exchange that preceded this question. Error bubbles are
@@ -318,52 +361,65 @@ export default function AgentConsole() {
     setTurns((t) => [...t, { role: 'user', text }])
     setPrompt('')
     setBusy(true)
+    setProgress([])
+    const controller = new AbortController()
+    abortRef.current = controller
 
     try {
-      const { data, error } = await supabase.functions.invoke('agent', {
-        // The project is sent, not inferred. The Edge Function verifies
-        // membership before using it, so this decides which project the agent
-        // is working on without deciding whether the caller may.
-        body: { prompt: text, history, projectId },
+      // The project is sent, not inferred. The Edge Function verifies
+      // membership before using it, so this decides which project the agent
+      // is working on without deciding whether the caller may.
+      const data = await callAgent({
+        prompt: text,
+        history,
+        projectId,
+        signal: controller.signal,
+        onStep: (step) => setProgress((p) => [...p, step]),
       })
-      if (error) throw error
+      if (controller.signal.aborted) return
 
       setTurns((t) => [
         ...t,
         {
           role: 'agent',
-          text: data?.error ?? data?.reply ?? '(no reply)',
-          trace: data?.trace,
-          index: data?.index,
-          changed: data?.changed,
-          isError: Boolean(data?.error),
+          text: data.error ?? data.reply ?? '(no reply)',
+          trace: data.trace,
+          index: data.index,
+          changed: data.changed,
+          isError: Boolean(data.error),
         },
       ])
 
       // An Action ran, so any cached view of the world model may now be stale.
       // Matched by prefix, which reaches the project-scoped keys underneath.
-      if ((data?.changed as ChangedRef[] | undefined)?.length) {
+      if (data.changed?.length) {
         for (const key of INVALIDATE_ON_CHANGE) {
           qc.invalidateQueries({ queryKey: [key] })
         }
       }
     } catch (err) {
       console.error('Agent request failed', err)
+      // Something may have been written before the failure; refetch so the
+      // lists show it rather than inviting a duplicate.
+      for (const key of INVALIDATE_ON_CHANGE) {
+        qc.invalidateQueries({ queryKey: [key] })
+      }
       setTurns((t) => [
         ...t,
         {
           role: 'agent',
-          text:
-            err instanceof Error
-              ? `Could not reach the agent: ${err.message}`
-              : 'Could not reach the agent.',
+          text: err instanceof Error ? err.message : 'Could not reach the agent.',
           isError: true,
         },
       ])
     } finally {
+      if (abortRef.current === controller) abortRef.current = null
       setBusy(false)
+      setProgress([])
     }
   }
+
+  const tooLong = prompt.trim().length > MAX_PROMPT_CHARS
 
   return (
     <div style={{ maxWidth: 860, margin: '0 auto', padding: '24px 20px 40px' }}>
@@ -548,17 +604,46 @@ export default function AgentConsole() {
         ))}
 
         {busy && (
-          <div
-            style={{
-              display: 'flex',
-              gap: 10,
-              alignItems: 'center',
-              fontSize: 13,
-              color: 'hsl(var(--muted-foreground))',
-            }}
-          >
-            <Sparkles size={14} style={{ color: 'hsl(var(--accent))' }} />
-            Reading the world model…
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div
+              style={{
+                display: 'flex',
+                gap: 10,
+                alignItems: 'center',
+                fontSize: 13,
+                color: 'hsl(var(--muted-foreground))',
+              }}
+            >
+              <Sparkles size={14} className="animate-pulse" style={{ color: 'hsl(var(--accent))' }} />
+              {progress.some((p) => isAction(p.tool))
+                ? `Recording… ${progress.filter((p) => isAction(p.tool) && p.ok).length} done`
+                : 'Reading the world model…'}
+              <button
+                type="button"
+                onClick={() => abortRef.current?.abort()}
+                className="ml-2 inline-flex items-center gap-1 text-xs hover:underline"
+              >
+                <Square size={10} />
+                Stop
+              </button>
+            </div>
+            {progress.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingLeft: 24 }}>
+                {progress.map((call, j) => (
+                  <span
+                    key={j}
+                    className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[11px]"
+                    style={{
+                      color: call.ok ? 'hsl(var(--muted-foreground))' : 'hsl(var(--destructive))',
+                    }}
+                  >
+                    <Wrench size={10} />
+                    {prettyTool(call)}
+                    {!call.ok && ' · failed'}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         )}
         <div ref={endRef} />
@@ -569,14 +654,15 @@ export default function AgentConsole() {
           e.preventDefault()
           ask(prompt)
         }}
-        style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}
+        style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}
       >
         <Textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={(e) => {
             // Enter sends; Shift+Enter is a newline.
-            if (e.key === 'Enter' && !e.shiftKey) {
+            // Not while an IME is composing: Enter there confirms a character.
+            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault()
               ask(prompt)
             }
@@ -586,9 +672,14 @@ export default function AgentConsole() {
           className="min-h-[52px] resize-none"
           style={{ flex: 1 }}
         />
-        <Button type="submit" disabled={busy || !prompt.trim()} size="lg">
+        <Button type="submit" disabled={busy || !prompt.trim() || tooLong} size="lg" aria-label="Send">
           <Send size={15} />
         </Button>
+        {tooLong && (
+          <p style={{ flexBasis: '100%', fontSize: 12, color: 'hsl(var(--destructive))' }}>
+            {prompt.trim().length} / {MAX_PROMPT_CHARS} characters — split it into two messages.
+          </p>
+        )}
       </form>
     </div>
   )

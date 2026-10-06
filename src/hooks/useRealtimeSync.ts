@@ -7,6 +7,10 @@ import { supabase } from '@/lib/supabase'
  * Any remote change invalidates the relevant React Query cache,
  * so all connected users see live updates without polling.
  *
+ * Only tables in the `supabase_realtime` publication deliver anything. That
+ * publication was empty until migration 021, so for months this subscribed
+ * successfully and never heard a thing.
+ *
  * Cache keys carry the project id since the app went multi-project, so these
  * invalidate by prefix — `['defects']` reaches `['defects', anyProject]`.
  * Realtime only delivers rows the subscriber may read, and a change on a
@@ -24,6 +28,7 @@ export function useRealtimeSync() {
         { event: '*', schema: 'public', table: 'defect_records' },
         () => {
           qc.invalidateQueries({ queryKey: ['defects'] })
+          qc.invalidateQueries({ queryKey: ['defect'] })
         },
       )
       .on(
@@ -38,6 +43,7 @@ export function useRealtimeSync() {
         { event: '*', schema: 'public', table: 'change_orders' },
         () => {
           qc.invalidateQueries({ queryKey: ['change-orders'] })
+          qc.invalidateQueries({ queryKey: ['change-order'] })
         },
       )
       .on(
@@ -59,6 +65,37 @@ export function useRealtimeSync() {
         { event: '*', schema: 'public', table: 'work_packages' },
         () => {
           qc.invalidateQueries({ queryKey: ['work-packages'] })
+          qc.invalidateQueries({ queryKey: ['work-package'] })
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'inspection_events' },
+        () => {
+          qc.invalidateQueries({ queryKey: ['inspections'] })
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'documents' },
+        () => {
+          qc.invalidateQueries({ queryKey: ['documents'] })
+        },
+      )
+      // A colleague's reply, and the obligation a mention just created for
+      // you, should not wait for a reload to appear.
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'messages' },
+        () => {
+          qc.invalidateQueries({ queryKey: ['messages'] })
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'action_items' },
+        () => {
+          qc.invalidateQueries({ queryKey: ['action-items'] })
         },
       )
       // Membership changes are the one thing everyone should see immediately:
