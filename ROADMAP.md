@@ -18,10 +18,14 @@ Ordered by impact over effort. Most items are a day or less.
    change-order delay, markers for inspections, owner gates and NCRs; drag to reschedule with Undo.
 3. ~~Agent scheduling~~ — `get_schedule` tool on the same engine as the chart
    (`supabase/functions/agent/schedule.ts`), and a live mini-Gantt under replies that touch the plan.
-4. **Parts model (next).** A persistent tree of the boat's systems and components (hull → deck →
-   winches → port primary), outliving any single project. Work packages, NCRs, inspections and
-   documents attach to parts; the Gantt groups by part; the agent answers "everything ever done to
-   the port primary". This is the backbone of the digital twin.
+4. ~~Parts model~~ — migration 027 and `/app/parts`: a tree of systems and components that belongs
+   to the vessel (or the property project), with make, model, serial and location; links from work
+   packages, NCRs, inspections, change orders and documents; the part's record across every
+   project; chips on work packages and NCRs; Gantt grouped by system; agent `get_parts` and part
+   Actions.
+5. **Next on this track.** Messages and photos attached to a part; part condition and service
+   intervals (next service due → a work package proposed by the agent); drawings and manuals
+   on the part; a property asset record so a building's parts outlive its project too.
 
 ## 1. Next — reliability (1–2 weeks)
 

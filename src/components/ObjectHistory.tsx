@@ -28,6 +28,15 @@ const EVENT_LABELS: Record<string, string> = {
   INSPECTION_COMPLETED: 'Result recorded',
   DOCUMENT_UPLOADED: 'Uploaded',
   PROJECT_CREATED: 'Created',
+  WORK_PACKAGE_RESCHEDULED: 'Rescheduled',
+  DEPENDENCY_LINKED: 'Dependency added',
+  DEPENDENCY_REMOVED: 'Dependency removed',
+  SCHEDULE_BASELINED: 'Baselined',
+  PART_CREATED: 'Recorded',
+  PART_UPDATED: 'Updated',
+  PART_REMOVED: 'Removed from the asset',
+  PART_LINKED: 'Linked',
+  PART_UNLINKED: 'Unlinked',
 }
 
 /** Field names as they read to a person rather than as they read to Postgres. */
@@ -51,6 +60,9 @@ const FIELD_LABELS: Record<string, string> = {
   scheduled_date: 'Scheduled',
   inspector_role: 'Inspector',
   linked_object_type: 'Linked to',
+  object_type: 'Record',
+  serial_number: 'Serial number',
+  installed_on: 'Installed',
   cost_amount: 'Amount',
 }
 
@@ -60,6 +72,14 @@ const HIDDEN_FIELDS = new Set([
   'linked_object_id',
   'change_order_id',
   'defect_record_id',
+  // Ids a reader cannot use; the names travel alongside them.
+  'id',
+  'object_id',
+  'parent_id',
+  'vessel_id',
+  'project_id',
+  'created_by',
+  'removed_at',
   // Not a field that changed — it is why the others did. Rendered as prose
   // below the diff instead of as `— → "it was the switch"`, because it is the
   // part of the event a person actually came to read.

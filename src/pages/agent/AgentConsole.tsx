@@ -17,6 +17,7 @@ const INVALIDATE_ON_CHANGE = [
   // Posting a message with a mention creates action items; inviting someone
   // changes the team and, for them, the project list.
   'action-items', 'team', 'my-role', 'my-projects', 'dependencies',
+  'parts', 'part-links', 'part-history',
 ]
 
 /** Reading or changing any of these puts the schedule under the reply. */
@@ -402,7 +403,10 @@ export default function AgentConsole() {
 
       // An Action ran, so any cached view of the world model may now be stale.
       // Matched by prefix, which reaches the project-scoped keys underneath.
-      if (data.changed?.length) {
+      // `changed` only lists numbered objects; a dependency or a part has no
+      // number, so a successful action_* call in the trace counts too.
+      const wrote = data.trace?.some((t) => t.tool.startsWith('action_') && t.ok)
+      if (data.changed?.length || wrote) {
         for (const key of INVALIDATE_ON_CHANGE) {
           qc.invalidateQueries({ queryKey: [key] })
         }

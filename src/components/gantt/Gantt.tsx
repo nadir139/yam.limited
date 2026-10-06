@@ -12,7 +12,7 @@ import { DAY_WIDTH, headerTicks, isWeekend, plural, shortDate, type Zoom } from 
 // approvals are gates, open NCRs are marks on the package they hit. Moving a
 // bar calls an Action, so the chart can only say what the record says.
 
-export type GroupBy = 'discipline' | 'status' | 'none'
+export type GroupBy = 'discipline' | 'status' | 'part' | 'none'
 
 export interface GanttMarker {
   /** Row to draw on: a work package id, or null for the project row. */
@@ -38,6 +38,8 @@ export interface GanttProps {
   lines?: GanttLine[]
   zoom: Zoom
   groupBy?: GroupBy
+  /** For groupBy 'part': the group each work package falls under, by id. */
+  partGroups?: Record<string, { key: string; label: string }>
   showBaseline?: boolean
   showDependencies?: boolean
   editable?: boolean
@@ -99,6 +101,7 @@ export default function Gantt({
   lines = [],
   zoom,
   groupBy = 'none',
+  partGroups,
   showBaseline = true,
   showDependencies = true,
   editable = false,
@@ -166,18 +169,32 @@ export default function Gantt({
       return sa - sb || a.wpNumber.localeCompare(b.wpNumber)
     })
     if (groupBy === 'none') return sorted.map((item) => ({ kind: 'item', item }) as Row)
-    const groups = new Map<string, ScheduleItem[]>()
+    const NO_PART = '__no_part'
+    const groups = new Map<string, { label: string; items: ScheduleItem[] }>()
     for (const it of sorted) {
-      const key = groupBy === 'discipline' ? it.discipline : it.status
-      groups.set(key, [...(groups.get(key) ?? []), it])
+      let key: string
+      let groupLabel: string
+      if (groupBy === 'part') {
+        const g = partGroups?.[it.id]
+        key = g?.key ?? NO_PART
+        groupLabel = g?.label ?? 'Not linked to a part'
+      } else {
+        key = groupBy === 'discipline' ? it.discipline : it.status
+        groupLabel = key.replace(/_/g, ' ')
+      }
+      const group = groups.get(key) ?? { label: groupLabel, items: [] }
+      group.items.push(it)
+      groups.set(key, group)
     }
+    // Work with no part goes last: it is the gap in the model, not a system.
+    const ordered = [...groups].sort(([a], [b]) => Number(a === NO_PART) - Number(b === NO_PART))
     const out: Row[] = []
-    for (const [key, list] of groups) {
-      out.push({ kind: 'group', key, label: key.replace(/_/g, ' '), items: list })
-      if (!collapsed.has(key)) for (const item of list) out.push({ kind: 'item', item })
+    for (const [key, group] of ordered) {
+      out.push({ kind: 'group', key, label: group.label, items: group.items })
+      if (!collapsed.has(key)) for (const item of group.items) out.push({ kind: 'item', item })
     }
     return out
-  }, [items, groupBy, collapsed, onlyIds])
+  }, [items, groupBy, partGroups, collapsed, onlyIds])
 
   const rowIndex = useMemo(() => {
     const m = new Map<string, number>()

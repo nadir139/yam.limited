@@ -338,6 +338,7 @@ export async function fetchOntology(): Promise<OntologySnapshot> {
 /** Tailwind colour pairs, one per object type, legible on both themes. */
 export const TYPE_COLOR: Record<string, string> = {
   VESSEL: 'text-[#2563eb] dark:text-[#60a5fa]',
+  PART: 'text-[#db2777] dark:text-[#f472b6]',
   PROJECT: 'text-[#4f46e5] dark:text-[#818cf8]',
   WORK_PACKAGE: 'text-[#0d9488] dark:text-[#2dd4bf]',
   INSPECTION_EVENT: 'text-[#16a34a] dark:text-[#4ade80]',

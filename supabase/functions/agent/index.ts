@@ -87,6 +87,8 @@ interface OntologyAction {
  */
 const VOCABULARY_FOR_PARAM: Record<string, string> = {
   p_discipline: "DISCIPLINE",
+  // A part's category is a discipline, scoped to the project type the same way.
+  p_category: "DISCIPLINE",
   p_doc_type: "DOC_TYPE",
   p_root_cause: "ROOT_CAUSE",
 };
@@ -113,6 +115,8 @@ function paramSchema(
         type: "array",
         items: { type: "string", description: "UUID of a project member" },
       };
+    case "text[]":
+      return { type: "array", items: { type: "string" } };
     case "integer":
       return { type: "integer" };
     case "numeric":
@@ -183,6 +187,19 @@ function buildTools(
       input_schema: { type: "object", properties: {}, required: [] },
     },
     {
+      name: "get_parts",
+      description:
+        "The asset's parts tree: every system, assembly and component recorded for this vessel (or building), with its path (Deck > Winches > Port primary), category, location, make, model and serial number, and which of this project's work packages, NCRs, inspections, change orders and documents are linked to it. Parts belong to the vessel, so the tree carries over between projects. Pass part_id to get one part's whole record instead: everything ever linked to it on every project you can read, including earlier ones. Call this before recording parts (to find the right parent and avoid duplicates) and before answering what has been done to a physical thing.",
+      input_schema: {
+        type: "object",
+        properties: {
+          part_id: { type: "string", description: "One part's UUID, for its full record" },
+          include_removed: { type: "boolean", description: "Also list parts taken off the asset" },
+        },
+        required: [],
+      },
+    },
+    {
       name: "get_object_story",
       description:
         "Everything that ever happened to ONE object: its own events oldest-first, and every message posted about it. Read this before answering any question about how an object got to its current state, or before reporting what it cost or how long it took. A row's fields are what someone typed when they raised it -- often an estimate made in the first five minutes. The reasons attached to its events and the messages on its thread are where the real story is, including why it was closed and what the work actually turned out to be.",
@@ -228,6 +245,7 @@ interface ProjectSummary {
   phase: string;
   yard_name: string | null;
   yard_location: string | null;
+  vessel_id: string | null;
   vessel_name: string | null;
 }
 
@@ -276,6 +294,9 @@ Several actions cascade. Raising a HIGH or CRITICAL defect that carries a cost i
 
 ## Plan in time
 The schedule is part of the world model. Call get_schedule before answering anything about dates, delays, order of work or "what if", and answer from its forecast, not from planned dates: the forecast already counts late starts, dependencies and change-order delays. When asked to plan or re-plan, set dates with action_reschedule_work_package and the order of work with action_link_work_packages (FS: after it finishes; SS: starting together), then call get_schedule again and say where the finish lands and what is on the critical path. If you have to assume a duration, give it in your one line of assumptions. Never set a baseline unless someone says the plan is agreed. The interface draws the schedule under your reply whenever you read or change it, so describe what moved rather than listing every date.
+
+## The asset's parts
+The model is of a physical thing, so the things work is done to are recorded too: a tree of systems and components (Deck > Winches > Port primary winch) that belongs to the vessel and outlives this project. Call get_parts before recording parts, and before answering what has been done to a physical thing -- get_parts with a part_id returns its record across every project. When a work package, NCR or inspection concerns a specific component, link it with action_link_part, recording the part first with action_create_part if it is not in the tree; place it under the right parent rather than at the top level, creating the system above it if needed. action_create_part returns the existing part when one of that name already sits under that parent, so it is safe to call for each item. When someone tells you a make, model or serial number, record it on the part.
 
 ## Act
 When you are asked to record something, record it. A list of jobs is a list of records: one work package per item, all issued together as parallel tool calls in a single turn, not one per turn. Check what already exists once, up front, so you do not file a duplicate. Fill the fields you were given, leave unknown optional fields empty, and state your assumptions in one line afterwards -- a filed record that ${actorName} corrects beats an interrogation.
@@ -470,7 +491,7 @@ Deno.serve(async (req: Request) => {
 
   const projectQuery = supabase
     .from("projects")
-    .select("id, name, project_type, phase, yard_name, yard_location, vessel:vessels(name)");
+    .select("id, name, project_type, phase, yard_name, yard_location, vessel_id, vessel:vessels(name)");
   const { data: projectRows, error: projectError } = requestedProjectId
     ? await projectQuery.eq("id", requestedProjectId).limit(1)
     : await projectQuery.order("created_at").limit(2);
@@ -501,6 +522,7 @@ Deno.serve(async (req: Request) => {
     phase: String(row.phase),
     yard_name: (row.yard_name as string | null) ?? null,
     yard_location: (row.yard_location as string | null) ?? null,
+    vessel_id: (row.vessel_id as string | null) ?? null,
     vessel_name:
       (Array.isArray(vessel) ? vessel[0]?.name : vessel?.name) ?? null,
   };
@@ -570,8 +592,17 @@ Deno.serve(async (req: Request) => {
   const projectColumn = (table: string): string | null => {
     if (table === "projects") return "id";
     if (table === "vessels") return null; // reached through its project
+    if (table === "parts") return null; // belongs to the asset; see scopeParts
     return "project_id";
   };
+
+  // A part belongs to the vessel, or to the project when it is a property.
+  // RLS would also show parts of the caller's other boats; this keeps the
+  // answer to the asset this conversation is about.
+  // deno-lint-ignore no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const scopeParts = (query: any) =>
+    project.vessel_id ? query.eq("vessel_id", project.vessel_id) : query.eq("project_id", projectId);
 
   /** Dispatches one tool call. Table names come from the registry, never the model. */
   async function runTool(name: string, input: Record<string, unknown>) {
@@ -582,6 +613,7 @@ Deno.serve(async (req: Request) => {
       let query = supabase.from(table).select("*").limit(limit);
       const column = projectColumn(table);
       if (column) query = query.eq(column, projectId);
+      if (table === "parts") query = scopeParts(query);
       if (table === "vessels" && project.vessel_name === null) return { rows: [] };
       const { data, error } = await query;
       if (error) return { error: error.message };
@@ -595,6 +627,7 @@ Deno.serve(async (req: Request) => {
       let query = supabase.from(table).select("*").eq("id", String(input.id));
       const column = projectColumn(table);
       if (column) query = query.eq(column, projectId);
+      if (table === "parts") query = scopeParts(query);
       const { data, error } = await query.maybeSingle();
       if (error) return { error: error.message };
       if (!data) return { error: "No object with that id on this project." };
@@ -682,6 +715,134 @@ Deno.serve(async (req: Request) => {
             .filter((d) => d.successor_id === it.id)
             .map((d) => ({ wp_number: numberOf(d.predecessor_id), kind: d.kind, lag_days: d.lag_days })),
         })),
+      };
+    }
+
+    if (name === "get_parts") {
+      const isBoat = project.project_type !== "PROPERTY";
+      if (isBoat && !project.vessel_id) {
+        return {
+          parts: [],
+          note: "This project has no vessel recorded, and parts belong to the vessel. Record the boat with action_set_project_vessel first.",
+        };
+      }
+      const { data: partRows, error: partsError } = await scopeParts(
+        supabase.from("parts").select("*").order("name"),
+      );
+      if (partsError) return { error: partsError.message };
+      const parts = (partRows ?? []) as Array<Record<string, unknown> & { id: string; name: string; parent_id: string | null; removed_at: string | null }>;
+      const byId = new Map(parts.map((p) => [p.id, p]));
+      const pathOf = (p: { id: string; name: string; parent_id: string | null }) => {
+        const names = [p.name];
+        const seen = new Set([p.id]);
+        let cur = p;
+        while (cur.parent_id && byId.has(cur.parent_id) && !seen.has(cur.parent_id)) {
+          cur = byId.get(cur.parent_id)!;
+          seen.add(cur.id);
+          names.unshift(cur.name);
+        }
+        return names.join(" > ");
+      };
+
+      // Numbers for the records parts are linked to, so the answer can name them.
+      const numberFor = async (links: Array<{ object_type: string; object_id: string }>) => {
+        const tables: Record<string, [string, string]> = {
+          WORK_PACKAGE: ["work_packages", "wp_number"],
+          DEFECT_RECORD: ["defect_records", "ncr_number"],
+          INSPECTION_EVENT: ["inspection_events", "inspection_number"],
+          CHANGE_ORDER: ["change_orders", "co_number"],
+          DOCUMENT: ["documents", "doc_number"],
+        };
+        const out = new Map<string, Record<string, unknown>>();
+        await Promise.all(
+          Object.entries(tables).map(async ([type, [table, numberCol]]) => {
+            const ids = links.filter((l) => l.object_type === type).map((l) => l.object_id);
+            if (!ids.length) return;
+            const statusCol = type === "INSPECTION_EVENT" ? "result" : "status";
+            const { data } = await supabase
+              .from(table)
+              .select(`id, project_id, ${numberCol}, title, ${statusCol}`)
+              .in("id", ids);
+            index.harvest(table, data ?? []);
+            for (const row of (data ?? []) as unknown as Record<string, unknown>[]) {
+              out.set(String(row.id), {
+                number: row[numberCol],
+                title: row.title,
+                status: row[statusCol],
+                project_id: row.project_id,
+              });
+            }
+          }),
+        );
+        return out;
+      };
+
+      if (typeof input.part_id === "string" && input.part_id) {
+        const part = byId.get(input.part_id);
+        if (!part) return { error: "No part with that id on this asset." };
+        const [linksRes, eventsRes] = await Promise.all([
+          supabase.from("part_links").select("*").eq("part_id", part.id).order("created_at"),
+          supabase
+            .from("world_model_events")
+            .select("event_type, after_state, before_state, triggered_by_name, triggered_at, project_id")
+            .eq("object_type", "PART")
+            .eq("object_id", part.id)
+            .order("triggered_at")
+            .limit(MAX_ROWS),
+        ]);
+        if (linksRes.error) return { error: linksRes.error.message };
+        const links = linksRes.data ?? [];
+        const records = await numberFor(links);
+        const projectIds = [...new Set(links.map((l) => l.project_id))];
+        const { data: projectNames } = projectIds.length
+          ? await supabase.from("projects").select("id, name").in("id", projectIds)
+          : { data: [] };
+        const nameOf = new Map((projectNames ?? []).map((p: { id: string; name: string }) => [p.id, p.name]));
+        return {
+          part: { ...part, path: pathOf(part) },
+          sub_parts: parts.filter((p) => p.parent_id === part.id && !p.removed_at).map((p) => ({ id: p.id, name: p.name })),
+          record: links.map((l) => ({
+            object_type: l.object_type,
+            ...(records.get(l.object_id) ?? { number: null, title: "(not visible to you)" }),
+            project: l.project_id === projectId ? "this project" : nameOf.get(l.project_id) ?? "another project",
+            linked_at: l.created_at,
+            removed: l.removed_at ? { at: l.removed_at, reason: l.removed_reason } : undefined,
+          })),
+          events: eventsRes.error ? [] : eventsRes.data,
+        };
+      }
+
+      const { data: linkRows, error: linksError } = await supabase
+        .from("part_links")
+        .select("part_id, object_type, object_id")
+        .eq("project_id", projectId)
+        .is("removed_at", null);
+      if (linksError) return { error: linksError.message };
+      const records = await numberFor(linkRows ?? []);
+      const linksFor = new Map<string, string[]>();
+      for (const l of linkRows ?? []) {
+        const number = records.get(l.object_id)?.number;
+        if (typeof number !== "string") continue;
+        linksFor.set(l.part_id, [...(linksFor.get(l.part_id) ?? []), number]);
+      }
+      const includeRemoved = input.include_removed === true;
+      return {
+        asset: project.vessel_name ?? project.name,
+        parts: parts
+          .filter((p) => includeRemoved || !p.removed_at)
+          .map((p) => ({
+            id: p.id,
+            path: pathOf(p),
+            parent_id: p.parent_id,
+            category: p.category ?? undefined,
+            location: p.location ?? undefined,
+            manufacturer: p.manufacturer ?? undefined,
+            model: p.model ?? undefined,
+            serial_number: p.serial_number ?? undefined,
+            installed_on: p.installed_on ?? undefined,
+            removed: p.removed_at ? p.removed_reason ?? true : undefined,
+            linked_here: linksFor.get(p.id),
+          })),
       };
     }
 

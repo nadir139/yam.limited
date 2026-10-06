@@ -51,7 +51,9 @@ yam.limited/app/*         ← authenticated world model (all routes below)
 | `/app/dashboard` | Dashboard | World model overview — stats, Needs Attention, Recent Activity, phase timeline |
 | `/app/project` | ProjectOverview | Vessel + project detail, quick-link counts |
 | `/app/work-packages` | WorkPackageList | Survey scope, filterable by discipline/status |
-| `/app/work-packages/:id` | WorkPackageDetail | WP detail + linked inspections/defects/documents |
+| `/app/work-packages/:id` | WorkPackageDetail | WP detail + linked inspections/defects/documents + parts |
+| `/app/schedule` | SchedulePage | Gantt: forecast vs plan vs baseline, critical path, drag to reschedule |
+| `/app/parts` | PartsPage | The asset's parts tree and each part's record across projects |
 | `/app/inspections` | InspectionList | Survey events, inspector role, result badges |
 | `/app/defects` | DefectList | NCR tracker with severity/status, table+card toggle |
 | `/app/defects/:id` | DefectDetail | Full NCR + cascade chain visualization |
@@ -1662,3 +1664,59 @@ In a rolled-back transaction, as two different signed-in identities:
 | the chef answers | `ACKNOWLEDGED`, reply posted, linked to the same WP |
 | answering twice | refused |
 | the chef's job list, never typed into | 1 |
+
+## 33. The plan has a shape in time (migration 026)
+
+Work packages had dates and nothing else, so a chart could draw bars but not
+say why one moved. Migration 026 adds what the forecast needs and nothing it
+can derive:
+
+- `baseline_start` / `baseline_end`, frozen by `action_set_schedule_baseline`.
+- `work_package_dependencies` (FS or SS, lag in days), soft-deleted with a
+  reason, cycle-checked in `action_link_work_packages`.
+- `action_reschedule_work_package`, whose event carries the dates before and
+  after and the reason — dragging a bar reads like any other change.
+
+The forecast, float, slip and critical path are **derived**, by one engine in
+`supabase/functions/agent/schedule.ts` that the app re-exports
+(`src/lib/schedule.ts`) and the agent imports. One copy, so the chart and the
+agent cannot disagree. Slip is measured against the *committed* finish: each
+package's baseline end where it has one, its planned end where it does not —
+comparing the whole plan with only the baselined packages showed a false
+"+12 days" on the first try.
+
+The agent reads the plan with `get_schedule` and the chat draws a live
+mini-Gantt (`AgentScheduleCard`) under any reply that read or changed it.
+
+## 34. The boat has parts (migration 027)
+
+The model had a vessel and the work done to it, and nothing in between: "the
+port primary winch" existed only inside work package titles. Now:
+
+- `parts` is a tree (parent_id) of systems, assemblies and components with
+  location, make, model, serial and install date. A part belongs to the
+  **vessel** (`vessel_id`), not the project, so the next project on the boat
+  starts with the tree and the part's history runs across both. A property has
+  no asset row yet, so its parts belong to the project (`project_id`); exactly
+  one of the two is set.
+- `part_links` points work packages, NCRs, inspections, change orders and
+  documents at parts. A link belongs to the **linked record's** project, so
+  reading it needs membership of that project, like the record itself.
+- Actions: create (returns the existing part when the same name already sits
+  under the same parent, so a list filed twice does not double the boat),
+  update (omitted keeps; `p_clear` empties named fields), remove (soft, with a
+  reason, refused while it has current sub-parts), link, unlink.
+
+`part_is_on_project` originally returned NULL for a project with no vessel,
+and `if not found or not NULL` does not raise — a vessel part could be linked
+to a work package on the Lucky Bird project. Caught in the rolled-back test,
+fixed with `coalesce(..., false)`. Helpers called only from Actions
+(`part_is_on_project`, `project_of_object`, `clean_text`, `parse_discipline`)
+are revoked from `authenticated`; `can_read_part` stays callable because RLS
+evaluates it as the reader.
+
+In the app: `/app/parts` (tree with rolled-up open-NCR and active-WP counts,
+search, the part's record across projects, history), part chips on work
+packages and NCRs with search-or-create, and "Group by system" on the Gantt.
+The agent has `get_parts` (the tree, or one part's record) and the five part
+Actions from the registry.

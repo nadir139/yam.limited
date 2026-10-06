@@ -26,6 +26,7 @@ import UploadDocumentForm from '@/components/actions/UploadDocumentForm'
 import AmendDefectImpact from '@/components/actions/AmendDefectImpact'
 import ObjectHistory from '@/components/ObjectHistory'
 import MessageThread from '@/components/MessageThread'
+import PartLinks from '@/components/parts/PartLinks'
 import type { DefectSeverity } from '@/lib/types'
 
 const SEVERITY_STYLES: Record<DefectSeverity, { bg: string; text: string }> = {
@@ -206,7 +207,10 @@ export default function DefectDetail() {
       {/* Description */}
       <Card>
         <CardContent className="p-5">
-          <p className="text-sm leading-relaxed mb-4">{defect.description}</p>
+          <p className="text-sm leading-relaxed mb-3">{defect.description}</p>
+          <div className="mb-4">
+            <PartLinks objectType="DEFECT_RECORD" objectId={defect.id} />
+          </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <PropRow label="Location" value={defect.location_on_vessel} />

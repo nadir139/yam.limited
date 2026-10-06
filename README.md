@@ -200,6 +200,7 @@ applied by hand in the Supabase SQL editor, in this order:
 26. `supabase-migration-024-numbering-is-serialised.sql` — numbered objects take a per-project lock, so parallel creates cannot collide
 27. `supabase-migration-025-vessel-details.sql` — `action_set_project_vessel`: a project can record which boat it is about
 28. `supabase-migration-026-schedule.sql` — baselines, work-package dependencies (FS/SS + lag) and the reschedule / link / unlink / baseline Actions behind the Schedule page
+29. `supabase-migration-027-parts.sql` — the asset's parts tree (belongs to the vessel, so it carries across projects), part links to work packages / NCRs / inspections / change orders / documents, and their Actions
 
 Migrations 006–008 are the important ones. After 008 the `authenticated` and
 `anon` roles hold **zero** `INSERT`/`UPDATE`/`DELETE` grants on the domain
