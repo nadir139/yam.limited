@@ -30,6 +30,9 @@ export const QUERY_KEYS = {
   team: (p: string) => ['team', p],
   events: (p: string) => ['events', p],
   dependencies: (p: string) => ['dependencies', p],
+  parts: (p: string) => ['parts', p],
+  partLinks: (p: string) => ['part-links', p],
+  partHistory: (id: string) => ['part-history', id],
 }
 
 export const useProject = () => {
@@ -322,6 +325,94 @@ export function useSetScheduleBaseline() {
   const projectId = useProjectId()
   return useMutation({
     mutationFn: (reason?: string | null) => db.setScheduleBaseline(projectId, reason),
+    onSuccess: invalidate,
+  })
+}
+
+// ─── Parts ────────────────────────────────────────────────────────────────────
+
+export type PartInput = db.PartInput
+export type PartLinkTarget = db.PartLinkTarget
+
+/** The asset's parts tree, removed parts included. */
+export const useParts = () => {
+  const projectId = useProjectId()
+  const { data: project } = useProject()
+  return useQuery({
+    queryKey: QUERY_KEYS.parts(projectId),
+    queryFn: () => db.fetchParts(projectId, project?.vessel_id ?? null),
+    enabled: !!projectId && project !== undefined,
+  })
+}
+
+export const usePartLinks = () => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: QUERY_KEYS.partLinks(projectId),
+    queryFn: () => db.fetchPartLinks(projectId),
+    enabled: !!projectId,
+  })
+}
+
+export const usePartHistory = (partId: string | null) =>
+  useQuery({
+    queryKey: QUERY_KEYS.partHistory(partId ?? ''),
+    queryFn: () => db.fetchPartHistory(partId!),
+    enabled: !!partId,
+  })
+
+function usePartsInvalidation() {
+  const qc = useQueryClient()
+  return () => {
+    qc.invalidateQueries({ queryKey: ['parts'] })
+    qc.invalidateQueries({ queryKey: ['part-links'] })
+    qc.invalidateQueries({ queryKey: ['part-history'] })
+    qc.invalidateQueries({ queryKey: ['events'] })
+  }
+}
+
+export function useCreatePart() {
+  const invalidate = usePartsInvalidation()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (input: PartInput) => db.createPart(projectId, input),
+    onSuccess: invalidate,
+  })
+}
+
+export function useUpdatePart() {
+  const invalidate = usePartsInvalidation()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (v: { id: string; input: PartInput; clear?: string[]; reason?: string | null }) =>
+      db.updatePart(projectId, v.id, v.input, v.clear, v.reason),
+    onSuccess: invalidate,
+  })
+}
+
+export function useRemovePart() {
+  const invalidate = usePartsInvalidation()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (v: { id: string; reason: string }) => db.removePart(projectId, v.id, v.reason),
+    onSuccess: invalidate,
+  })
+}
+
+export function useLinkPart() {
+  const invalidate = usePartsInvalidation()
+  return useMutation({
+    mutationFn: (v: { partId: string; objectType: PartLinkTarget; objectId: string }) =>
+      db.linkPart(v.partId, v.objectType, v.objectId),
+    onSuccess: invalidate,
+  })
+}
+
+export function useUnlinkPart() {
+  const invalidate = usePartsInvalidation()
+  return useMutation({
+    mutationFn: (v: { partId: string; objectType: PartLinkTarget; objectId: string; reason?: string | null }) =>
+      db.unlinkPart(v.partId, v.objectType, v.objectId, v.reason),
     onSuccess: invalidate,
   })
 }

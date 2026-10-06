@@ -8,8 +8,11 @@ import ScheduleDetailPanel from '@/components/gantt/ScheduleDetailPanel'
 import { plural, shortDate, type Zoom } from '@/components/gantt/scale'
 import { useProjectSchedule } from '@/lib/use-schedule'
 import { fromDay } from '@/lib/schedule'
+import { workPackageSystems } from '@/lib/parts'
 import {
   useLinkWorkPackages,
+  usePartLinks,
+  useParts,
   usePermissions,
   useRescheduleWorkPackage,
   useSetScheduleBaseline,
@@ -51,6 +54,9 @@ export default function SchedulePage() {
   const reschedule = useRescheduleWorkPackage()
   const link = useLinkWorkPackages()
   const baseline = useSetScheduleBaseline()
+  const { data: parts = [] } = useParts()
+  const { data: partLinks = [] } = usePartLinks()
+  const partGroups = useMemo(() => workPackageSystems(parts, partLinks), [parts, partLinks])
 
   const [zoom, setZoom] = useState<Zoom>('week')
   const [groupBy, setGroupBy] = useState<GroupBy>('discipline')
@@ -206,6 +212,7 @@ export default function SchedulePage() {
           aria-label="Group by"
         >
           <option value="discipline">Group by discipline</option>
+          <option value="part">Group by system</option>
           <option value="status">Group by status</option>
           <option value="none">No grouping</option>
         </select>
@@ -240,6 +247,7 @@ export default function SchedulePage() {
         lines={lines}
         zoom={zoom}
         groupBy={groupBy}
+        partGroups={partGroups}
         showBaseline={showBaseline}
         showDependencies={showDeps}
         editable={canReschedule}

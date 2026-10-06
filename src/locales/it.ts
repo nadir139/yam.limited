@@ -24,6 +24,7 @@ export const it: Record<string, string> = {
   'nav.project': 'Progetto',
   'nav.workPackages': 'Pacchetti di lavoro',
   'nav.schedule': 'Cronoprogramma',
+  'nav.parts': 'Componenti',
   'nav.inspections': 'Ispezioni',
   'nav.defects': 'Non conformità',
   'nav.changeOrders': 'Varianti',

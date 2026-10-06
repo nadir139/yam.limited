@@ -2,6 +2,8 @@ import { supabase } from './supabase'
 import type {
   Vessel,
   WorkPackageDependency,
+  Part,
+  PartLink,
   Project,
   WorkPackage,
   InspectionEvent,
@@ -155,6 +157,192 @@ export async function setScheduleBaseline(projectId: string, reason?: string | n
   })
   const result = unwrap(data, error, 'Set baseline') as unknown as { baselined: number }
   return result.baselined
+}
+
+// ─── Parts ────────────────────────────────────────────────────────────────────
+//
+// Migration 027. A part belongs to the vessel (or, on a property project, to
+// the project), so the same tree comes back on every project about that boat.
+// Removed parts are returned too: they are history, and the page decides
+// whether to show them.
+
+/** The kinds of record a part can be linked to. */
+export type PartLinkTarget = 'WORK_PACKAGE' | 'DEFECT_RECORD' | 'INSPECTION_EVENT' | 'CHANGE_ORDER' | 'DOCUMENT'
+
+export async function fetchParts(projectId: string, vesselId: string | null): Promise<Part[]> {
+  const query = supabase.from('parts').select('*').order('name')
+  const { data, error } = vesselId
+    ? await query.eq('vessel_id', vesselId)
+    : await query.eq('project_id', projectId)
+  if (error) throw error
+  return data ?? []
+}
+
+/** Live links from this project's records to parts. */
+export async function fetchPartLinks(projectId: string): Promise<PartLink[]> {
+  const { data, error } = await supabase
+    .from('part_links')
+    .select('*')
+    .eq('project_id', projectId)
+    .is('removed_at', null)
+  if (error) throw error
+  return data ?? []
+}
+
+/** One record a part was linked to, on any project the caller can read. */
+export interface PartHistoryEntry {
+  link: PartLink
+  objectType: PartLinkTarget
+  number: string | null
+  title: string | null
+  status: string | null
+  date: string | null
+  projectId: string
+  projectName: string | null
+}
+
+/**
+ * Everything ever linked to a part, across every project on the asset that the
+ * caller is a member of. RLS hides links on projects they are not on, so the
+ * same call is safe for anyone; it simply shows them less.
+ */
+export async function fetchPartHistory(partId: string): Promise<PartHistoryEntry[]> {
+  const { data: links, error } = await supabase
+    .from('part_links')
+    .select('*')
+    .eq('part_id', partId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  if (!links?.length) return []
+
+  const idsOf = (t: PartLinkTarget) => links.filter((l) => l.object_type === t).map((l) => l.object_id)
+  const projectIds = [...new Set(links.map((l) => l.project_id))]
+  const none = Promise.resolve({ data: [] as Record<string, unknown>[], error: null })
+  const pick = (t: PartLinkTarget, table: string, columns: string) =>
+    idsOf(t).length ? supabase.from(table as 'work_packages').select(columns).in('id', idsOf(t)) : none
+
+  const [wps, defects, inspections, cos, docs, projects] = await Promise.all([
+    pick('WORK_PACKAGE', 'work_packages', 'id, wp_number, title, status, planned_start'),
+    pick('DEFECT_RECORD', 'defect_records', 'id, ncr_number, title, status, discovered_date'),
+    pick('INSPECTION_EVENT', 'inspection_events', 'id, inspection_number, title, result, scheduled_date'),
+    pick('CHANGE_ORDER', 'change_orders', 'id, co_number, title, status, created_at'),
+    pick('DOCUMENT', 'documents', 'id, doc_number, title, status, uploaded_date'),
+    supabase.from('projects').select('id, name').in('id', projectIds),
+  ])
+  for (const r of [wps, defects, inspections, cos, docs, projects]) if (r.error) throw r.error
+
+  const rows = new Map<string, Record<string, unknown>>()
+  for (const r of [wps, defects, inspections, cos, docs]) {
+    for (const row of (r.data ?? []) as unknown as Record<string, unknown>[]) rows.set(String(row.id), row)
+  }
+  const projectName = new Map(
+    ((projects.data ?? []) as { id: string; name: string }[]).map((p) => [p.id, p.name]),
+  )
+  const str = (v: unknown) => (v === null || v === undefined ? null : String(v))
+
+  return links.map((link) => {
+    const row = rows.get(link.object_id) ?? {}
+    return {
+      link,
+      objectType: link.object_type as PartLinkTarget,
+      number: str(row.wp_number ?? row.ncr_number ?? row.inspection_number ?? row.co_number ?? row.doc_number),
+      title: str(row.title),
+      status: str(row.status ?? row.result),
+      date: str(row.planned_start ?? row.discovered_date ?? row.scheduled_date ?? row.uploaded_date ?? row.created_at),
+      projectId: link.project_id,
+      projectName: projectName.get(link.project_id) ?? null,
+    }
+  })
+}
+
+export interface PartInput {
+  name?: string | null
+  category?: string | null
+  parentId?: string | null
+  location?: string | null
+  manufacturer?: string | null
+  model?: string | null
+  serialNumber?: string | null
+  installedOn?: string | null
+  notes?: string | null
+}
+
+export async function createPart(
+  projectId: string,
+  input: PartInput,
+): Promise<{ part: Part; existing: boolean }> {
+  const { data, error } = await supabase.rpc('action_create_part', {
+    p_project_id: projectId,
+    p_name: input.name ?? undefined,
+    p_category: input.category ?? undefined,
+    p_parent_id: input.parentId ?? undefined,
+    p_location: input.location ?? undefined,
+    p_manufacturer: input.manufacturer ?? undefined,
+    p_model: input.model ?? undefined,
+    p_serial_number: input.serialNumber ?? undefined,
+    p_installed_on: input.installedOn ?? undefined,
+    p_notes: input.notes ?? undefined,
+  })
+  return unwrap(data, error, 'Record part') as unknown as { part: Part; existing: boolean }
+}
+
+/** Omitted fields keep their value; fields named in `clear` are emptied. */
+export async function updatePart(
+  projectId: string,
+  partId: string,
+  input: PartInput,
+  clear: string[] = [],
+  reason?: string | null,
+): Promise<Part> {
+  const { data, error } = await supabase.rpc('action_update_part', {
+    p_part_id: partId,
+    p_project_id: projectId,
+    p_name: input.name ?? undefined,
+    p_category: input.category ?? undefined,
+    p_parent_id: input.parentId ?? undefined,
+    p_location: input.location ?? undefined,
+    p_manufacturer: input.manufacturer ?? undefined,
+    p_model: input.model ?? undefined,
+    p_serial_number: input.serialNumber ?? undefined,
+    p_installed_on: input.installedOn ?? undefined,
+    p_notes: input.notes ?? undefined,
+    p_clear: clear.length ? clear : undefined,
+    p_reason: reason ?? undefined,
+  })
+  return (unwrap(data, error, 'Update part') as unknown as { part: Part }).part
+}
+
+export async function removePart(projectId: string, partId: string, reason: string): Promise<Part> {
+  const { data, error } = await supabase.rpc('action_remove_part', {
+    p_part_id: partId,
+    p_reason: reason,
+    p_project_id: projectId,
+  })
+  return (unwrap(data, error, 'Remove part') as unknown as { part: Part }).part
+}
+
+export async function linkPart(partId: string, objectType: PartLinkTarget, objectId: string): Promise<PartLink> {
+  const { data, error } = await supabase.rpc('action_link_part', {
+    p_part_id: partId,
+    p_object_type: objectType,
+    p_object_id: objectId,
+  })
+  return (unwrap(data, error, 'Link part') as unknown as { link: PartLink }).link
+}
+
+export async function unlinkPart(
+  partId: string,
+  objectType: PartLinkTarget,
+  objectId: string,
+  reason?: string | null,
+): Promise<void> {
+  const { error } = await supabase.rpc('action_unlink_part', {
+    p_part_id: partId,
+    p_object_type: objectType,
+    p_object_id: objectId,
+    p_reason: reason ?? undefined,
+  })
+  if (error) throw new Error(error.message)
 }
 
 export async function fetchWorkPackage(id: string): Promise<WorkPackage> {

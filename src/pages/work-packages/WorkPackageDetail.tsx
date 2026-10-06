@@ -21,6 +21,7 @@ import ScheduleInspectionForm from '@/components/actions/ScheduleInspectionForm'
 import WorkPackageStatusControl from '@/components/actions/WorkPackageStatusControl'
 import ObjectHistory from '@/components/ObjectHistory'
 import MessageThread from '@/components/MessageThread'
+import PartLinks from '@/components/parts/PartLinks'
 
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -129,6 +130,9 @@ export default function WorkPackageDetail() {
                 <Badge style={{ backgroundColor: 'hsl(var(--accent)/0.15)', color: 'hsl(var(--accent))', border: 'none' }}>
                   {wp.status.replace(/_/g, ' ')}
                 </Badge>
+              </div>
+              <div className="mt-3">
+                <PartLinks objectType="WORK_PACKAGE" objectId={wp.id} />
               </div>
             </div>
             <div className="flex flex-col gap-3">
