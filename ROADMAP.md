@@ -10,6 +10,19 @@ Ordered by impact over effort. Most items are a day or less.
 | 0.1 | ~~Merge and deploy~~ | Done — PR #33, production build READY | — |
 | 0.3 | Re-run the Lucky Bird job list in the agent | It should file ~10 work packages in one parallel turn, with live progress | 2 min |
 
+## Digital twin track (agreed order, Oct 2026)
+
+1. ~~Schedule data and Actions~~ — migration 026: baselines, FS/SS dependencies with lag,
+   reschedule / link / unlink / baseline Actions, all in the audit log.
+2. ~~Schedule page~~ — `/app/schedule`: forecast bars with plan ghost and baseline, critical path,
+   change-order delay, markers for inspections, owner gates and NCRs; drag to reschedule with Undo.
+3. ~~Agent scheduling~~ — `get_schedule` tool on the same engine as the chart
+   (`supabase/functions/agent/schedule.ts`), and a live mini-Gantt under replies that touch the plan.
+4. **Parts model (next).** A persistent tree of the boat's systems and components (hull → deck →
+   winches → port primary), outliving any single project. Work packages, NCRs, inspections and
+   documents attach to parts; the Gantt groups by part; the agent answers "everything ever done to
+   the port primary". This is the backbone of the digital twin.
+
 ## 1. Next — reliability (1–2 weeks)
 
 1. **Batch Action for job lists.** `action_create_work_packages(p_items jsonb)`: one transaction, so a

@@ -28,6 +28,7 @@ export const en: Record<string, string> = {
   'nav.dashboard': 'Dashboard',
   'nav.project': 'Project',
   'nav.workPackages': 'Work Packages',
+  'nav.schedule': 'Schedule',
   'nav.inspections': 'Inspections',
   'nav.defects': 'Defects / NCRs',
   'nav.changeOrders': 'Change Orders',

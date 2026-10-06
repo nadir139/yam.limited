@@ -82,6 +82,13 @@ export function useRealtimeSync() {
           qc.invalidateQueries({ queryKey: ['documents'] })
         },
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'work_package_dependencies' },
+        () => {
+          qc.invalidateQueries({ queryKey: ['dependencies'] })
+        },
+      )
       // A colleague's reply, and the obligation a mention just created for
       // you, should not wait for a reload to appear.
       .on(

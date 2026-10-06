@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2";
 import Anthropic from "npm:@anthropic-ai/sdk";
+import { computeSchedule, delaysFromChangeOrders, fromDay } from "./schedule.ts";
 
 // The world-model agent.
 //
@@ -176,6 +177,12 @@ function buildTools(
       },
     },
     {
+      name: "get_schedule",
+      description:
+        "The project's schedule as it will really happen: every work package with its planned dates, its forecast dates (after late starts, dependencies and change-order delays), slip against the baseline, float, whether it is on the critical path, what pushed it, and what it waits on. Also the committed and forecast finish. Call this before answering any question about dates, delays, sequencing or 'what happens if', and before planning or re-planning work. Dates are YYYY-MM-DD.",
+      input_schema: { type: "object", properties: {}, required: [] },
+    },
+    {
       name: "get_object_story",
       description:
         "Everything that ever happened to ONE object: its own events oldest-first, and every message posted about it. Read this before answering any question about how an object got to its current state, or before reporting what it cost or how long it took. A row's fields are what someone typed when they raised it -- often an estimate made in the first five minutes. The reasons attached to its events and the messages on its thread are where the real story is, including why it was closed and what the work actually turned out to be.",
@@ -266,6 +273,9 @@ When someone tells you what a job really cost, really took, or was really caused
 The action_* tools are the only way to change anything. They run with ${actorName}'s own permissions and record them as the actor, so you cannot do anything they could not do themselves. Each one validates its input server-side and writes an audit event in the same transaction.
 
 Several actions cascade. Raising a HIGH or CRITICAL defect that carries a cost impact automatically raises the Change Order and the Owner Approval it requires. Deciding an approval propagates that decision to the Change Order it gates. Say in one line what else moved -- an approval now waiting on someone is the thing they need to know.
+
+## Plan in time
+The schedule is part of the world model. Call get_schedule before answering anything about dates, delays, order of work or "what if", and answer from its forecast, not from planned dates: the forecast already counts late starts, dependencies and change-order delays. When asked to plan or re-plan, set dates with action_reschedule_work_package and the order of work with action_link_work_packages (FS: after it finishes; SS: starting together), then call get_schedule again and say where the finish lands and what is on the critical path. If you have to assume a duration, give it in your one line of assumptions. Never set a baseline unless someone says the plan is agreed. The interface draws the schedule under your reply whenever you read or change it, so describe what moved rather than listing every date.
 
 ## Act
 When you are asked to record something, record it. A list of jobs is a list of records: one work package per item, all issued together as parallel tool calls in a single turn, not one per turn. Check what already exists once, up front, so you do not file a duplicate. Fill the fields you were given, leave unknown optional fields empty, and state your assumptions in one line afterwards -- a filed record that ${actorName} corrects beats an interrogation.
@@ -601,6 +611,78 @@ Deno.serve(async (req: Request) => {
         .order("triggered_at", { ascending: false })
         .limit(limit);
       return error ? { error: error.message } : { events: data };
+    }
+
+    if (name === "get_schedule") {
+      const [wpRes, depRes, coRes, defectRes] = await Promise.all([
+        supabase
+          .from("work_packages")
+          .select("id, wp_number, title, discipline, status, planned_start, planned_end, actual_start, actual_end, baseline_start, baseline_end")
+          .eq("project_id", projectId),
+        supabase
+          .from("work_package_dependencies")
+          .select("predecessor_id, successor_id, kind, lag_days")
+          .eq("project_id", projectId)
+          .is("removed_at", null),
+        supabase
+          .from("change_orders")
+          .select("co_number, status, schedule_delta_days, defect_record_id")
+          .eq("project_id", projectId),
+        supabase
+          .from("defect_records")
+          .select("id, work_package_id")
+          .eq("project_id", projectId),
+      ]);
+      const failed = wpRes.error ?? depRes.error ?? coRes.error ?? defectRes.error;
+      if (failed) return { error: failed.message };
+
+      const wps = wpRes.data ?? [];
+      index.harvest("work_packages", wps);
+      const deps = depRes.data ?? [];
+      // The engine counts days in the viewer's calendar; the function runs in
+      // UTC, which is the same day for Italy outside 00:00-02:00.
+      const sched = computeSchedule({
+        workPackages: wps,
+        dependencies: deps,
+        delays: delaysFromChangeOrders(coRes.data ?? [], defectRes.data ?? []),
+        today: new Date().toISOString().slice(0, 10),
+      });
+      const day = (d: number | null) => (d === null ? null : fromDay(d));
+      const numberOf = (id: string) => sched.byId[id]?.wpNumber ?? id;
+
+      return {
+        today: day(sched.today),
+        committed_finish: day(sched.committedFinish),
+        forecast_finish: day(sched.forecastFinish),
+        finish_slip_days:
+          sched.forecastFinish !== null && sched.committedFinish !== null
+            ? sched.forecastFinish - sched.committedFinish
+            : null,
+        has_baseline: sched.baselineFinish !== null,
+        critical_path: sched.criticalPath.map(numberOf),
+        unscheduled: sched.unscheduled.map(numberOf),
+        work_packages: sched.items.map((it) => ({
+          id: it.id,
+          wp_number: it.wpNumber,
+          title: it.title,
+          status: it.status,
+          planned: it.scheduled ? [day(it.plannedStart), day(it.plannedEnd)] : null,
+          forecast: it.forecastStart !== null ? [day(it.forecastStart), day(it.forecastEnd)] : null,
+          baseline: it.baselineStart !== null ? [day(it.baselineStart), day(it.baselineEnd)] : null,
+          slip_days: it.slipDays,
+          float_days: it.floatDays,
+          critical: it.critical,
+          pushed_by: it.drivenBy,
+          late_start: it.lateStart || undefined,
+          overdue: it.overdue || undefined,
+          change_order_delay_days: it.delayDays || undefined,
+          change_orders: it.delaySources.length ? it.delaySources : undefined,
+          awaiting_owner_decision: it.awaitingApproval || undefined,
+          waits_on: deps
+            .filter((d) => d.successor_id === it.id)
+            .map((d) => ({ wp_number: numberOf(d.predecessor_id), kind: d.kind, lag_days: d.lag_days })),
+        })),
+      };
     }
 
     // One object's whole story. The row alone is what someone believed when
