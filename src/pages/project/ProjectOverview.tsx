@@ -1,7 +1,6 @@
 import { day, eur } from '@/lib/format'
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { format } from 'date-fns'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -147,7 +146,7 @@ export default function ProjectOverview() {
                 label="Survey Due"
                 value={
                   <span style={{ color: 'hsl(var(--warning))' }}>
-                    {format(new Date(project.survey_due_date), 'd MMM yyyy')}
+                    {day(project.survey_due_date)}
                   </span>
                 }
               />

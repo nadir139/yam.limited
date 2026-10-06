@@ -1,4 +1,4 @@
-import { format as formatDate, formatDistanceToNow } from 'date-fns'
+import { format as formatDate, formatDistanceToNow, parseISO } from 'date-fns'
 
 // Rendering values that may not be there.
 //
@@ -49,11 +49,38 @@ export const percentValue = (
   whole: number | null | undefined,
 ) => percent(part, whole) ?? 0
 
-export function day(iso: string | null | undefined, pattern = 'd MMM yyyy'): string {
-  if (!iso) return NONE
-  const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? NONE : formatDate(d, pattern)
+/**
+ * Parses a `date` or `timestamptz` value.
+ *
+ * Not `new Date(iso)`: that reads a bare `2026-10-06` as UTC midnight, which
+ * is the previous evening anywhere west of Greenwich and 02:00 in Sardinia.
+ * parseISO reads a date-only value as local midnight — the day it names.
+ */
+export function parseDay(iso: string | null | undefined): Date | null {
+  if (!iso) return null
+  const d = parseISO(iso)
+  return Number.isNaN(d.getTime()) ? null : d
 }
+
+export function day(iso: string | null | undefined, pattern = 'd MMM yyyy'): string {
+  const d = parseDay(iso)
+  return d ? formatDate(d, pattern) : NONE
+}
+
+/**
+ * Today as a `date` column value, in the viewer's own timezone.
+ *
+ * `new Date().toISOString().split('T')[0]` is today in UTC — so a result
+ * recorded at 01:00 in Sardinia was filed against yesterday.
+ */
+export const localToday = () => formatDate(new Date(), 'yyyy-MM-dd')
+
+/**
+ * Whether a `date` deadline has passed. A deadline is the whole of its day:
+ * an approval due today is due, not overdue.
+ */
+export const isOverdue = (date: string | null | undefined) =>
+  Boolean(date) && date!.slice(0, 10) < localToday()
 
 export function sinceNow(iso: string | null | undefined): string {
   if (!iso) return NONE
@@ -62,7 +89,7 @@ export function sinceNow(iso: string | null | undefined): string {
 }
 
 /** Milliseconds for sorting; missing dates sort oldest rather than throwing. */
-export const at = (iso: string | null | undefined) => (iso ? new Date(iso).getTime() : 0)
+export const at = (iso: string | null | undefined) => parseDay(iso)?.getTime() ?? 0
 
 /** Numeric columns are nullable; totals and comparisons need a number. */
 export const num = (n: number | null | undefined) => n ?? 0

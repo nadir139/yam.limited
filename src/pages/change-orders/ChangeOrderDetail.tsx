@@ -1,6 +1,5 @@
-import { eur } from '@/lib/format'
+import { eur, day } from '@/lib/format'
 import { useParams, useNavigate } from 'react-router-dom'
-import { format } from 'date-fns'
 import { ArrowLeft, ArrowRight, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -124,7 +123,7 @@ export default function ChangeOrderDetail() {
             <Row label="Raised by" value={co.raised_by} />
             <Row
               label="Raised"
-              value={format(new Date(co.raised_date), 'd MMM yyyy')}
+              value={day(co.raised_date)}
             />
           </div>
         </CardContent>

@@ -2,7 +2,6 @@ import { day, eur, percentLabel, percentValue } from '@/lib/format'
 import React from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, CheckCircle2 } from 'lucide-react'
-import { format } from 'date-fns'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -252,7 +251,7 @@ export default function WorkPackageDetail() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm">{d.status.replace(/_/g, ' ')}</TableCell>
-                    <TableCell className="text-sm">{format(new Date(d.discovered_date), 'd MMM yyyy')}</TableCell>
+                    <TableCell className="text-sm">{day(d.discovered_date)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

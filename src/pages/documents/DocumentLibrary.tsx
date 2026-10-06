@@ -1,5 +1,4 @@
 import React, { useState } from 'react'
-import { format } from 'date-fns'
 import { Download, ExternalLink, CheckCircle2 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -8,6 +7,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@
 import { useDocuments, useVocabulary } from '@/lib/query-hooks'
 import { useTranslation } from '@/lib/i18n'
 import UploadDocumentForm from '@/components/actions/UploadDocumentForm'
+import { day } from '@/lib/format'
 
 const DOC_TYPE_STYLES: Record<string, { bg: string; text: string }> = {
   SURVEY_REPORT:    { bg: 'hsl(215 50% 23% / 0.1)',  text: 'hsl(var(--primary))' },
@@ -172,7 +172,7 @@ export default function DocumentLibrary() {
                       : '—'}
                   </TableCell>
                   <TableCell className="text-sm">
-                    {format(new Date(doc.uploaded_date), 'd MMM yyyy')}
+                    {day(doc.uploaded_date)}
                   </TableCell>
                   <TableCell className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
                     {formatBytes(doc.file_size)}

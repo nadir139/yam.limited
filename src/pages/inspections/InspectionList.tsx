@@ -1,6 +1,5 @@
 import { day, num } from '@/lib/format'
 import React, { useState } from 'react'
-import { format } from 'date-fns'
 import { CheckCircle2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -141,7 +140,7 @@ export default function InspectionList() {
                   <span>{insp.inspector_name}</span>
                   <span>
                     {insp.actual_date
-                      ? `Completed ${format(new Date(insp.actual_date), 'd MMM yyyy')}`
+                      ? `Completed ${day(insp.actual_date)}`
                       : `Scheduled ${day(insp.scheduled_date)}`}
                   </span>
                 </div>

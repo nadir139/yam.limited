@@ -1,61 +1,51 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
+import { Navigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
+const RESEND_SECONDS = 30
+
 export default function Login() {
-  const { login } = useAuth()
-  const [email, setEmail] = useState('nadir.balena@gmail.com')
+  const { login, user, isLoading } = useAuth()
+  // Empty, not pre-filled. This is the public sign-in page: a default address
+  // showed one person's email to every visitor, and sent them that person's
+  // magic link if they pressed the button.
+  const [email, setEmail] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [sent, setSent] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [resendCountdown, setResendCountdown] = useState(0)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  // One timer, owned by an effect, so leaving the page cannot leave an
+  // interval ticking on an unmounted component.
+  useEffect(() => {
+    if (resendCountdown <= 0) return
+    const timer = setTimeout(() => setResendCountdown((n) => n - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [resendCountdown])
+
+  const send = async () => {
     setIsSubmitting(true)
     setError(null)
-    const result = await login(email)
+    const result = await login(email.trim())
     setIsSubmitting(false)
     if (result.error) {
       setError(result.error)
-    } else {
-      setSent(true)
-      // Start 30-second resend countdown
-      setResendCountdown(30)
-      const interval = setInterval(() => {
-        setResendCountdown((prev) => {
-          if (prev <= 1) {
-            clearInterval(interval)
-            return 0
-          }
-          return prev - 1
-        })
-      }, 1000)
+      return
     }
+    setSent(true)
+    setResendCountdown(RESEND_SECONDS)
   }
 
-  const handleResend = async () => {
-    setIsSubmitting(true)
-    setError(null)
-    const result = await login(email)
-    setIsSubmitting(false)
-    if (result.error) {
-      setError(result.error)
-    } else {
-      setResendCountdown(30)
-      const interval = setInterval(() => {
-        setResendCountdown((prev) => {
-          if (prev <= 1) {
-            clearInterval(interval)
-            return 0
-          }
-          return prev - 1
-        })
-      }, 1000)
-    }
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    void send()
   }
+
+  // Already signed in: the form has nothing to offer.
+  if (!isLoading && user) return <Navigate to="/app/dashboard" replace />
 
   return (
     <div
@@ -100,7 +90,7 @@ export default function Login() {
             <Button
               variant="outline"
               size="sm"
-              onClick={handleResend}
+              onClick={() => void send()}
               disabled={resendCountdown > 0 || isSubmitting}
               className="w-full"
             >
@@ -128,6 +118,8 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
+                autoComplete="email"
+                autoFocus
                 required
               />
             </div>

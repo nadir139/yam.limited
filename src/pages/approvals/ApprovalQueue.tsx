@@ -1,6 +1,6 @@
-import { eur } from '@/lib/format'
+import { eur, day, isOverdue, parseDay } from '@/lib/format'
 import React, { useState } from 'react'
-import { format, formatDistanceToNow, isPast } from 'date-fns'
+import { endOfDay, formatDistanceToNow } from 'date-fns'
 import { CheckCircle, XCircle } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -26,8 +26,9 @@ const TIER_STYLES: Record<string, { bg: string; text: string; label: string }> =
 
 function DeadlineDisplay({ deadline }: { deadline: string | null }) {
   if (!deadline) return null
-  const date = new Date(deadline)
-  const overdue = isPast(date)
+  // A date-only deadline lasts until the end of its own day, in local time.
+  const date = endOfDay(parseDay(deadline) ?? new Date(deadline))
+  const overdue = isOverdue(deadline)
   return (
     <span
       className="text-xs font-medium"
@@ -62,7 +63,7 @@ export default function ApprovalQueue() {
     .sort((a, b) => {
       if (!a.deadline) return 1
       if (!b.deadline) return -1
-      return new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
+      return a.deadline.localeCompare(b.deadline)
     })
 
   const decided = approvals.filter((a) => a.status !== 'PENDING')
@@ -256,7 +257,7 @@ export default function ApprovalQueue() {
                     </TableCell>
                     <TableCell className="text-sm">
                       {approval.decision_date
-                        ? format(new Date(approval.decision_date), 'd MMM yyyy')
+                        ? day(approval.decision_date)
                         : '—'}
                     </TableCell>
                     <TableCell className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>

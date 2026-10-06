@@ -17,11 +17,17 @@ import Anthropic from "npm:@anthropic-ai/sdk";
 // touching this file.
 
 const MODEL = "claude-opus-5";
-const MAX_TURNS = 8;
+// A job list of ten items is one read, one turn of parallel writes and a
+// summary -- but a model that checks each item first can need more. Running
+// out of turns mid-list leaves half a list recorded, which is worse than slow.
+const MAX_TURNS = 12;
 const MAX_ROWS = 50;
+/** Keeps a streamed response from looking idle to the platform's gateway. */
+const KEEPALIVE_MS = 15_000;
 
 const ALLOWED_ORIGINS = new Set([
   "https://yam.limited",
+  "https://www.yam.limited",
   "http://localhost:8080",
 ]);
 
@@ -68,12 +74,44 @@ interface OntologyAction {
   cascades: string[];
 }
 
+/**
+ * Parameters whose allowed values depend on the kind of project.
+ *
+ * The registry's enum lists are the whole Postgres enum, or a snapshot of it
+ * from when the Action was registered -- action_create_work_package still
+ * offered only the nine maritime disciplines after PLANNING, CADASTRAL, ENERGY
+ * and LANDSCAPE were added, so the agent could not file a work package on a
+ * property at all. ontology_vocabulary is the source of truth for what each
+ * project type may use; the forms already read it, and now so does the agent.
+ */
+const VOCABULARY_FOR_PARAM: Record<string, string> = {
+  p_discipline: "DISCIPLINE",
+  p_doc_type: "DOC_TYPE",
+  p_root_cause: "ROOT_CAUSE",
+};
+
 /** Maps a registry parameter's declared type onto a JSON Schema fragment. */
-function paramSchema(p: OntologyAction["parameters"][number]) {
+function paramSchema(
+  p: OntologyAction["parameters"][number],
+  vocabulary: Map<string, string[]>,
+) {
+  const scoped = VOCABULARY_FOR_PARAM[p.name]
+    ? vocabulary.get(VOCABULARY_FOR_PARAM[p.name])
+    : undefined;
+  if (scoped?.length) {
+    return { type: "string", enum: scoped };
+  }
   if (p.type === "enum" && p.values?.length) {
     return { type: "string", enum: p.values };
   }
   switch (p.type) {
+    // action_post_message takes p_mentions uuid[]. Falling through to "string"
+    // told the model to send one string, which PostgREST rejects as an array.
+    case "uuid[]":
+      return {
+        type: "array",
+        items: { type: "string", description: "UUID of a project member" },
+      };
     case "integer":
       return { type: "integer" };
     case "numeric":
@@ -89,7 +127,11 @@ function paramSchema(p: OntologyAction["parameters"][number]) {
   }
 }
 
-function buildTools(types: OntologyType[], actions: OntologyAction[]) {
+function buildTools(
+  types: OntologyType[],
+  actions: OntologyAction[],
+  vocabulary: Map<string, string[]>,
+) {
   const typeKeys = types.map((t) => t.key);
 
   const readTools = [
@@ -156,7 +198,7 @@ function buildTools(types: OntologyType[], actions: OntologyAction[]) {
       // project. Exposing it would offer the model a decision it has no basis
       // for and every reason to get wrong.
       if (p.name === "p_project_id") continue;
-      properties[p.name] = paramSchema(p);
+      properties[p.name] = paramSchema(p, vocabulary);
       if (p.required) required.push(p.name);
     }
     const cascadeNote = a.cascades?.length
@@ -226,7 +268,7 @@ The action_* tools are the only way to change anything. They run with ${actorNam
 Several actions cascade. Raising a HIGH or CRITICAL defect that carries a cost impact automatically raises the Change Order and the Owner Approval it requires. Deciding an approval propagates that decision to the Change Order it gates. Say in one line what else moved -- an approval now waiting on someone is the thing they need to know.
 
 ## Act
-When you are asked to record something, record it. Fill the fields you were given, leave unknown optional fields empty, and state your assumptions in one line afterwards -- a filed record that ${actorName} corrects beats an interrogation.
+When you are asked to record something, record it. A list of jobs is a list of records: one work package per item, all issued together as parallel tool calls in a single turn, not one per turn. Check what already exists once, up front, so you do not file a duplicate. Fill the fields you were given, leave unknown optional fields empty, and state your assumptions in one line afterwards -- a filed record that ${actorName} corrects beats an interrogation.
 
 Ask at most one question per reply, and only when the answer changes what gets written and you cannot reasonably default it. Never ask for something already in this conversation: earlier turns are above, read them before asking. If you find yourself asking twice for the same thing, write the record instead.
 
@@ -370,7 +412,7 @@ Deno.serve(async (req: Request) => {
     return json({ error: "Not signed in." }, 401, origin);
   }
 
-  let body: { prompt?: unknown; history?: unknown; projectId?: unknown };
+  let body: { prompt?: unknown; history?: unknown; projectId?: unknown; stream?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -456,7 +498,7 @@ Deno.serve(async (req: Request) => {
 
   // Load the ontology registry -- the agent's tool manifest is generated from
   // the same table that documents the object model.
-  const [typesRes, linksRes, actionsRes, memberRes] = await Promise.all([
+  const [typesRes, linksRes, actionsRes, memberRes, vocabRes] = await Promise.all([
     supabase.from("ontology_object_types").select("*").order("display_order"),
     supabase.from("ontology_links").select("*"),
     supabase.from("ontology_actions").select("*").eq("is_agent_usable", true),
@@ -466,6 +508,10 @@ Deno.serve(async (req: Request) => {
       .eq("project_id", projectId)
       .ilike("email", actorEmail)
       .limit(1),
+    supabase
+      .from("ontology_vocabulary")
+      .select("kind, value, applies_to, display_order")
+      .order("display_order"),
   ]);
 
   if (typesRes.error || linksRes.error || actionsRes.error) {
@@ -486,7 +532,19 @@ Deno.serve(async (req: Request) => {
       .filter((a) => (a.parameters ?? []).some((p) => p.name === "p_project_id"))
       .map((a) => a.key),
   );
-  const tools = buildTools(types, actions);
+  // The values this project's type may use, per kind. A failed read leaves the
+  // map empty and the registry's own enum lists apply, as they did before.
+  const vocabulary = new Map<string, string[]>();
+  if (vocabRes.error) {
+    console.error("Failed to load vocabulary", vocabRes.error);
+  }
+  for (const v of (vocabRes.data ?? []) as Array<{ kind: string; value: string; applies_to: string | null }>) {
+    if (v.applies_to !== null && v.applies_to !== project.project_type) continue;
+    const list = vocabulary.get(v.kind) ?? [];
+    list.push(v.value);
+    vocabulary.set(v.kind, list);
+  }
+  const tools = buildTools(types, actions, vocabulary);
 
   const index = new ObjectIndex(typeForTable);
   const changed: Array<
@@ -599,9 +657,17 @@ Deno.serve(async (req: Request) => {
       // creating Action takes p_project_id and refuses to guess when the caller
       // is on more than one, so omitting it would turn a normal request into an
       // error the model would then try to "fix" by picking one.
+      //
+      // Nulls are dropped first. An argument sent as null overrides the SQL
+      // default rather than falling back to it: action_post_message with
+      // p_kind: null fails a NOT NULL constraint instead of filing a NOTE.
+      // Omitting an optional field is what the model means by null anyway.
+      const given = Object.fromEntries(
+        Object.entries(input).filter(([, v]) => v !== null && v !== undefined),
+      );
       const args = actionTakesProject.has(name)
-        ? { ...input, p_project_id: projectId }
-        : input;
+        ? { ...given, p_project_id: projectId }
+        : given;
 
       // Goes through PostgREST as the caller. The Action validates, mutates and
       // logs atomically; a rejection here is the database refusing, not us.
@@ -642,90 +708,155 @@ Deno.serve(async (req: Request) => {
   const system = buildSystemPrompt(types, links, actorName, project);
   const trace: Array<{ tool: string; input: unknown; ok: boolean }> = [];
 
-  try {
-    for (let turn = 0; turn < MAX_TURNS; turn++) {
-      const response = await anthropic.beta.messages.create({
-        model: MODEL,
-        max_tokens: 16000,
-        system,
-        tools,
-        messages,
-        thinking: { type: "adaptive" },
-        output_config: { effort: "high" },
-        // Opus 5's safety classifiers can decline a request outright. "default"
-        // lets the API re-run it on the recommended fallback rather than
-        // returning the refusal, routed by refusal category.
-        betas: ["server-side-fallback-2026-07-01"],
-        fallbacks: "default",
-      } as Anthropic.Beta.MessageCreateParamsNonStreaming);
+  /** Progress for a streaming caller; a no-op for a plain JSON one. */
+  type Emit = (event: Record<string, unknown>) => void;
 
-      if (response.stop_reason === "refusal") {
-        return json(
-          { error: "That request was declined. Try rephrasing it.", trace },
-          200,
-          origin,
-        );
-      }
+  /** Runs the model/tool loop and returns the body the console renders. */
+  async function runAgent(emit: Emit): Promise<{ body: Record<string, unknown>; status: number }> {
+    try {
+      for (let turn = 0; turn < MAX_TURNS; turn++) {
+        emit({ type: "turn", turn });
+        const response = await anthropic.beta.messages.create({
+          model: MODEL,
+          max_tokens: 16000,
+          // Tools and system are identical on every turn of the loop, and are
+          // most of each request; caching them makes turns two onward cheaper
+          // and faster to first token.
+          cache_control: { type: "ephemeral" },
+          system,
+          tools,
+          messages,
+          thinking: { type: "adaptive" },
+          output_config: { effort: "high" },
+          // Opus 5's safety classifiers can decline a request outright. "default"
+          // lets the API re-run it on the recommended fallback rather than
+          // returning the refusal, routed by refusal category.
+          betas: ["server-side-fallback-2026-07-01"],
+          fallbacks: "default",
+        } as Anthropic.Beta.MessageCreateParamsNonStreaming);
 
-      // Push the whole content array, not just text -- thinking blocks must be
-      // replayed unchanged on the next turn or the request is rejected.
-      messages.push({ role: "assistant", content: response.content });
-
-      const toolUses = response.content.filter(
-        (b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use",
-      );
-
-      if (toolUses.length === 0) {
-        const reply = response.content
-          .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
-          .map((b) => b.text)
-          .join("\n")
-          .trim();
-        return json(
-          { reply, trace, index: index.toJSON(), changed },
-          200,
-          origin,
-        );
-      }
-
-      // Parallel tool calls must all come back in ONE user message, or the model
-      // learns to stop issuing them in parallel.
-      const results = await Promise.all(
-        toolUses.map(async (call) => {
-          const out = await runTool(call.name, (call.input ?? {}) as Record<string, unknown>);
-          const failed = typeof out === "object" && out !== null && "error" in out;
-          trace.push({ tool: call.name, input: call.input, ok: !failed });
+        if (response.stop_reason === "refusal") {
           return {
-            type: "tool_result" as const,
-            tool_use_id: call.id,
-            content: JSON.stringify(out),
-            is_error: failed,
+            body: { error: "That request was declined. Try rephrasing it.", trace, index: index.toJSON(), changed },
+            status: 200,
           };
-        }),
-      );
+        }
 
-      messages.push({ role: "user", content: results });
+        // Push the whole content array, not just text -- thinking blocks must be
+        // replayed unchanged on the next turn or the request is rejected.
+        messages.push({ role: "assistant", content: response.content });
+
+        const toolUses = response.content.filter(
+          (b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use",
+        );
+
+        if (toolUses.length === 0) {
+          const reply = response.content
+            .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
+            .map((b) => b.text)
+            .join("\n")
+            .trim();
+          return {
+            body: {
+              // A reply cut off by max_tokens is still worth showing, but the
+              // reader should know it is not the whole answer.
+              reply: response.stop_reason === "max_tokens"
+                ? `${reply}\n\n(The reply was cut short.)`
+                : reply,
+              trace,
+              index: index.toJSON(),
+              changed,
+            },
+            status: 200,
+          };
+        }
+
+        // Parallel tool calls must all come back in ONE user message, or the model
+        // learns to stop issuing them in parallel.
+        const results = await Promise.all(
+          toolUses.map(async (call) => {
+            const out = await runTool(call.name, (call.input ?? {}) as Record<string, unknown>);
+            const failed = typeof out === "object" && out !== null && "error" in out;
+            const step = { tool: call.name, input: call.input, ok: !failed };
+            trace.push(step);
+            emit({ type: "tool", ...step });
+            return {
+              type: "tool_result" as const,
+              tool_use_id: call.id,
+              content: JSON.stringify(out),
+              is_error: failed,
+            };
+          }),
+        );
+
+        messages.push({ role: "user", content: results });
+      }
+
+      return {
+        body: {
+          reply: changed.length
+            ? "I ran out of steps before finishing. What is listed above was recorded; ask me to continue with the rest."
+            : "I ran out of steps before finishing. Try narrowing the request.",
+          trace,
+          index: index.toJSON(),
+          changed,
+        },
+        status: 200,
+      };
+    } catch (err) {
+      console.error("Agent turn failed", err);
+      const message = err instanceof Error ? err.message : String(err);
+      // `changed` still ships on failure: an Action may have committed before a
+      // later turn threw, and the user needs to know a record exists.
+      return {
+        body: { error: `The agent failed: ${message}`, trace, index: index.toJSON(), changed },
+        status: 500,
+      };
     }
-
-    return json(
-      {
-        reply: "I ran out of steps before finishing. Try narrowing the request.",
-        trace,
-        index: index.toJSON(),
-        changed,
-      },
-      200,
-      origin,
-    );
-  } catch (err) {
-    console.error("Agent turn failed", err);
-    const message = err instanceof Error ? err.message : String(err);
-    // `changed` still ships on failure: an Action may have committed before a
-    // later turn threw, and the user needs to know a record exists.
-    return json(
-      { error: `The agent failed: ${message}`, trace, index: index.toJSON(), changed },
-      500,
-      origin,
-    );
   }
+
+  // A plain JSON response holds the connection silent until the whole loop is
+  // done -- for a ten-item job list that is several model turns, long enough
+  // for a gateway to give up on an idle request. A caller that asks for a
+  // stream gets newline-delimited JSON instead: progress as each tool runs,
+  // a keepalive while the model thinks, and the same final body as the last
+  // line. Opt-in, so a console that predates it keeps working unchanged.
+  if (body.stream !== true) {
+    const { body: out, status } = await runAgent(() => {});
+    return json(out, status, origin);
+  }
+
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      let open = true;
+      const write = (event: Record<string, unknown>) => {
+        if (!open) return;
+        try {
+          controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
+        } catch {
+          // The caller went away. The loop still finishes, so an Action in
+          // flight is not abandoned half-way; its output just has nowhere to go.
+          open = false;
+        }
+      };
+      const keepalive = setInterval(() => write({ type: "ping" }), KEEPALIVE_MS);
+      try {
+        const { body: out, status } = await runAgent(write);
+        write({ type: "result", status, ...out });
+      } finally {
+        clearInterval(keepalive);
+        if (open) controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-cache",
+      ...corsHeaders(origin),
+    },
+  });
 });

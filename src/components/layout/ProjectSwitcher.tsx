@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Check, ChevronsUpDown, Plus, Ship, Home, ClipboardCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -47,6 +48,18 @@ export default function ProjectSwitcher() {
   const { projects, activeProject, setActiveProjectId, isLoading } = useActiveProject()
   const { t } = useTranslation()
   const [creating, setCreating] = useState(false)
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  // A detail page shows one object of the project you were on. Switching
+  // while on /app/defects/<id> kept that NCR on screen under the new project's
+  // name, so step back to the list it came from.
+  const switchTo = (id: string) => {
+    if (id === activeProject?.id) return
+    setActiveProjectId(id)
+    const detail = /^(\/app\/[^/]+)\/[^/]+$/.exec(location.pathname)
+    if (detail) navigate(detail[1])
+  }
 
   if (isLoading) {
     return (
@@ -96,7 +109,7 @@ export default function ProjectSwitcher() {
             return (
               <DropdownMenuItem
                 key={p.id}
-                onClick={() => setActiveProjectId(p.id)}
+                onClick={() => switchTo(p.id)}
                 className="gap-2"
               >
                 <P size={14} style={{ color: 'hsl(var(--muted-foreground))', flexShrink: 0 }} />

@@ -1,7 +1,6 @@
-import { at, eur, percent, sinceNow } from '@/lib/format'
+import { at, eur, percent, sinceNow, isOverdue } from '@/lib/format'
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { formatDistanceToNow } from 'date-fns'
 import { AlertTriangle, CheckCircle2, ChevronRight, ArrowRight, Lock } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -263,12 +262,12 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold mb-1">{pendingApprovals.length}</div>
-            {pendingApprovals.some((a) => a.deadline && new Date(a.deadline) < new Date()) && (
+            {pendingApprovals.some((a) => isOverdue(a.deadline)) && (
               <span className="text-xs" style={{ color: 'hsl(var(--destructive))' }}>
                 Some past deadline
               </span>
             )}
-            {!pendingApprovals.some((a) => a.deadline && new Date(a.deadline) < new Date()) && pendingApprovals.length > 0 && (
+            {!pendingApprovals.some((a) => isOverdue(a.deadline)) && pendingApprovals.length > 0 && (
               <span className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
                 All within deadline
               </span>
