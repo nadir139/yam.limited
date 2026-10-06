@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ProjectProvider } from "@/contexts/ProjectContext";
 import { LanguageProvider } from "@/lib/i18n";
 import Index from "./pages/Index";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 // The public landing page (Index) is the only eagerly-loaded route. Everything
 // behind /app plus the standalone pages are split out, so a visitor to the
@@ -66,6 +67,9 @@ const App = () => (
               public pages can translate too. */}
           <ProjectProvider>
           <BrowserRouter>
+            {/* Last resort for anything outside the app shell (public pages,
+                sign-in). Pages inside the shell have their own boundary. */}
+            <ErrorBoundary fullScreen>
             <Suspense fallback={null}>
               <Routes>
                 <Route path="/" element={<Index />} />
@@ -92,6 +96,7 @@ const App = () => (
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
+            </ErrorBoundary>
           </BrowserRouter>
           </ProjectProvider>
         </AuthProvider>
