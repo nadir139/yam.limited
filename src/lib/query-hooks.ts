@@ -648,10 +648,20 @@ export function useProjectPresence() {
     }
 
     void beat()
-    const timer = setInterval(beat, HEARTBEAT_MS)
+    // A tab left open in the background is not someone looking at the project:
+    // skip the write while hidden, and beat once on return so "here now" is
+    // right the moment they come back.
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') void beat()
+    }, HEARTBEAT_MS)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void beat()
+    }
+    document.addEventListener('visibilitychange', onVisible)
     return () => {
       cancelled = true
       clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [projectId, qc])
 }

@@ -12,7 +12,11 @@ interface AppShellProps {
 
 export default function AppShell({ children }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
+  // Read on first render, not after it: starting at false painted the desktop
+  // sidebar across a phone screen for a frame before the effect corrected it.
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth < 768,
+  )
   // Signed in but a member of nothing is a real state, not an error: reads are
   // scoped to membership, so every page would render an empty shell of itself.
   // Better to say so once and offer the way out.
