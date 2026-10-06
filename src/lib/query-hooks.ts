@@ -29,6 +29,7 @@ export const QUERY_KEYS = {
   documents: (p: string) => ['documents', p],
   team: (p: string) => ['team', p],
   events: (p: string) => ['events', p],
+  dependencies: (p: string) => ['dependencies', p],
 }
 
 export const useProject = () => {
@@ -57,6 +58,15 @@ export const useWorkPackages = () => {
   return useQuery({
     queryKey: QUERY_KEYS.workPackages(projectId),
     queryFn: () => db.fetchWorkPackages(projectId),
+    enabled: !!projectId,
+  })
+}
+
+export const useDependencies = () => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: QUERY_KEYS.dependencies(projectId),
+    queryFn: () => db.fetchDependencies(projectId),
     enabled: !!projectId,
   })
 }
@@ -264,6 +274,54 @@ export function useAdvancePhase() {
   const projectId = useProjectId()
   return useMutation({
     mutationFn: () => db.advanceProjectPhase(projectId),
+    onSuccess: invalidate,
+  })
+}
+
+// ─── Scheduling ───────────────────────────────────────────────────────────────
+
+function useScheduleInvalidation() {
+  const qc = useQueryClient()
+  return () => {
+    qc.invalidateQueries({ queryKey: ['work-packages'] })
+    qc.invalidateQueries({ queryKey: ['work-package'] })
+    qc.invalidateQueries({ queryKey: ['dependencies'] })
+    qc.invalidateQueries({ queryKey: ['events'] })
+  }
+}
+
+export function useRescheduleWorkPackage() {
+  const invalidate = useScheduleInvalidation()
+  return useMutation({
+    mutationFn: (v: { id: string; start: string | null; end: string | null; reason?: string | null }) =>
+      db.rescheduleWorkPackage(v.id, v.start, v.end, v.reason),
+    onSuccess: invalidate,
+  })
+}
+
+export function useLinkWorkPackages() {
+  const invalidate = useScheduleInvalidation()
+  return useMutation({
+    mutationFn: (v: { predecessorId: string; successorId: string; kind?: 'FS' | 'SS'; lagDays?: number }) =>
+      db.linkWorkPackages(v.predecessorId, v.successorId, v.kind, v.lagDays),
+    onSuccess: invalidate,
+  })
+}
+
+export function useUnlinkWorkPackages() {
+  const invalidate = useScheduleInvalidation()
+  return useMutation({
+    mutationFn: (v: { predecessorId: string; successorId: string; reason?: string | null }) =>
+      db.unlinkWorkPackages(v.predecessorId, v.successorId, v.reason),
+    onSuccess: invalidate,
+  })
+}
+
+export function useSetScheduleBaseline() {
+  const invalidate = useScheduleInvalidation()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (reason?: string | null) => db.setScheduleBaseline(projectId, reason),
     onSuccess: invalidate,
   })
 }

@@ -21,6 +21,7 @@ export const fr: Record<string, string> = {
   'nav.dashboard': 'Tableau de bord',
   'nav.project': 'Projet',
   'nav.workPackages': 'Lots de travaux',
+  'nav.schedule': 'Planning',
   'nav.inspections': 'Inspections',
   'nav.defects': 'Non-conformités',
   'nav.changeOrders': 'Avenants',

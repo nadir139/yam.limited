@@ -7,6 +7,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useProjectId } from '@/lib/query-hooks'
 import { typeColor } from '@/lib/ontology'
 import ChatObjectPanel from './ChatObjectPanel'
+import AgentScheduleCard from '@/components/gantt/AgentScheduleCard'
 
 /** Cache prefixes an Action could have invalidated, whichever Action it was. */
 const INVALIDATE_ON_CHANGE = [
@@ -15,8 +16,17 @@ const INVALIDATE_ON_CHANGE = [
   'project', 'events', 'messages',
   // Posting a message with a mention creates action items; inviting someone
   // changes the team and, for them, the project list.
-  'action-items', 'team', 'my-role', 'my-projects',
+  'action-items', 'team', 'my-role', 'my-projects', 'dependencies',
 ]
+
+/** Reading or changing any of these puts the schedule under the reply. */
+const SCHEDULE_TOOLS = new Set([
+  'get_schedule',
+  'action_reschedule_work_package',
+  'action_link_work_packages',
+  'action_unlink_work_packages',
+  'action_set_schedule_baseline',
+])
 
 type ToolCall = AgentStep
 
@@ -582,6 +592,14 @@ export default function AgentConsole() {
                       onToggle={togglePanel(i)}
                     />
                   </div>
+
+                  {turn.trace?.some((t) => SCHEDULE_TOOLS.has(t.tool)) && (
+                    <AgentScheduleCard
+                      focusIds={turn.changed
+                        ?.filter((c) => c.type === 'WORK_PACKAGE')
+                        .map((c) => c.id)}
+                    />
+                  )}
 
                   {/* Objects opened from this turn, inline. */}
                   {(openPanels[i] ?? []).map((number) => {

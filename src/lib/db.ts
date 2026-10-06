@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import type {
   Vessel,
+  WorkPackageDependency,
   Project,
   WorkPackage,
   InspectionEvent,
@@ -81,6 +82,79 @@ export async function fetchWorkPackages(projectId: string): Promise<WorkPackage[
     .order('wp_number')
   if (error) throw error
   return data ?? []
+}
+
+/** Live dependencies only; removed links stay in the table as history. */
+export async function fetchDependencies(projectId: string): Promise<WorkPackageDependency[]> {
+  const { data, error } = await supabase
+    .from('work_package_dependencies')
+    .select('*')
+    .eq('project_id', projectId)
+    .is('removed_at', null)
+  if (error) throw error
+  return data ?? []
+}
+
+// ─── Scheduling ───────────────────────────────────────────────────────────────
+//
+// Migration 026. Every move on the Gantt is one of these Actions, so dragging
+// a bar leaves the same kind of record as anything else: who, when, the dates
+// before and after, and why.
+
+export async function rescheduleWorkPackage(
+  workPackageId: string,
+  plannedStart: string | null,
+  plannedEnd: string | null,
+  reason?: string | null,
+): Promise<WorkPackage> {
+  const { data, error } = await supabase.rpc('action_reschedule_work_package', {
+    p_work_package_id: workPackageId,
+    p_planned_start: plannedStart ?? undefined,
+    p_planned_end: plannedEnd ?? undefined,
+    p_reason: reason ?? undefined,
+  })
+  const result = unwrap(data, error, 'Reschedule') as unknown as { work_package: WorkPackage }
+  return result.work_package
+}
+
+export async function linkWorkPackages(
+  predecessorId: string,
+  successorId: string,
+  kind: 'FS' | 'SS' = 'FS',
+  lagDays = 0,
+): Promise<WorkPackageDependency> {
+  const { data, error } = await supabase.rpc('action_link_work_packages', {
+    p_predecessor_id: predecessorId,
+    p_successor_id: successorId,
+    p_kind: kind,
+    p_lag_days: lagDays,
+  })
+  const result = unwrap(data, error, 'Link work packages') as unknown as {
+    dependency: WorkPackageDependency
+  }
+  return result.dependency
+}
+
+export async function unlinkWorkPackages(
+  predecessorId: string,
+  successorId: string,
+  reason?: string | null,
+): Promise<void> {
+  const { error } = await supabase.rpc('action_unlink_work_packages', {
+    p_predecessor_id: predecessorId,
+    p_successor_id: successorId,
+    p_reason: reason ?? undefined,
+  })
+  if (error) throw new Error(error.message)
+}
+
+export async function setScheduleBaseline(projectId: string, reason?: string | null): Promise<number> {
+  const { data, error } = await supabase.rpc('action_set_schedule_baseline', {
+    p_project_id: projectId,
+    p_reason: reason ?? undefined,
+  })
+  const result = unwrap(data, error, 'Set baseline') as unknown as { baselined: number }
+  return result.baselined
 }
 
 export async function fetchWorkPackage(id: string): Promise<WorkPackage> {

@@ -896,12 +896,81 @@ export type Database = {
         }
         Relationships: []
       }
+      work_package_dependencies: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          created_by_name: string | null
+          id: string
+          kind: string
+          lag_days: number
+          predecessor_id: string
+          project_id: string
+          removed_at: string | null
+          removed_by_name: string | null
+          removed_reason: string | null
+          successor_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          id?: string
+          kind?: string
+          lag_days?: number
+          predecessor_id: string
+          project_id: string
+          removed_at?: string | null
+          removed_by_name?: string | null
+          removed_reason?: string | null
+          successor_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          id?: string
+          kind?: string
+          lag_days?: number
+          predecessor_id?: string
+          project_id?: string
+          removed_at?: string | null
+          removed_by_name?: string | null
+          removed_reason?: string | null
+          successor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_package_dependencies_predecessor_id_fkey"
+            columns: ["predecessor_id"]
+            isOneToOne: false
+            referencedRelation: "work_packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_package_dependencies_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_package_dependencies_successor_id_fkey"
+            columns: ["successor_id"]
+            isOneToOne: false
+            referencedRelation: "work_packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       work_packages: {
         Row: {
           actual_cost: number | null
           actual_end: string | null
           actual_hours: number | null
           actual_start: string | null
+          baseline_end: string | null
+          baseline_start: string | null
           class_item_ref: string | null
           class_society: Database["public"]["Enums"]["class_society"] | null
           created_at: string | null
@@ -924,6 +993,8 @@ export type Database = {
           actual_end?: string | null
           actual_hours?: number | null
           actual_start?: string | null
+          baseline_end?: string | null
+          baseline_start?: string | null
           class_item_ref?: string | null
           class_society?: Database["public"]["Enums"]["class_society"] | null
           created_at?: string | null
@@ -946,6 +1017,8 @@ export type Database = {
           actual_end?: string | null
           actual_hours?: number | null
           actual_start?: string | null
+          baseline_end?: string | null
+          baseline_start?: string | null
           class_item_ref?: string | null
           class_society?: Database["public"]["Enums"]["class_society"] | null
           created_at?: string | null
@@ -1118,6 +1191,15 @@ export type Database = {
         Args: { p_defect_id: string; p_work_package_id?: string }
         Returns: Json
       }
+      action_link_work_packages: {
+        Args: {
+          p_kind?: string
+          p_lag_days?: number
+          p_predecessor_id: string
+          p_successor_id: string
+        }
+        Returns: Json
+      }
       action_post_message: {
         Args: {
           p_body: string
@@ -1180,6 +1262,15 @@ export type Database = {
         Args: { p_member_id: string; p_project_id: string; p_reason: string }
         Returns: Json
       }
+      action_reschedule_work_package: {
+        Args: {
+          p_planned_end?: string
+          p_planned_start?: string
+          p_reason?: string
+          p_work_package_id: string
+        }
+        Returns: Json
+      }
       action_schedule_inspection: {
         Args: {
           p_class_item_ref?: string
@@ -1208,6 +1299,18 @@ export type Database = {
           p_project_id?: string
           p_vessel_type?: string
           p_year_built?: number
+        }
+        Returns: Json
+      }
+      action_set_schedule_baseline: {
+        Args: { p_project_id?: string; p_reason?: string }
+        Returns: Json
+      }
+      action_unlink_work_packages: {
+        Args: {
+          p_predecessor_id: string
+          p_reason?: string
+          p_successor_id: string
         }
         Returns: Json
       }
