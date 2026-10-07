@@ -23,9 +23,14 @@ Ordered by impact over effort. Most items are a day or less.
    packages, NCRs, inspections, change orders and documents; the part's record across every
    project; chips on work packages and NCRs; Gantt grouped by system; agent `get_parts` and part
    Actions.
-5. **Next on this track.** Messages and photos attached to a part; part condition and service
-   intervals (next service due → a work package proposed by the agent); drawings and manuals
-   on the part; a property asset record so a building's parts outlive its project too.
+5. ~~Import from documents~~ — migration 028, `extract-parts` and `/app/parts/import`: upload the manual
+   and the drawings; Claude maps the set (what each page is, systems, spaces), reads it a few pages at a
+   time, and proposes parts, spaces, connections and where each part is drawn. A person reviews, edits
+   and applies it in one transaction. Parts gain a space, a drawing tag, a safety-critical flag and
+   connections; the drawing viewer opens a sheet on the part; the agent traces what depends on what.
+6. **Next on this track.** Procedures from manuals (start engine, pump out) as checklists linked to
+   parts; re-import a newer revision as a diff against what is recorded; messages and photos on a part;
+   service intervals; a property asset record so a building's parts outlive its project too.
 
 ## 1. Next — reliability (1–2 weeks)
 
@@ -75,7 +80,7 @@ Ordered by impact over effort. Most items are a day or less.
 - Agent stuck on "Reading the world model…": auth-lock deadlock in `AuthContext`. Requests never left
   the browser.
 - Agent: streamed progress, Stop button, bounded waits, per-project threads, a correct cascade
-  drawing. The function (v6, deployed) takes enums from the project's vocabulary, gives `uuid[]` an
+  drawing. The function (v6 at the time; v9 now) takes enums from the project's vocabulary, gives `uuid[]` an
   array schema, drops nulls so SQL defaults apply, caches its prompt and files lists in parallel.
 - Realtime never delivered anything (the publication was empty). Fixed in migration 021.
 - Security: `mention_context` was callable by anyone; anon EXECUTE was revoked on definer functions;

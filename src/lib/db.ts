@@ -4,6 +4,10 @@ import type {
   WorkPackageDependency,
   Part,
   PartLink,
+  Space,
+  PartConnection,
+  PartReference,
+  PartImport,
   Project,
   WorkPackage,
   InspectionEvent,
@@ -341,6 +345,163 @@ export async function unlinkPart(
     p_object_type: objectType,
     p_object_id: objectId,
     p_reason: reason ?? undefined,
+  })
+  if (error) throw new Error(error.message)
+}
+
+// ─── Spaces, connections, drawings, imports ──────────────────────────────────
+//
+// Migration 028. Spaces and connections belong to the asset like parts do;
+// references belong to the document's project; imports are drafts until applied.
+
+export async function fetchSpaces(projectId: string, vesselId: string | null): Promise<Space[]> {
+  const query = supabase.from('spaces').select('*').order('name')
+  const { data, error } = vesselId
+    ? await query.eq('vessel_id', vesselId)
+    : await query.eq('project_id', projectId)
+  if (error) throw error
+  return data ?? []
+}
+
+/** Live connections between the asset's parts. */
+export async function fetchPartConnections(projectId: string, vesselId: string | null): Promise<PartConnection[]> {
+  const query = supabase.from('part_connections').select('*').is('removed_at', null)
+  const { data, error } = vesselId
+    ? await query.eq('vessel_id', vesselId)
+    : await query.eq('project_id', projectId)
+  if (error) throw error
+  return data ?? []
+}
+
+/** Where a part is drawn, with the document it is drawn in. */
+export type PartReferenceWithDocument = PartReference & {
+  document: { id: string; title: string; doc_number: string; file_url: string | null } | null
+}
+
+export async function fetchPartReferences(partId: string): Promise<PartReferenceWithDocument[]> {
+  const { data, error } = await supabase
+    .from('part_references')
+    .select('*, document:documents(id, title, doc_number, file_url)')
+    .eq('part_id', partId)
+    .order('page')
+  if (error) throw error
+  return (data ?? []) as unknown as PartReferenceWithDocument[]
+}
+
+export async function fetchPartImports(projectId: string): Promise<PartImport[]> {
+  const { data, error } = await supabase
+    .from('part_imports')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+export async function fetchPartImport(id: string): Promise<PartImport | null> {
+  const { data, error } = await supabase.from('part_imports').select('*').eq('id', id).maybeSingle()
+  if (error) throw error
+  return data
+}
+
+export async function savePartImport(
+  projectId: string,
+  proposal: unknown,
+  documentIds: string[] | null,
+  importId: string | null,
+): Promise<{ id: string }> {
+  const { data, error } = await supabase.rpc('action_save_part_import', {
+    p_project_id: projectId,
+    p_proposal: proposal as never,
+    p_document_ids: documentIds ?? undefined,
+    p_import_id: importId ?? undefined,
+  })
+  return (unwrap(data, error, 'Save import') as unknown as { import: { id: string } }).import
+}
+
+export interface ImportSummary {
+  spaces_created: number
+  spaces_reused: number
+  parts_created: number
+  parts_reused: number
+  connections: number
+  references: number
+  skipped: unknown[]
+}
+
+export async function applyPartImport(projectId: string, importId: string, proposal: unknown): Promise<ImportSummary> {
+  const { data, error } = await supabase.rpc('action_apply_part_import', {
+    p_import_id: importId,
+    p_proposal: proposal as never,
+    p_project_id: projectId,
+  })
+  return (unwrap(data, error, 'Apply import') as unknown as { result: ImportSummary }).result
+}
+
+export async function discardPartImport(projectId: string, importId: string): Promise<void> {
+  const { error } = await supabase.rpc('action_discard_part_import', {
+    p_import_id: importId,
+    p_project_id: projectId,
+  })
+  if (error) throw new Error(error.message)
+}
+
+export async function createSpace(projectId: string, name: string, parentId: string | null): Promise<Space> {
+  const { data, error } = await supabase.rpc('action_create_space', {
+    p_project_id: projectId,
+    p_name: name,
+    p_parent_id: parentId ?? undefined,
+  })
+  return (unwrap(data, error, 'Record space') as unknown as { space: Space }).space
+}
+
+export interface PartDetailsInput {
+  kind?: string | null
+  designation?: string | null
+  spaceId?: string | null
+  safetyCritical?: boolean | null
+}
+
+export async function setPartDetails(
+  projectId: string,
+  partId: string,
+  input: PartDetailsInput,
+  clear: string[] = [],
+): Promise<Part> {
+  const { data, error } = await supabase.rpc('action_set_part_details', {
+    p_part_id: partId,
+    p_project_id: projectId,
+    p_kind: input.kind ?? undefined,
+    p_designation: input.designation ?? undefined,
+    p_space_id: input.spaceId ?? undefined,
+    p_safety_critical: input.safetyCritical ?? undefined,
+    p_clear: clear.length ? clear : undefined,
+  })
+  return (unwrap(data, error, 'Set part details') as unknown as { part: Part }).part
+}
+
+export async function connectParts(
+  projectId: string,
+  fromId: string,
+  toId: string,
+  kind: string,
+  label?: string | null,
+): Promise<PartConnection> {
+  const { data, error } = await supabase.rpc('action_connect_parts', {
+    p_from_part_id: fromId,
+    p_to_part_id: toId,
+    p_kind: kind,
+    p_label: label ?? undefined,
+    p_project_id: projectId,
+  })
+  return (unwrap(data, error, 'Connect parts') as unknown as { connection: PartConnection }).connection
+}
+
+export async function disconnectParts(projectId: string, connectionId: string, reason?: string | null): Promise<void> {
+  const { error } = await supabase.rpc('action_disconnect_parts', {
+    p_connection_id: connectionId,
+    p_reason: reason ?? undefined,
+    p_project_id: projectId,
   })
   if (error) throw new Error(error.message)
 }

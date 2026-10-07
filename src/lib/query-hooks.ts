@@ -33,6 +33,11 @@ export const QUERY_KEYS = {
   parts: (p: string) => ['parts', p],
   partLinks: (p: string) => ['part-links', p],
   partHistory: (id: string) => ['part-history', id],
+  spaces: (p: string) => ['spaces', p],
+  partConnections: (p: string) => ['part-connections', p],
+  partReferences: (id: string) => ['part-references', id],
+  partImports: (p: string) => ['part-imports', p],
+  partImport: (id: string) => ['part-import', id],
 }
 
 export const useProject = () => {
@@ -367,6 +372,11 @@ function usePartsInvalidation() {
     qc.invalidateQueries({ queryKey: ['parts'] })
     qc.invalidateQueries({ queryKey: ['part-links'] })
     qc.invalidateQueries({ queryKey: ['part-history'] })
+    qc.invalidateQueries({ queryKey: ['spaces'] })
+    qc.invalidateQueries({ queryKey: ['part-connections'] })
+    qc.invalidateQueries({ queryKey: ['part-references'] })
+    qc.invalidateQueries({ queryKey: ['part-imports'] })
+    qc.invalidateQueries({ queryKey: ['part-import'] })
     qc.invalidateQueries({ queryKey: ['events'] })
   }
 }
@@ -413,6 +423,122 @@ export function useUnlinkPart() {
   return useMutation({
     mutationFn: (v: { partId: string; objectType: PartLinkTarget; objectId: string; reason?: string | null }) =>
       db.unlinkPart(v.partId, v.objectType, v.objectId, v.reason),
+    onSuccess: invalidate,
+  })
+}
+
+export const useSpaces = () => {
+  const projectId = useProjectId()
+  const { data: project } = useProject()
+  return useQuery({
+    queryKey: QUERY_KEYS.spaces(projectId),
+    queryFn: () => db.fetchSpaces(projectId, project?.vessel_id ?? null),
+    enabled: !!projectId && project !== undefined,
+  })
+}
+
+export const usePartConnections = () => {
+  const projectId = useProjectId()
+  const { data: project } = useProject()
+  return useQuery({
+    queryKey: QUERY_KEYS.partConnections(projectId),
+    queryFn: () => db.fetchPartConnections(projectId, project?.vessel_id ?? null),
+    enabled: !!projectId && project !== undefined,
+  })
+}
+
+export const usePartReferences = (partId: string | null) =>
+  useQuery({
+    queryKey: QUERY_KEYS.partReferences(partId ?? ''),
+    queryFn: () => db.fetchPartReferences(partId!),
+    enabled: !!partId,
+  })
+
+export const usePartImports = () => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: QUERY_KEYS.partImports(projectId),
+    queryFn: () => db.fetchPartImports(projectId),
+    enabled: !!projectId,
+  })
+}
+
+export const usePartImport = (id: string | null) =>
+  useQuery({
+    queryKey: QUERY_KEYS.partImport(id ?? ''),
+    queryFn: () => db.fetchPartImport(id!),
+    enabled: !!id,
+  })
+
+export function useSavePartImport() {
+  const qc = useQueryClient()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (v: { proposal: unknown; documentIds: string[] | null; importId: string | null }) =>
+      db.savePartImport(projectId, v.proposal, v.documentIds, v.importId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['part-imports'] }),
+  })
+}
+
+export function useApplyPartImport() {
+  const invalidate = usePartsInvalidation()
+  const qc = useQueryClient()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (v: { importId: string; proposal: unknown }) => db.applyPartImport(projectId, v.importId, v.proposal),
+    onSuccess: () => {
+      invalidate()
+      // The import may have created the vessel.
+      qc.invalidateQueries({ queryKey: ['project'] })
+      qc.invalidateQueries({ queryKey: ['vessel'] })
+      qc.invalidateQueries({ queryKey: ['my-projects'] })
+    },
+  })
+}
+
+export function useDiscardPartImport() {
+  const invalidate = usePartsInvalidation()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (importId: string) => db.discardPartImport(projectId, importId),
+    onSuccess: invalidate,
+  })
+}
+
+export function useCreateSpace() {
+  const invalidate = usePartsInvalidation()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (v: { name: string; parentId: string | null }) => db.createSpace(projectId, v.name, v.parentId),
+    onSuccess: invalidate,
+  })
+}
+
+export function useSetPartDetails() {
+  const invalidate = usePartsInvalidation()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (v: { id: string; input: db.PartDetailsInput; clear?: string[] }) =>
+      db.setPartDetails(projectId, v.id, v.input, v.clear),
+    onSuccess: invalidate,
+  })
+}
+
+export function useConnectParts() {
+  const invalidate = usePartsInvalidation()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (v: { fromId: string; toId: string; kind: string; label?: string | null }) =>
+      db.connectParts(projectId, v.fromId, v.toId, v.kind, v.label),
+    onSuccess: invalidate,
+  })
+}
+
+export function useDisconnectParts() {
+  const invalidate = usePartsInvalidation()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (v: { id: string; reason?: string | null }) => db.disconnectParts(projectId, v.id, v.reason),
     onSuccess: invalidate,
   })
 }

@@ -38,7 +38,7 @@ export interface AgentResult {
 export class AgentRequestError extends Error {}
 
 /** The caller's access token, or a clear error instead of an endless wait. */
-async function accessToken(): Promise<string> {
+export async function accessToken(): Promise<string> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(

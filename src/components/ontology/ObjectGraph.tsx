@@ -22,6 +22,7 @@ const LAYOUT: Record<string, { x: number; y: number }> = {
   VESSEL: { x: 110, y: 80 },
   // The asset's own structure sits beside it: what the work is done to.
   PART: { x: 360, y: 80 },
+  SPACE: { x: 360, y: 500 },
   PROJECT: { x: 110, y: 250 },
   SUBCONTRACTOR: { x: 110, y: 430 },
   WORK_PACKAGE: { x: 360, y: 250 },

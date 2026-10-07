@@ -53,7 +53,8 @@ yam.limited/app/*         ← authenticated world model (all routes below)
 | `/app/work-packages` | WorkPackageList | Survey scope, filterable by discipline/status |
 | `/app/work-packages/:id` | WorkPackageDetail | WP detail + linked inspections/defects/documents + parts |
 | `/app/schedule` | SchedulePage | Gantt: forecast vs plan vs baseline, critical path, drag to reschedule |
-| `/app/parts` | PartsPage | The asset's parts tree and each part's record across projects |
+| `/app/parts` | PartsPage | The asset's parts tree (by system or by space) and each part's record, connections and drawings |
+| `/app/parts/import` | PartsImportPage | Read a manual and drawings into a reviewable proposal of parts, spaces and connections |
 | `/app/inspections` | InspectionList | Survey events, inspector role, result badges |
 | `/app/defects` | DefectList | NCR tracker with severity/status, table+card toggle |
 | `/app/defects/:id` | DefectDetail | Full NCR + cascade chain visualization |
@@ -1720,3 +1721,60 @@ search, the part's record across projects, history), part chips on work
 packages and NCRs with search-or-create, and "Group by system" on the Gantt.
 The agent has `get_parts` (the tree, or one part's record) and the five part
 Actions from the registry.
+
+## 35. The boat from her drawings (migration 028, `extract-parts`)
+
+A boat arrives with a manual and a drawing set; nobody types her parts in by
+hand. The import reads them and proposes; a person decides.
+
+**The model gained** spaces (a second tree: where things are, beside the
+systems tree of what they do), and on parts a kind, the designation the
+drawings use (11.1Q21), a space and a safety-critical flag. `part_connections`
+records how parts relate (POWERS, PROTECTS, CONTROLS, SIGNALS, FLOWS_TO,
+CONNECTED) so "this breaker tripped, what stopped?" is a traversal, not a
+guess. `part_references` records where a part is drawn: document, page, sheet,
+grid cell and an approximate box on the page.
+
+**Reading** runs in passes the app drives one request at a time, so no single
+request runs long (edge functions have a wall-clock limit):
+
+1. *Map* — every document at once. What each page is (prose, a drawing sheet,
+   a copy of a sheet that is also in the set, photos, an index), the vessel,
+   the systems, the spaces. Lucky Bird's manual embeds smaller copies of the
+   schematics; the map marks them `SCHEMATIC_COPY` and they are not read
+   again, which is what stops every pump being created twice.
+2. *Parts* — two drawing pages or four prose pages per pass, three passes at
+   once, each sliced out of the PDF with pdf-lib and sent with the map as
+   context. A pass that fails is retried a page at a time.
+3. *Merge* (`supabase/functions/extract-parts/proposal.ts`, shared with the
+   app like the schedule engine) — folds the partial readings: the same
+   drawing tag is the same part; the same name in the same system is the same
+   part ("Bilge pump engine room" in the manual and "Bilge pump E/R" on sheet
+   50.4: names normalise E/R, PS/SB, port/starboard). Cross-sheet references
+   (`=>11.1/21`) resolve to the breaker tagged 11.1Q21 or the part drawn in that
+   row of that sheet; what cannot be resolved becomes a warning, not a guess.
+   Parts and spaces already on the asset are matched by name.
+
+The proposal is saved as a draft (`part_imports`) and opened for review:
+untick, rename, move to a space, open the drawing on any part. Edits autosave.
+`action_apply_part_import` applies it in one transaction: it creates the
+vessel first if the project has none, creates parents before children (a loop
+of parents lands at the top level rather than spinning), reuses existing parts
+and spaces and only fills their empty fields, skips anything nameless or
+excluded, and records PART_CREATED per part plus one PARTS_IMPORTED summary.
+A draft moves from DRAFT to APPLIED or DISCARDED once.
+
+The model is `claude-opus-5-5` with strict tool schemas, adaptive thinking
+(effort medium for the map, high for parts) and server-side refusal
+fallbacks. Forced tool choice is not available on that model, so a response
+without the tool call is retried once. The function only imports the
+constants from `proposal.ts`; the deployed bundle carries that subset.
+
+**Verified** in rolled-back transactions on the live database (vessel created
+from the import, parent loop, excluded and nameless items, connection and
+reference dedupe, reuse that fills only empty fields, re-apply refused,
+surveyor refused, outsider sees nothing); with Deno tests on the merge built
+from what Lucky Bird's sheets actually show; and in the browser against
+mocks, including pdf.js rendering the real sheet 11.1 with the part
+highlighted. The model passes themselves can only be exercised against the
+real API, from the deployed function.
