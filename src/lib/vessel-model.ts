@@ -48,8 +48,11 @@ export interface PlacedSpace {
 export interface PlacedPart {
   part: Part
   position: Vec3
-  /** How the position was found: its own space, an ancestor's, or its system's name. */
-  source: 'space' | 'ancestor' | 'name'
+  /**
+   * How the position was found: its own space, an ancestor's, beside the
+   * parts it is connected to, or from the names along its path.
+   */
+  source: 'space' | 'ancestor' | 'connection' | 'name'
 }
 
 export interface VesselModel {
@@ -145,17 +148,20 @@ const ALONG: Array<[RegExp, number]> = [
   [/\b(cockpit|helm|wheel|binnacle|pedestal|primary|primaries|secondary|winch|winches)\b/, 0.2],
   [/\b(aft cabin|owner|owners|master)\b/, 0.22],
   [/\b(er|engine|engines|machinery|propulsion|generator|genset|shaft|gearbox|saildrive|exhaust)\b/, 0.32],
-  [/\b(nav|chart|navigation|instruments?|electronics)\b/, 0.42],
-  [/\b(galley|kitchen|fridge|refrigeration|stove)\b/, 0.46],
+  [/\b(nav|chart|navigation|instruments?|electronics|mainboard|main board|switchboard|switch board|rcp|control panel|electrical panel|breaker panel|distribution)\b/, 0.42],
+  [/\b(galley|kitchen|fridge|refrigerator|refrigeration|stove|freezer)\b/, 0.46],
   [/\b(saloon|salon|lounge|interior|mess|dinette)\b/, 0.53],
   [/\b(mast|rig|rigging|sails?|boom|spreaders?|shrouds?|halyards?|stays?|furler|vang)\b/, 0.6],
-  [/\b(heads?|toilet|wc|shower|bathroom)\b/, 0.68],
+  [/\b(heads?|toilet|wc|shower|bathroom|wet ?cell)\b/, 0.68],
+  [/\b(fresh ?water|water tanks?|fuel tanks?)\b/, 0.5],
   [/\b(forward|fwd|fore)\b/, 0.78],
   [/\b(aft|after)\b/, 0.15],
   [/\b(mid|midship|midships|amidships|central|centre|center)\b/, 0.5],
 ]
 
 const LEVELS: Array<[RegExp, Level]> = [
+  // "Under floor PS of mast" is in the bilge, not up the mast.
+  [/\b(under ?floor|under|floor|sole|bilges?)\b/, 'low'],
   [/\b(mast|rig|rigging|sails?|boom|spreaders?|shrouds?|halyards?|stays?|furler|vang)\b/, 'mast'],
   [/\b(deck|decks|cockpit|coachroof|flybridge|bridge|cabin top|bimini|helm|winch|winches|stanchions?|pulpit|hatch|hatches|windlass)\b/, 'deck'],
   [/\b(bilge|bilges|tanks?|keel|sump|fuel|water|holding|ballast|plumbing|hull|structure|bottom|through ?hulls?|seacocks?)\b/, 'low'],
@@ -239,12 +245,33 @@ function insideBox(box: Box, id: string, margin = 0.18): Vec3 {
   }
 }
 
-export function placeSpaces(spaces: Space[], dims: HullDims): PlacedSpace[] {
+/**
+ * A space that stands for the whole boat rather than a place on her: a root
+ * named after the vessel ("Lucky Bird"), or a root with no place in its name
+ * holding three or more spaces. It is not drawn, and what it holds is placed
+ * as if it sat at the top.
+ */
+function isContainer(s: Space, kids: number, assetName: string | null): boolean {
+  if (s.parent_id) return false
+  if (assetName && nameWords(s.name) === nameWords(assetName)) return true
+  return kids >= 3 && readName(s.name).t === null
+}
+
+export function placeSpaces(spaces: Space[], dims: HullDims, assetName: string | null = null): PlacedSpace[] {
   const live = spaces.filter((s) => !s.removed_at)
-  const ids = new Set(live.map((s) => s.id))
+  const byId = new Map(live.map((s) => [s.id, s]))
+  const kidCount = new Map<string, number>()
+  for (const s of live) if (s.parent_id && byId.has(s.parent_id)) kidCount.set(s.parent_id, (kidCount.get(s.parent_id) ?? 0) + 1)
+  const containers = new Set(live.filter((s) => isContainer(s, kidCount.get(s.id) ?? 0, assetName)).map((s) => s.id))
+
+  // Where each space hangs. A child whose own name says where it is, under
+  // a parent whose name does not, is placed by its own name: "Aft peak SB"
+  // inside an unplaceable "Stores" would otherwise inherit a guess.
   const children = new Map<string | null, Space[]>()
   for (const s of live) {
-    const parent = s.parent_id && ids.has(s.parent_id) ? s.parent_id : null
+    if (containers.has(s.id)) continue
+    let parent = s.parent_id && byId.has(s.parent_id) && !containers.has(s.parent_id) ? s.parent_id : null
+    if (parent && readName(byId.get(parent)!.name).t === null && readName(s.name).t !== null) parent = null
     children.set(parent, [...(children.get(parent) ?? []), s])
   }
   const out: PlacedSpace[] = []
@@ -267,7 +294,9 @@ export function placeSpaces(spaces: Space[], dims: HullDims): PlacedSpace[] {
   let guessIndex = 0
   for (const s of top) {
     const hint = readName(s.name)
-    const level: Level = hint.level === 'mast' ? 'deck' : hint.level ?? 'interior'
+    // A mast space runs up the mast; its base or step sits on deck.
+    const level: Level =
+      hint.level === 'mast' && /\b(base|step|foot|heel)\b/.test(nameWords(s.name)) ? 'deck' : hint.level ?? 'interior'
     let t = hint.t
     const guessed = t === null
     if (t === null) t = guessSlots[guessIndex++ % guessSlots.length]
@@ -286,7 +315,8 @@ export function placeSpaces(spaces: Space[], dims: HullDims): PlacedSpace[] {
     if (!kids.length || depth > 6) return
     const unsided = kids.filter((k) => readName(k.name).side === 0)
     kids.forEach((k) => {
-      const side = readName(k.name).side
+      const hint = readName(k.name)
+      const side = hint.side
       const b = parent.box
       let box: Box
       if (side !== 0) {
@@ -303,6 +333,13 @@ export function placeSpaces(spaces: Space[], dims: HullDims): PlacedSpace[] {
           size: { x: seg * 0.9, y: b.size.y * 0.9, z: b.size.z * 0.9 },
         }
       }
+      // "Under bed PS" sits in the bottom half of its cabin.
+      if (hint.level === 'low' && parent.box.size.y > 0.6) {
+        box = {
+          center: { ...box.center, y: b.center.y - b.size.y / 4 },
+          size: { ...box.size, y: b.size.y / 2 * 0.9 },
+        }
+      }
       const placed: PlacedSpace = { space: k, box, guessed: parent.guessed }
       out.push(placed)
       placeChildren(placed, depth + 1)
@@ -312,10 +349,18 @@ export function placeSpaces(spaces: Space[], dims: HullDims): PlacedSpace[] {
   return out
 }
 
-export function placeParts(parts: Part[], spaces: PlacedSpace[], dims: HullDims): PlacedPart[] {
+export function placeParts(
+  parts: Part[],
+  spaces: PlacedSpace[],
+  dims: HullDims,
+  connections: PartConnection[] = [],
+): PlacedPart[] {
   const boxes = new Map(spaces.map((s) => [s.space.id, s.box]))
   const byId = new Map(parts.map((p) => [p.id, p]))
   const out: PlacedPart[] = []
+  // Parts whose names say nothing about where they are, to try again by
+  // what they connect to once the rest are placed.
+  const clueless = new Set<string>()
   for (const part of parts) {
     if (part.removed_at) continue
     // Its own space, else the nearest ancestor's, else what the names along
@@ -345,23 +390,53 @@ export function placeParts(parts: Part[], spaces: PlacedSpace[], dims: HullDims)
         if (side === 0) side = h.side
         level ??= h.level
       }
+      if (t === null) clueless.add(part.id)
       // Parts with nothing to go on gather amidships, low in the boat.
       box = zoneBox(dims, t ?? 0.5, side, level ?? 'interior', dims.loa * 0.12)
     }
     out.push({ part, position: insideBox(box, part.id), source })
   }
+
+  // A breaker with no space but wired to the switchboard sits by the
+  // switchboard: put each clueless part at the middle of the placed parts it
+  // connects to, a little apart. A few rounds, so a chain of them follows.
+  const placed = new Map(out.map((p) => [p.part.id, p]))
+  const neighbours = new Map<string, string[]>()
+  for (const c of connections) {
+    if (c.removed_at) continue
+    neighbours.set(c.from_part_id, [...(neighbours.get(c.from_part_id) ?? []), c.to_part_id])
+    neighbours.set(c.to_part_id, [...(neighbours.get(c.to_part_id) ?? []), c.from_part_id])
+  }
+  for (let round = 0; round < 4 && clueless.size; round++) {
+    const settled: Array<[string, Vec3]> = []
+    for (const id of clueless) {
+      const anchors = (neighbours.get(id) ?? [])
+        .map((n) => placed.get(n))
+        .filter((p): p is PlacedPart => !!p && !clueless.has(p.part.id))
+      if (!anchors.length) continue
+      const mid = anchors.reduce((a, p) => ({ x: a.x + p.position.x, y: a.y + p.position.y, z: a.z + p.position.z }), { x: 0, y: 0, z: 0 })
+      const j = (salt: number) => (hash01(id, salt) - 0.5) * 0.5
+      settled.push([id, { x: mid.x / anchors.length + j(4), y: mid.y / anchors.length + j(5), z: mid.z / anchors.length + j(6) }])
+    }
+    if (!settled.length) break
+    for (const [id, position] of settled) {
+      placed.get(id)!.position = position
+      placed.get(id)!.source = 'connection'
+      clueless.delete(id)
+    }
+  }
   return out
 }
 
 export function buildVesselModel(
-  vessel: Pick<Vessel, 'loa' | 'beam' | 'draft' | 'vessel_type'> | null,
+  vessel: Pick<Vessel, 'loa' | 'beam' | 'draft' | 'vessel_type' | 'name'> | null,
   parts: Part[],
   spaces: Space[],
   connections: PartConnection[],
 ): VesselModel {
   const dims = hullDims(vessel, parts)
-  const placedSpaces = placeSpaces(spaces, dims)
-  const placedParts = placeParts(parts, placedSpaces, dims)
+  const placedSpaces = placeSpaces(spaces, dims, vessel?.name ?? null)
+  const placedParts = placeParts(parts, placedSpaces, dims, connections)
   // A system or assembly is drawn only when something connects to it; its
   // components already show where it is, and a marker for "Electrical"
   // floating amidships would point at nothing.

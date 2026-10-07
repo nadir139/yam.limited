@@ -1803,7 +1803,12 @@ The interface the /ontology page promises, inside the app. Two tabs:
 
 **The frame** is fixed now so stored positions survive a scan later: metres,
 x forward (stern at -LOA/2), y up from the waterline, z to starboard.
-Nothing is stored yet; every position is recomputed from names. Storing them
+Nothing is stored yet; every position is recomputed from names. Two rules
+learned on Lucky Bird: a root space named after the boat (or a root with
+no place in its name holding three or more spaces) is the whole boat, not a
+place, so it is not drawn and its spaces are placed by their own names; and
+a part with no space anywhere up its tree sits beside the parts it is
+connected to (a breaker by its switchboard), else amidships. Storing them
 (an Action that sets a space's box or a part's position, by dragging) is the
 next step, then a scan registered into the same frame.
 
