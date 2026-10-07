@@ -25,8 +25,8 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
         borderBottom: '1px solid hsl(var(--border))',
         display: 'flex',
         alignItems: 'center',
-        padding: '0 20px',
-        gap: '12px',
+        padding: '0 12px',
+        gap: '8px',
         flexShrink: 0,
       }}
     >
@@ -51,6 +51,8 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
         {phaseLabel && (
           <Badge
+            // The project switcher matters more than the phase on a phone.
+            className="hidden sm:inline-flex"
             style={{
               backgroundColor: 'hsl(185 60% 40% / 0.12)',
               color: 'hsl(185 60% 35%)',

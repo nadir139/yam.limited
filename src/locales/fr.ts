@@ -23,6 +23,8 @@ export const fr: Record<string, string> = {
   'nav.workPackages': 'Lots de travaux',
   'nav.schedule': 'Planning',
   'nav.model': 'YAManagement',
+  'navShort.defects': 'NCR',
+  'navShort.more': 'Plus',
   'nav.parts': 'Composants',
   'nav.inspections': 'Inspections',
   'nav.defects': 'Non-conformités',

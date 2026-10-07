@@ -30,6 +30,8 @@ export const en: Record<string, string> = {
   'nav.workPackages': 'Work Packages',
   'nav.schedule': 'Schedule',
   'nav.model': 'YAManagement',
+  'navShort.defects': 'NCRs',
+  'navShort.more': 'More',
   'nav.parts': 'Parts',
   'nav.inspections': 'Inspections',
   'nav.defects': 'Defects / NCRs',

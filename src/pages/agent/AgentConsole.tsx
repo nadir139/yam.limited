@@ -671,11 +671,14 @@ export default function AgentConsole() {
         <div ref={endRef} />
       </div>
 
+      {/* Stays under the thumb while the conversation scrolls; on a phone it
+          sits just above the bottom bar. */}
       <form
         onSubmit={(e) => {
           e.preventDefault()
           ask(prompt)
         }}
+        className="sticky bottom-[calc(58px+env(safe-area-inset-bottom))] z-10 bg-background py-2 md:bottom-0"
         style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}
       >
         <Textarea

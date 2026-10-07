@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
+import MobileNav, { MOBILE_NAV_HEIGHT } from './MobileNav'
 import { NoProjects } from './ProjectSwitcher'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import { useProjectPresence } from '@/lib/query-hooks'
@@ -37,7 +38,9 @@ export default function AppShell({ children }: AppShellProps) {
   }, [])
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+    // 100dvh, not 100vh: on a phone 100vh includes the strip under the browser's
+    // toolbar, which hid the bottom of every page.
+    <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
       {/* Desktop sidebar — always visible on md+ */}
       {!isMobile && <Sidebar />}
 
@@ -56,7 +59,16 @@ export default function AppShell({ children }: AppShellProps) {
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
         <Topbar onMenuClick={() => setSidebarOpen(true)} />
-        <main style={{ flex: 1, overflowY: 'auto', padding: '1.5rem' }}>
+        <main
+          className="p-4 md:p-6"
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            overscrollBehavior: 'contain',
+            // Room for the bottom bar, so the last thing on a page is reachable.
+            paddingBottom: isMobile ? `calc(${MOBILE_NAV_HEIGHT + 16}px + env(safe-area-inset-bottom))` : undefined,
+          }}
+        >
           {/* Scoped to the page: a failure here keeps the sidebar and switcher,
               and clears itself on navigating away or switching project. The
               Suspense keeps a lazily loaded page from blanking the shell. */}
@@ -67,6 +79,7 @@ export default function AppShell({ children }: AppShellProps) {
           </ErrorBoundary>
         </main>
       </div>
+      {isMobile && <MobileNav onMenu={() => setSidebarOpen(true)} />}
     </div>
   )
 }

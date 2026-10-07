@@ -427,3 +427,84 @@
 .animate-boat-wave {
   animation: boat-wave 2s ease-in-out infinite;
 }
+
+/* ─── Phones ─────────────────────────────────────────────────────────────── */
+
+/* Decorative overhangs (the landing page's offset cards) must never let a
+   page scroll sideways. `clip`, unlike `hidden`, keeps sticky headers working. */
+html,
+body {
+  overflow-x: clip;
+}
+
+body {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* A grid column defaults to the width of its widest child, so one long
+   graph or table pushed a whole page wider than the phone. */
+main .grid > * {
+  min-width: 0;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  /* iOS zooms the page into any field under 16px and leaves it zoomed. */
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Tables become cards on a phone: one card per row, one line per column,
+   labelled from the column heading (see components/ui/table.tsx). */
+@media (max-width: 639px) {
+  table[data-stack] thead {
+    display: none;
+  }
+  table[data-stack],
+  table[data-stack] tbody {
+    display: block;
+    width: 100%;
+  }
+  table[data-stack] tr {
+    display: block;
+    padding: 0.625rem 0.875rem;
+    border-bottom: 1px solid hsl(var(--border));
+  }
+  table[data-stack] tbody tr:last-child {
+    border-bottom: 0;
+  }
+  table[data-stack] td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.2rem 0;
+    border: 0;
+    text-align: right;
+    height: auto;
+  }
+  table[data-stack] td::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    text-align: left;
+    font-size: 0.75rem;
+    color: hsl(var(--muted-foreground));
+  }
+  table[data-stack] td[data-label=""]::before,
+  table[data-stack] td[colspan]::before {
+    content: none;
+  }
+  table[data-stack] td[colspan] {
+    justify-content: center;
+    text-align: center;
+  }
+}

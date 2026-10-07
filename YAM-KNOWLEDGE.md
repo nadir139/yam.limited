@@ -1833,3 +1833,30 @@ follow it; a stored part also anchors the connection-based placement of its
 neighbours. The camera backs off to fit the hull across whatever frame it
 has, so a phone held upright sees the whole boat.
 
+## 37. On a phone
+
+The app is used on the boat, so every page was checked at 390 px against
+mocks (no sideways scrolling anywhere) and the shared pieces were changed
+rather than each page:
+
+- **Shell.** `100dvh` instead of `100vh` (iOS counted the strip under its
+  toolbar, hiding the bottom of pages and the sidebar's sign-out); 16 px
+  page gutter; a bottom bar (`MobileNav`: Agent, Dashboard, YAManagement,
+  NCRs with the open count, More = the full menu) above the safe area; the
+  topbar drops the phase badge so the project name fits.
+- **Tables** (`components/ui/table.tsx`) label every cell with its column
+  heading and below 640 px index.css shows each row as a card of label /
+  value lines. `<Table stack={false}>` opts out.
+- **Tabs** scroll sideways instead of spilling off the screen; **dialogs**
+  sit inset from the edges and scroll when taller than the screen; **fields**
+  are 16 px on phones so iOS does not zoom in on focus; grid columns may
+  shrink (`main .grid > * { min-width: 0 }`), which is what pushed the
+  graph tab, a part's record and the NCR page wider than the phone.
+- **Pages.** NCR and work-package headers wrap their buttons under the
+  title; the Gantt's name column is 136 px on a phone; the agent's input
+  sticks above the bottom bar; YAManagement puts the boat first and fits
+  the camera to the frame.
+- **Home screen.** `manifest.webmanifest`, icons and Apple meta tags: Add to
+  Home Screen opens YAM full screen on the dashboard. There is no service
+  worker, so it needs a connection.
+

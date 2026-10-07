@@ -64,7 +64,8 @@ Ordered by impact over effort. Most items are a day or less.
 2. **Notifications for action items.** "Nothing emails them" — the sidebar badge is the only
    reminder. Send a daily digest email of open items plus an instant email on mention (Supabase
    Edge Function + Resend, or a pg_cron job).
-3. **Capture from the boat.** Installable PWA, camera → NCR with photo in two taps, queue offline and
+3. **Capture from the boat.** *Half done:* the app is laid out for phones and installs to the home
+   screen (manifest, no service worker yet). Still open: camera → NCR with photo in two taps, queue offline and
    sync on reconnect. Most findings start as a photo on a phone.
 4. **Agent memory per project.** Store conversations server-side (per project, per user) instead of
    `sessionStorage`, so a thread survives a closed tab and a teammate can see what was asked.
