@@ -92,11 +92,11 @@ export default function WorkPackageDetail() {
 
   return (
     <div className="flex flex-col gap-6 max-w-5xl mx-auto">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button variant="outline" size="sm" onClick={() => navigate('/app/work-packages')}>
           <ArrowLeft size={14} className="mr-1" /> Back
         </Button>
-        <div>
+        <div className="min-w-[12rem] flex-1">
           <div className="flex items-center gap-2">
             <span className="font-mono text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
               {wp.wp_number}

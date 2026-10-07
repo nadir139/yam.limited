@@ -152,11 +152,11 @@ export default function DefectDetail() {
         </div>
       )}
 
-      <div className="flex items-start gap-3">
+      <div className="flex flex-wrap items-start gap-3">
         <Button variant="outline" size="sm" onClick={() => navigate('/app/defects')}>
           <ArrowLeft size={14} className="mr-1" /> Back
         </Button>
-        <div className="flex-1">
+        <div className="min-w-[12rem] flex-1">
           <div className="flex items-center gap-2 mb-0.5 flex-wrap">
             <span className="font-mono text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
               {defect.ncr_number}

@@ -79,7 +79,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
     <div
       style={{
         width: '240px',
-        height: '100vh',
+        height: '100dvh',
         background: 'hsl(215 50% 23%)',
         color: 'white',
         display: 'flex',

@@ -2,13 +2,45 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
-  ({ className, ...props }, ref) => (
+// On a phone a wide table either squashes every column or scrolls sideways;
+// both are hard to read on the go. Each cell is labelled with its column's
+// heading (data-label), and below 640px index.css lays every row out as a
+// small card of label / value lines. `stack={false}` keeps a real table.
+const Table = React.forwardRef<
+  HTMLTableElement,
+  React.HTMLAttributes<HTMLTableElement> & { stack?: boolean }
+>(({ className, stack = true, ...props }, ref) => {
+  const inner = React.useRef<HTMLTableElement>(null);
+  React.useImperativeHandle(ref, () => inner.current as HTMLTableElement);
+  React.useLayoutEffect(() => {
+    const table = inner.current;
+    if (!table || !stack) return;
+    const label = () => {
+      const heads = Array.from(table.querySelectorAll("thead th")).map((th) => th.textContent?.trim() ?? "");
+      table.querySelectorAll("tbody tr").forEach((tr) => {
+        Array.from(tr.children).forEach((cell, i) => {
+          const text = heads[i] ?? "";
+          if (cell.getAttribute("data-label") !== text) cell.setAttribute("data-label", text);
+        });
+      });
+    };
+    label();
+    // Rows come and go with the data; attribute writes do not re-trigger this.
+    const observer = new MutationObserver(label);
+    observer.observe(table, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
+  }, [stack]);
+  return (
     <div className="relative w-full overflow-auto">
-      <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
+      <table
+        ref={inner}
+        data-stack={stack ? "" : undefined}
+        className={cn("w-full caption-bottom text-sm", className)}
+        {...props}
+      />
     </div>
-  ),
-);
+  );
+});
 Table.displayName = "Table";
 
 const TableHeader = React.forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(

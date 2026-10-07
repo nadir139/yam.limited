@@ -118,7 +118,9 @@ export default function Gantt({
 }: GanttProps) {
   const ROW = compact ? 28 : 38
   const HEADER = compact ? 40 : 50
-  const LEFT = compact ? 200 : 300
+  // On a phone the names give way to the bars; they still truncate cleanly.
+  const narrow = typeof window !== 'undefined' && window.innerWidth < 640
+  const LEFT = narrow ? 136 : compact ? 200 : 300
   const dw = DAY_WIDTH[zoom]
 
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
@@ -298,7 +300,7 @@ export default function Gantt({
     <div
       ref={scrollRef}
       className="relative overflow-auto rounded-[var(--radius)] border select-none"
-      style={{ borderColor: border, background: 'hsl(var(--card))', maxHeight: compact ? 320 : 'calc(100vh - 260px)' }}
+      style={{ borderColor: border, background: 'hsl(var(--card))', maxHeight: compact ? 320 : 'calc(100dvh - 260px)' }}
       onPointerMove={moveDrag}
       onPointerUp={endDrag}
       onPointerCancel={() => setDrag(null)}
