@@ -28,7 +28,14 @@ Ordered by impact over effort. Most items are a day or less.
    time, and proposes parts, spaces, connections and where each part is drawn. A person reviews, edits
    and applies it in one transaction. Parts gain a space, a drawing tag, a safety-critical flag and
    connections; the drawing viewer opens a sheet on the part; the agent traces what depends on what.
-6. **Next on this track.** Procedures from manuals (start engine, pump out) as checklists linked to
+6. ~~YAManagement~~ — `/app/model`: the boat in 3D (hull from LOA/beam/draft, spaces and parts placed
+   from their names, connections coloured by kind, colour by system or by open NCR / work), and the
+   object graph with live counts and the records behind each type.
+7. **Next for the model.** Store positions: `spaces.model_box` and `parts.model_position` in the
+   model frame, set by dragging in the 3D view through an Action, so placement stops being a guess.
+   Then a `vessel_models` slot for a scan (decimated, Draco-compressed GLB under the 50 MB bucket limit,
+   or a point cloud tiled with Potree / 3D Tiles), registered to the same frame by three picked points.
+8. **Next on this track.** Procedures from manuals (start engine, pump out) as checklists linked to
    parts; re-import a newer revision as a diff against what is recorded; messages and photos on a part;
    service intervals; a property asset record so a building's parts outlive its project too.
 
