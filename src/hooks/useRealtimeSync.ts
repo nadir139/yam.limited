@@ -98,6 +98,27 @@ export function useRealtimeSync() {
       )
       .on(
         'postgres_changes',
+        { event: '*', schema: 'public', table: 'spaces' },
+        () => {
+          qc.invalidateQueries({ queryKey: ['spaces'] })
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'part_connections' },
+        () => {
+          qc.invalidateQueries({ queryKey: ['part-connections'] })
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'part_references' },
+        () => {
+          qc.invalidateQueries({ queryKey: ['part-references'] })
+        },
+      )
+      .on(
+        'postgres_changes',
         { event: '*', schema: 'public', table: 'part_links' },
         () => {
           qc.invalidateQueries({ queryKey: ['part-links'] })

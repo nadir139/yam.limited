@@ -201,6 +201,7 @@ applied by hand in the Supabase SQL editor, in this order:
 27. `supabase-migration-025-vessel-details.sql` — `action_set_project_vessel`: a project can record which boat it is about
 28. `supabase-migration-026-schedule.sql` — baselines, work-package dependencies (FS/SS + lag) and the reschedule / link / unlink / baseline Actions behind the Schedule page
 29. `supabase-migration-027-parts.sql` — the asset's parts tree (belongs to the vessel, so it carries across projects), part links to work packages / NCRs / inspections / change orders / documents, and their Actions
+30. `supabase-migration-028-document-import.sql` — spaces (where things are), part connections (powers / protects / controls / signals / flows to), drawing references (document, page, grid, box), and import drafts applied in one transaction by `action_apply_part_import`
 
 Migrations 006–008 are the important ones. After 008 the `authenticated` and
 `anon` roles hold **zero** `INSERT`/`UPDATE`/`DELETE` grants on the domain

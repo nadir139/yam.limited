@@ -3,6 +3,10 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
   Boxes,
+  FileUp,
+  FileSearch,
+  ShieldAlert,
+  ArrowRight,
   ChevronDown,
   ChevronRight,
   Pencil,
@@ -27,9 +31,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import ObjectHistory from '@/components/ObjectHistory'
+import DrawingViewer, { type DrawingTarget } from '@/components/parts/DrawingViewer'
 import {
   useChangeOrders,
+  useConnectParts,
   useCreatePart,
+  useDisconnectParts,
+  usePartConnections,
+  usePartImports,
+  usePartReferences,
+  useSetPartDetails,
+  useSpaces,
   useDefects,
   useDocuments,
   useInspections,
@@ -58,7 +70,7 @@ import {
 } from '@/lib/parts'
 import { day } from '@/lib/format'
 import { useTranslation } from '@/lib/i18n'
-import type { Discipline, Part } from '@/lib/types'
+import type { Discipline, Part, PartConnection, Space } from '@/lib/types'
 import { Constants } from '@/lib/database.types'
 
 // The asset, as a tree of the things work is done to.
@@ -341,6 +353,8 @@ function TreeRow({
           <span className="w-5" />
         )}
         <span className={`truncate ${part.removed_at ? 'line-through' : ''}`}>{part.name}</span>
+        {part.designation && <span className="shrink-0 font-mono text-[10px]" style={muted}>{part.designation}</span>}
+        {part.safety_critical && <ShieldAlert size={12} className="shrink-0" style={{ color: 'hsl(0 72% 51%)' }} aria-label="Safety-critical" />}
         <span className="ml-auto flex items-center gap-1.5 text-[11px]">
           {c && c.openNcrs > 0 && (
             <span className="rounded-full px-1.5" style={{ background: 'hsl(0 72% 51% / 0.12)', color: 'hsl(0 72% 45%)' }} title="Open NCRs on this part or inside it">
@@ -530,6 +544,8 @@ function PartDetail({
         )}
       </div>
 
+      {!part.removed_at && <PartDetailsRow part={part} />}
+
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         <Field label="Where" value={part.location} />
         <Field label="Manufacturer" value={part.manufacturer} />
@@ -562,8 +578,16 @@ function PartDetail({
       <Tabs defaultValue="record">
         <TabsList>
           <TabsTrigger value="record">Record ({live.length})</TabsTrigger>
+          <TabsTrigger value="connections">Connections</TabsTrigger>
+          <TabsTrigger value="drawings">Drawings</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
+        <TabsContent value="connections">
+          <PartConnectionsPanel part={part} parts={parts} onSelect={onSelect} />
+        </TabsContent>
+        <TabsContent value="drawings">
+          <PartDrawingsPanel part={part} />
+        </TabsContent>
         <TabsContent value="record" className="flex flex-col gap-3">
           <p className="text-xs" style={muted}>
             Every work package, NCR, inspection, change order and document about this part, on
@@ -637,6 +661,273 @@ function PartDetail({
   )
 }
 
+// ─── Where things are ────────────────────────────────────────────────────────
+
+function SpaceTree({
+  spaces,
+  parts,
+  selectedId,
+  select,
+}: {
+  spaces: Space[]
+  parts: Part[]
+  selectedId: string | null
+  select: (id: string) => void
+}) {
+  const live = spaces.filter((s) => !s.removed_at)
+  const kids = (parentId: string | null) =>
+    live.filter((s) => (s.parent_id ?? null) === parentId).sort((a, b) => a.name.localeCompare(b.name))
+  const partsIn = (spaceId: string | null) =>
+    parts.filter((p) => (p.space_id ?? null) === spaceId && p.kind !== 'SYSTEM').sort((a, b) => a.name.localeCompare(b.name))
+  const partRow = (p: Part, depth: number) => (
+    <button
+      key={p.id}
+      type="button"
+      onClick={() => select(p.id)}
+      className="block w-full truncate rounded-md py-0.5 pr-2 text-left text-sm hover:bg-[hsl(var(--muted))]"
+      style={{ paddingLeft: 8 + depth * 16, background: selectedId === p.id ? 'hsl(var(--accent) / 0.12)' : undefined }}
+    >
+      {p.name}
+      {p.safety_critical && <ShieldAlert size={11} className="ml-1 inline" style={{ color: 'hsl(0 72% 51%)' }} />}
+    </button>
+  )
+  const render = (s: Space, depth: number): ReactNode => (
+    <div key={s.id}>
+      <div className="py-1 text-xs font-semibold uppercase tracking-wide" style={{ paddingLeft: 4 + depth * 16, ...muted }}>{s.name}</div>
+      {partsIn(s.id).map((p) => partRow(p, depth + 1))}
+      {kids(s.id).map((c) => render(c, depth + 1))}
+    </div>
+  )
+  const unplaced = partsIn(null)
+  return (
+    <div>
+      {live.length === 0 && <p className="p-2 text-sm" style={muted}>No spaces recorded yet. An import records them from the documents.</p>}
+      {kids(null).map((s) => render(s, 0))}
+      {unplaced.length > 0 && (
+        <div>
+          <div className="py-1 text-xs font-semibold uppercase tracking-wide" style={{ paddingLeft: 4, ...muted }}>Not placed</div>
+          {unplaced.map((p) => partRow(p, 1))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const KINDS = ['SYSTEM', 'ASSEMBLY', 'COMPONENT'] as const
+const CONNECTION_LABEL: Record<string, [string, string]> = {
+  POWERS: ['powers', 'powered by'],
+  PROTECTS: ['protects', 'protected by'],
+  CONTROLS: ['controls', 'controlled by'],
+  SIGNALS: ['signals to', 'signalled by'],
+  FLOWS_TO: ['flows to', 'fed from'],
+  CONNECTED: ['connects to', 'connected from'],
+}
+
+function PartDetailsRow({ part }: { part: Part }) {
+  const { can } = usePermissions()
+  const { data: spaces = [] } = useSpaces()
+  const set = useSetPartDetails()
+  const [designation, setDesignation] = useState(part.designation ?? '')
+  useEffect(() => setDesignation(part.designation ?? ''), [part.id, part.designation])
+  const editable = can('action_update_part')
+  const save = (input: Parameters<typeof set.mutate>[0]['input'], clear: string[] = []) =>
+    set.mutate({ id: part.id, input, clear }, { onError: (e) => toast.error(e instanceof Error ? e.message : 'Could not save') })
+  const liveSpaces = spaces.filter((s) => !s.removed_at)
+  const spaceById = new Map(spaces.map((s) => [s.id, s]))
+  const spacePath = (s: Space): string => {
+    const parent = s.parent_id ? spaceById.get(s.parent_id) : undefined
+    return parent ? `${spacePath(parent)} › ${s.name}` : s.name
+  }
+
+  return (
+    <div className="flex flex-wrap items-end gap-3 text-xs">
+      <label className="flex flex-col gap-1">
+        <span style={muted}>Kind</span>
+        <select
+          disabled={!editable}
+          value={part.kind ?? ''}
+          onChange={(e) => (e.target.value ? save({ kind: e.target.value }) : save({}, ['kind']))}
+          className="h-8 rounded-md border px-2"
+          style={selectStyle}
+        >
+          <option value="">—</option>
+          {KINDS.map((k) => <option key={k} value={k}>{k.toLowerCase()}</option>)}
+        </select>
+      </label>
+      <label className="flex flex-col gap-1">
+        <span style={muted}>Sits in</span>
+        <select
+          disabled={!editable}
+          value={part.space_id ?? ''}
+          onChange={(e) => (e.target.value ? save({ spaceId: e.target.value }) : save({}, ['space']))}
+          className="h-8 max-w-[16rem] rounded-md border px-2"
+          style={selectStyle}
+        >
+          <option value="">— not placed —</option>
+          {liveSpaces.map((s) => ({ s, path: spacePath(s) })).sort((a, b) => a.path.localeCompare(b.path)).map(({ s, path }) => (
+            <option key={s.id} value={s.id}>{path}</option>
+          ))}
+        </select>
+      </label>
+      <label className="flex flex-col gap-1">
+        <span style={muted}>Drawing tag</span>
+        <Input
+          disabled={!editable}
+          value={designation}
+          onChange={(e) => setDesignation(e.target.value)}
+          onBlur={() => {
+            if (designation.trim() === (part.designation ?? '')) return
+            if (designation.trim()) save({ designation: designation.trim() })
+            else save({}, ['designation'])
+          }}
+          placeholder="e.g. 11.1Q21"
+          className="h-8 w-32 font-mono text-xs"
+        />
+      </label>
+      <label className="flex items-center gap-1.5 pb-2">
+        <input
+          type="checkbox"
+          disabled={!editable}
+          checked={part.safety_critical}
+          onChange={(e) => save({ safetyCritical: e.target.checked })}
+        />
+        <ShieldAlert size={13} style={{ color: part.safety_critical ? 'hsl(0 72% 51%)' : undefined }} /> Safety-critical
+      </label>
+    </div>
+  )
+}
+
+function PartConnectionsPanel({ part, parts, onSelect }: { part: Part; parts: Part[]; onSelect: (id: string) => void }) {
+  const { can } = usePermissions()
+  const { data: connections = [] } = usePartConnections()
+  const connect = useConnectParts()
+  const disconnect = useDisconnectParts()
+  const [kind, setKind] = useState('POWERS')
+  const [direction, setDirection] = useState<'out' | 'in'>('out')
+  const [other, setOther] = useState('')
+  const [label, setLabel] = useState('')
+  const byId = useMemo(() => new Map(parts.map((p) => [p.id, p])), [parts])
+
+  const outgoing = connections.filter((c) => c.from_part_id === part.id)
+  const incoming = connections.filter((c) => c.to_part_id === part.id)
+  const options = flattenTree(buildPartTree(parts)).filter((n) => n.part.id !== part.id)
+
+  const row = (c: PartConnection, dir: 'out' | 'in') => {
+    const otherId = dir === 'out' ? c.to_part_id : c.from_part_id
+    const o = byId.get(otherId)
+    return (
+      <div key={c.id} className="flex items-center gap-2 border-b py-1.5 text-sm last:border-b-0" style={{ borderColor: 'hsl(var(--border))' }}>
+        <span className="w-28 shrink-0 text-xs" style={muted}>{CONNECTION_LABEL[c.kind]?.[dir === 'out' ? 0 : 1] ?? c.kind}</span>
+        <button type="button" className="truncate font-medium hover:underline" onClick={() => o && onSelect(o.id)}>
+          {o ? partPath(o, byId) : 'a part you cannot see'}
+        </button>
+        {c.label && <span className="font-mono text-xs" style={muted}>{c.label}</span>}
+        {can('action_connect_parts') && (
+          <button
+            type="button"
+            aria-label="Remove connection"
+            className="ml-auto opacity-50 hover:opacity-100"
+            onClick={() => {
+              const reason = window.prompt('Why is this connection wrong or gone? (kept in the record)')
+              if (reason === null) return
+              disconnect.mutate({ id: c.id, reason }, { onError: (e) => toast.error(e instanceof Error ? e.message : 'Could not remove') })
+            }}
+          >
+            <X size={14} />
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  const add = () => {
+    if (!other) return
+    const [fromId, toId] = direction === 'out' ? [part.id, other] : [other, part.id]
+    connect.mutate(
+      { fromId, toId, kind, label: label.trim() || null },
+      {
+        onSuccess: () => {
+          setOther('')
+          setLabel('')
+        },
+        onError: (e) => toast.error(e instanceof Error ? e.message : 'Could not connect'),
+      },
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-xs" style={muted}>
+        What this part depends on and what depends on it, as the drawings show it. Following these is how the
+        record answers "this breaker tripped, what stopped?".
+      </p>
+      {incoming.length === 0 && outgoing.length === 0 && <p className="text-sm" style={muted}>No connections recorded.</p>}
+      {incoming.map((c) => row(c, 'in'))}
+      {outgoing.map((c) => row(c, 'out'))}
+      {can('action_connect_parts') && !part.removed_at && (
+        <div className="flex flex-wrap items-center gap-2 border-t pt-3" style={{ borderColor: 'hsl(var(--border))' }}>
+          <select value={direction} onChange={(e) => setDirection(e.target.value as 'out' | 'in')} className="h-8 rounded-md border px-2 text-xs" style={selectStyle} aria-label="Direction">
+            <option value="out">This part</option>
+            <option value="in">This part is</option>
+          </select>
+          <select value={kind} onChange={(e) => setKind(e.target.value)} className="h-8 rounded-md border px-2 text-xs" style={selectStyle} aria-label="Kind">
+            {Object.entries(CONNECTION_LABEL).map(([k, [out, inn]]) => (
+              <option key={k} value={k}>{direction === 'out' ? out : inn}</option>
+            ))}
+          </select>
+          <select value={other} onChange={(e) => setOther(e.target.value)} className="h-8 min-w-0 flex-1 rounded-md border px-2 text-xs" style={selectStyle} aria-label="Other part">
+            <option value="">Choose a part…</option>
+            {options.map((n) => <option key={n.part.id} value={n.part.id}>{partPath(n.part, byId)}</option>)}
+          </select>
+          <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label (breaker, size)" className="h-8 w-36 text-xs" />
+          <Button size="sm" variant="outline" onClick={add} disabled={!other || connect.isPending}>
+            <Link2 size={13} className="mr-1" /> Connect
+          </Button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PartDrawingsPanel({ part }: { part: Part }) {
+  const { data: refs = [], isLoading } = usePartReferences(part.id)
+  const [viewer, setViewer] = useState<DrawingTarget | null>(null)
+  return (
+    <div className="flex flex-col gap-2">
+      {isLoading && <p className="text-sm" style={muted}>Loading…</p>}
+      {!isLoading && refs.length === 0 && (
+        <p className="text-sm" style={muted}>Not found on any drawing yet. Importing the documents records where each part is drawn.</p>
+      )}
+      {refs.map((r) => (
+        <button
+          key={r.id}
+          type="button"
+          disabled={!r.document?.file_url}
+          onClick={() =>
+            r.document?.file_url &&
+            setViewer({
+              url: r.document.file_url,
+              title: `${r.document.title} · page ${r.page}${r.sheet ? ` · sheet ${r.sheet}` : ''}`,
+              page: r.page,
+              bbox: r.bbox,
+              label: part.name,
+            })
+          }
+          className="flex items-center gap-2 rounded-md border px-3 py-2 text-left text-sm hover:bg-[hsl(var(--muted))]"
+          style={{ borderColor: 'hsl(var(--border))' }}
+        >
+          <FileSearch size={15} style={{ color: 'hsl(var(--accent))' }} />
+          <span className="flex-1 truncate">{r.document?.title ?? 'Document'}</span>
+          <span className="text-xs" style={muted}>
+            page {r.page}{r.sheet ? ` · sheet ${r.sheet}` : ''}{r.grid ? ` · ${r.grid}` : ''}
+          </span>
+        </button>
+      ))}
+      <DrawingViewer target={viewer} onClose={() => setViewer(null)} />
+    </div>
+  )
+}
+
 // ─── The page ────────────────────────────────────────────────────────────────
 
 export default function PartsPage() {
@@ -654,6 +945,10 @@ export default function PartsPage() {
   const [showRemoved, setShowRemoved] = useState(false)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [dialog, setDialog] = useState<{ editing: Part | null; parentId: string } | null>(null)
+  const [view, setView] = useState<'systems' | 'spaces'>('systems')
+  const { data: spaces = [] } = useSpaces()
+  const { data: imports = [] } = usePartImports()
+  const drafts = imports.filter((i) => i.status === 'DRAFT')
 
   const byId = useMemo(() => new Map(parts.map((p) => [p.id, p])), [parts])
   const tree = useMemo(() => buildPartTree(parts, showRemoved), [parts, showRemoved])
@@ -767,12 +1062,33 @@ export default function PartsPage() {
             {!isProperty && ' Parts belong to the vessel, so they carry over to every project on her.'}
           </p>
         </div>
-        {can('action_create_part') && !needsVessel && (
-          <Button size="sm" onClick={() => setDialog({ editing: null, parentId: selected && !selected.removed_at ? selected.id : '' })}>
-            <Plus size={14} className="mr-1" /> Record part
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {can('action_create_part') && (
+            <Button size="sm" variant="outline" asChild>
+              <Link to="/app/parts/import"><FileUp size={14} className="mr-1" /> Import from documents</Link>
+            </Button>
+          )}
+          {can('action_create_part') && !needsVessel && (
+            <Button size="sm" onClick={() => setDialog({ editing: null, parentId: selected && !selected.removed_at ? selected.id : '' })}>
+              <Plus size={14} className="mr-1" /> Record part
+            </Button>
+          )}
+        </div>
       </div>
+
+      {drafts.length > 0 && (
+        <Card>
+          <CardContent className="flex flex-wrap items-center gap-3 p-3 text-sm">
+            <FileUp size={15} style={{ color: 'hsl(var(--accent))' }} />
+            <span>{drafts.length === 1 ? 'An import is' : `${drafts.length} imports are`} waiting for review.</span>
+            {drafts.map((d) => (
+              <Link key={d.id} to={`/app/parts/import/${d.id}`} className="inline-flex items-center gap-1 font-medium hover:underline" style={{ color: 'hsl(var(--accent))' }}>
+                {d.created_by_name ?? 'Draft'} · {day(d.created_at)} <ArrowRight size={12} />
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {needsVessel ? (
         <Card>
@@ -781,7 +1097,9 @@ export default function PartsPage() {
             <Link to="/app/project" className="font-medium underline">
               Add the boat's details
             </Link>{' '}
-            first, then come back to build her parts.
+            first, then come back to build her parts, or{' '}
+            <Link to="/app/parts/import" className="font-medium underline">import them from her manual and drawings</Link>,
+            which records the boat as well.
           </CardContent>
         </Card>
       ) : isLoading ? (
@@ -790,8 +1108,9 @@ export default function PartsPage() {
         <Card>
           <CardContent className="flex flex-col items-start gap-3 p-6 text-sm">
             <p>
-              No parts recorded yet. Start with the main systems and add components as work
-              touches them — or ask the agent to build the tree from a spec or a job list.
+              No parts recorded yet. The quickest start is to{' '}
+              <Link to="/app/parts/import" className="font-medium underline">import them from the manual and drawings</Link>.
+              Or start with the main systems and add components as work touches them.
             </p>
             {can('action_create_part') && (
               <Button size="sm" variant="outline" onClick={seedStarter} disabled={create.isPending}>
@@ -807,6 +1126,19 @@ export default function PartsPage() {
               <div className="relative">
                 <Search size={14} className="absolute left-2.5 top-2.5" style={muted} />
                 <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search name, make, serial…" className="h-9 pl-8" />
+              </div>
+              <div className="inline-flex self-start overflow-hidden rounded-md border text-xs" style={{ borderColor: 'hsl(var(--border))' }}>
+                {(['systems', 'spaces'] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setView(v)}
+                    className="px-3 py-1"
+                    style={{ background: view === v ? 'hsl(var(--primary))' : 'transparent', color: view === v ? 'hsl(var(--primary-foreground))' : undefined }}
+                  >
+                    By {v === 'systems' ? 'system' : 'space'}
+                  </button>
+                ))}
               </div>
               <div className="flex items-center justify-between text-xs" style={muted}>
                 <span>{parts.filter((p) => !p.removed_at).length} parts</span>
@@ -835,9 +1167,11 @@ export default function PartsPage() {
                           {partPath(p, byId)}
                         </button>
                       ))
-                  : tree.map((n) => (
-                      <TreeRow key={n.part.id} node={n} selectedId={selectedId} expanded={expanded} toggle={toggle} select={select} counts={counts} />
-                    ))}
+                  : view === 'spaces'
+                    ? <SpaceTree spaces={spaces} parts={parts.filter((p) => showRemoved || !p.removed_at)} selectedId={selectedId} select={select} />
+                    : tree.map((n) => (
+                        <TreeRow key={n.part.id} node={n} selectedId={selectedId} expanded={expanded} toggle={toggle} select={select} counts={counts} />
+                      ))}
               </div>
             </CardContent>
           </Card>

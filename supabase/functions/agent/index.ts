@@ -189,7 +189,7 @@ function buildTools(
     {
       name: "get_parts",
       description:
-        "The asset's parts tree: every system, assembly and component recorded for this vessel (or building), with its path (Deck > Winches > Port primary), category, location, make, model and serial number, and which of this project's work packages, NCRs, inspections, change orders and documents are linked to it. Parts belong to the vessel, so the tree carries over between projects. Pass part_id to get one part's whole record instead: everything ever linked to it on every project you can read, including earlier ones. Call this before recording parts (to find the right parent and avoid duplicates) and before answering what has been done to a physical thing.",
+        "The asset's parts tree: every system, assembly and component recorded for this vessel (or building), with its path (Deck > Winches > Port primary), category, location, make, model and serial number, and which of this project's work packages, NCRs, inspections, change orders and documents are linked to it. Parts belong to the vessel, so the tree carries over between projects. Each part also carries its kind, the designation the drawings use for it (e.g. 11.1Q21), the space it sits in and whether it is safety-critical. Pass part_id to get one part's whole record instead: everything ever linked to it on every project you can read, where it is drawn, and what it is connected to -- upstream (what powers, protects, controls or feeds it) and downstream (everything that depends on it, followed through the connections). Call this before recording parts (to find the right parent and avoid duplicates), before answering what has been done to a physical thing, and for any 'what stops if this fails / what feeds this' question.",
       input_schema: {
         type: "object",
         properties: {
@@ -297,6 +297,8 @@ The schedule is part of the world model. Call get_schedule before answering anyt
 
 ## The asset's parts
 The model is of a physical thing, so the things work is done to are recorded too: a tree of systems and components (Deck > Winches > Port primary winch) that belongs to the vessel and outlives this project. Call get_parts before recording parts, and before answering what has been done to a physical thing -- get_parts with a part_id returns its record across every project. When a work package, NCR or inspection concerns a specific component, link it with action_link_part, recording the part first with action_create_part if it is not in the tree; place it under the right parent rather than at the top level, creating the system above it if needed. action_create_part returns the existing part when one of that name already sits under that parent, so it is safe to call for each item. When someone tells you a make, model or serial number, record it on the part.
+
+Parts also have a place (action_create_space, then action_set_part_details with p_space_id) and connections (action_connect_parts: POWERS, PROTECTS, CONTROLS, SIGNALS, FLOWS_TO). For "what stops if X fails", "what feeds X" or "which breaker is the bilge pump on", call get_parts with that part's id and answer from upstream and downstream; say when the record has no connections rather than guessing from names. Safety-critical parts (seacocks, through-hulls, fuel shut-offs) deserve a mention whenever work touches them. A whole manual or drawing set is imported from the Parts page ("Import from documents"), not through you: suggest it when someone wants to load many parts from documents.
 
 ## Act
 When you are asked to record something, record it. A list of jobs is a list of records: one work package per item, all issued together as parallel tool calls in a single turn, not one per turn. Check what already exists once, up front, so you do not file a duplicate. Fill the fields you were given, leave unknown optional fields empty, and state your assumptions in one line afterwards -- a filed record that ${actorName} corrects beats an interrogation.
@@ -592,7 +594,7 @@ Deno.serve(async (req: Request) => {
   const projectColumn = (table: string): string | null => {
     if (table === "projects") return "id";
     if (table === "vessels") return null; // reached through its project
-    if (table === "parts") return null; // belongs to the asset; see scopeParts
+    if (table === "parts" || table === "spaces") return null; // belong to the asset; see scopeParts
     return "project_id";
   };
 
@@ -613,7 +615,7 @@ Deno.serve(async (req: Request) => {
       let query = supabase.from(table).select("*").limit(limit);
       const column = projectColumn(table);
       if (column) query = query.eq(column, projectId);
-      if (table === "parts") query = scopeParts(query);
+      if (table === "parts" || table === "spaces") query = scopeParts(query);
       if (table === "vessels" && project.vessel_name === null) return { rows: [] };
       const { data, error } = await query;
       if (error) return { error: error.message };
@@ -627,7 +629,7 @@ Deno.serve(async (req: Request) => {
       let query = supabase.from(table).select("*").eq("id", String(input.id));
       const column = projectColumn(table);
       if (column) query = query.eq(column, projectId);
-      if (table === "parts") query = scopeParts(query);
+      if (table === "parts" || table === "spaces") query = scopeParts(query);
       const { data, error } = await query.maybeSingle();
       if (error) return { error: error.message };
       if (!data) return { error: "No object with that id on this project." };
@@ -732,6 +734,24 @@ Deno.serve(async (req: Request) => {
       if (partsError) return { error: partsError.message };
       const parts = (partRows ?? []) as Array<Record<string, unknown> & { id: string; name: string; parent_id: string | null; removed_at: string | null }>;
       const byId = new Map(parts.map((p) => [p.id, p]));
+      const [spacesRes, connectionsRes] = await Promise.all([
+        scopeParts(supabase.from("spaces").select("id, name, parent_id").is("removed_at", null)),
+        scopeParts(supabase.from("part_connections").select("id, from_part_id, to_part_id, kind, label").is("removed_at", null)),
+      ]);
+      const spaceRows = (spacesRes.data ?? []) as Array<{ id: string; name: string; parent_id: string | null }>;
+      const spaceById = new Map(spaceRows.map((x) => [x.id, x]));
+      const spacePath = (id: string): string | undefined => {
+        const names: string[] = [];
+        const seen = new Set<string>();
+        let cur = spaceById.get(id);
+        while (cur && !seen.has(cur.id)) {
+          names.unshift(cur.name);
+          seen.add(cur.id);
+          cur = cur.parent_id ? spaceById.get(cur.parent_id) : undefined;
+        }
+        return names.length ? names.join(" > ") : undefined;
+      };
+      const connections = (connectionsRes.data ?? []) as Array<{ id: string; from_part_id: string; to_part_id: string; kind: string; label: string | null }>;
       const pathOf = (p: { id: string; name: string; parent_id: string | null }) => {
         const names = [p.name];
         const seen = new Set([p.id]);
@@ -798,8 +818,43 @@ Deno.serve(async (req: Request) => {
           ? await supabase.from("projects").select("id, name").in("id", projectIds)
           : { data: [] };
         const nameOf = new Map((projectNames ?? []).map((p: { id: string; name: string }) => [p.id, p.name]));
+        // Upstream: what this part depends on. Downstream: everything that
+        // depends on it, followed through the connections (a breaker protects
+        // a pump that drains a bilge...), so "what stops if this fails" has a
+        // whole answer, not just the first hop.
+        const nameAt = (id: string) => {
+          const x = byId.get(id);
+          return x ? pathOf(x) : "(a part you cannot see)";
+        };
+        const upstream = connections
+          .filter((c) => c.to_part_id === part.id)
+          .map((c) => ({ connection_id: c.id, kind: c.kind, from: nameAt(c.from_part_id), from_id: c.from_part_id, label: c.label ?? undefined }));
+        const downstream: Array<{ depth: number; kind: string; part: string; part_id: string; via: string; label?: string }> = [];
+        const visited = new Set([part.id]);
+        let frontier = [part.id];
+        for (let depth = 1; depth <= 6 && frontier.length; depth++) {
+          const next: string[] = [];
+          for (const from of frontier) {
+            for (const c of connections.filter((x) => x.from_part_id === from)) {
+              if (visited.has(c.to_part_id)) continue;
+              visited.add(c.to_part_id);
+              next.push(c.to_part_id);
+              downstream.push({ depth, kind: c.kind, part: nameAt(c.to_part_id), part_id: c.to_part_id, via: nameAt(from), label: c.label ?? undefined });
+            }
+          }
+          frontier = next;
+        }
+        const { data: drawn } = await supabase
+          .from("part_references")
+          .select("page, sheet, grid, document:documents(title, doc_number)")
+          .eq("part_id", part.id)
+          .limit(MAX_ROWS);
+
         return {
-          part: { ...part, path: pathOf(part) },
+          part: { ...part, path: pathOf(part), space: typeof part.space_id === "string" ? spacePath(part.space_id) : undefined },
+          upstream,
+          downstream,
+          drawn_in: drawn ?? [],
           sub_parts: parts.filter((p) => p.parent_id === part.id && !p.removed_at).map((p) => ({ id: p.id, name: p.name })),
           record: links.map((l) => ({
             object_type: l.object_type,
@@ -835,6 +890,10 @@ Deno.serve(async (req: Request) => {
             path: pathOf(p),
             parent_id: p.parent_id,
             category: p.category ?? undefined,
+            kind: p.kind ?? undefined,
+            designation: p.designation ?? undefined,
+            space: typeof p.space_id === "string" ? spacePath(p.space_id) : undefined,
+            safety_critical: p.safety_critical === true || undefined,
             location: p.location ?? undefined,
             manufacturer: p.manufacturer ?? undefined,
             model: p.model ?? undefined,

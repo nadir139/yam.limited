@@ -712,6 +712,216 @@ export type Database = {
           },
         ]
       }
+      part_connections: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          created_by_name: string | null
+          from_part_id: string
+          id: string
+          kind: string
+          label: string | null
+          project_id: string | null
+          removed_at: string | null
+          removed_by_name: string | null
+          removed_reason: string | null
+          source_document_id: string | null
+          source_page: number | null
+          to_part_id: string
+          vessel_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          from_part_id: string
+          id?: string
+          kind: string
+          label?: string | null
+          project_id?: string | null
+          removed_at?: string | null
+          removed_by_name?: string | null
+          removed_reason?: string | null
+          source_document_id?: string | null
+          source_page?: number | null
+          to_part_id: string
+          vessel_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          from_part_id?: string
+          id?: string
+          kind?: string
+          label?: string | null
+          project_id?: string | null
+          removed_at?: string | null
+          removed_by_name?: string | null
+          removed_reason?: string | null
+          source_document_id?: string | null
+          source_page?: number | null
+          to_part_id?: string
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "part_connections_from_part_id_fkey"
+            columns: ["from_part_id"]
+            isOneToOne: false
+            referencedRelation: "parts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "part_connections_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "part_connections_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "part_connections_to_part_id_fkey"
+            columns: ["to_part_id"]
+            isOneToOne: false
+            referencedRelation: "parts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "part_connections_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      part_imports: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          created_by_name: string | null
+          decided_at: string | null
+          decided_by_name: string | null
+          document_ids: string[]
+          id: string
+          project_id: string
+          proposal: Json
+          result: Json | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          decided_at?: string | null
+          decided_by_name?: string | null
+          document_ids?: string[]
+          id?: string
+          project_id: string
+          proposal: Json
+          result?: Json | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          decided_at?: string | null
+          decided_by_name?: string | null
+          document_ids?: string[]
+          id?: string
+          project_id?: string
+          proposal?: Json
+          result?: Json | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "part_imports_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      part_references: {
+        Row: {
+          bbox: number[] | null
+          created_at: string
+          created_by: string | null
+          created_by_name: string | null
+          document_id: string
+          grid: string | null
+          id: string
+          note: string | null
+          page: number
+          part_id: string
+          project_id: string
+          sheet: string | null
+        }
+        Insert: {
+          bbox?: number[] | null
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          document_id: string
+          grid?: string | null
+          id?: string
+          note?: string | null
+          page: number
+          part_id: string
+          project_id: string
+          sheet?: string | null
+        }
+        Update: {
+          bbox?: number[] | null
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          document_id?: string
+          grid?: string | null
+          id?: string
+          note?: string | null
+          page?: number
+          part_id?: string
+          project_id?: string
+          sheet?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "part_references_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "part_references_part_id_fkey"
+            columns: ["part_id"]
+            isOneToOne: false
+            referencedRelation: "parts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "part_references_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       part_links: {
         Row: {
           created_at: string
@@ -775,8 +985,10 @@ export type Database = {
           created_at: string
           created_by: string | null
           created_by_name: string | null
+          designation: string | null
           id: string
           installed_on: string | null
+          kind: string | null
           location: string | null
           manufacturer: string | null
           model: string | null
@@ -787,7 +999,9 @@ export type Database = {
           removed_at: string | null
           removed_by_name: string | null
           removed_reason: string | null
+          safety_critical: boolean
           serial_number: string | null
+          space_id: string | null
           updated_at: string | null
           vessel_id: string | null
         }
@@ -796,8 +1010,10 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           created_by_name?: string | null
+          designation?: string | null
           id?: string
           installed_on?: string | null
+          kind?: string | null
           location?: string | null
           manufacturer?: string | null
           model?: string | null
@@ -808,7 +1024,9 @@ export type Database = {
           removed_at?: string | null
           removed_by_name?: string | null
           removed_reason?: string | null
+          safety_critical?: boolean
           serial_number?: string | null
+          space_id?: string | null
           updated_at?: string | null
           vessel_id?: string | null
         }
@@ -817,8 +1035,10 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           created_by_name?: string | null
+          designation?: string | null
           id?: string
           installed_on?: string | null
+          kind?: string | null
           location?: string | null
           manufacturer?: string | null
           model?: string | null
@@ -829,7 +1049,9 @@ export type Database = {
           removed_at?: string | null
           removed_by_name?: string | null
           removed_reason?: string | null
+          safety_critical?: boolean
           serial_number?: string | null
+          space_id?: string | null
           updated_at?: string | null
           vessel_id?: string | null
         }
@@ -983,6 +1205,73 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "projects_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      spaces: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          created_by_name: string | null
+          id: string
+          name: string
+          notes: string | null
+          parent_id: string | null
+          project_id: string | null
+          removed_at: string | null
+          removed_by_name: string | null
+          removed_reason: string | null
+          vessel_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          parent_id?: string | null
+          project_id?: string | null
+          removed_at?: string | null
+          removed_by_name?: string | null
+          removed_reason?: string | null
+          vessel_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          parent_id?: string | null
+          project_id?: string | null
+          removed_at?: string | null
+          removed_by_name?: string | null
+          removed_reason?: string | null
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spaces_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "spaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spaces_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spaces_vessel_id_fkey"
             columns: ["vessel_id"]
             isOneToOne: false
             referencedRelation: "vessels"
@@ -1285,6 +1574,16 @@ export type Database = {
         Args: { p_item_id: string; p_note?: string; p_project_id: string }
         Returns: Json
       }
+      action_connect_parts: {
+        Args: {
+          p_from_part_id: string
+          p_kind: string
+          p_label?: string
+          p_project_id?: string
+          p_to_part_id: string
+        }
+        Returns: Json
+      }
       action_create_part: {
         Args: {
           p_category?: string
@@ -1300,6 +1599,10 @@ export type Database = {
         }
         Returns: Json
       }
+      action_apply_part_import: {
+        Args: { p_import_id: string; p_project_id?: string; p_proposal?: Json }
+        Returns: Json
+      }
       action_create_project: {
         Args: {
           p_budget_locked?: number
@@ -1310,6 +1613,15 @@ export type Database = {
           p_project_type?: string
           p_yard_location?: string
           p_yard_name?: string
+        }
+        Returns: Json
+      }
+      action_create_space: {
+        Args: {
+          p_name?: string
+          p_notes?: string
+          p_parent_id?: string
+          p_project_id?: string
         }
         Returns: Json
       }
@@ -1335,6 +1647,14 @@ export type Database = {
       }
       action_decline_item: {
         Args: { p_item_id: string; p_project_id: string; p_reason: string }
+        Returns: Json
+      }
+      action_discard_part_import: {
+        Args: { p_import_id: string; p_project_id?: string }
+        Returns: Json
+      }
+      action_disconnect_parts: {
+        Args: { p_connection_id: string; p_project_id?: string; p_reason?: string }
         Returns: Json
       }
       action_invite_member: {
@@ -1439,6 +1759,15 @@ export type Database = {
         }
         Returns: Json
       }
+      action_save_part_import: {
+        Args: {
+          p_document_ids?: string[]
+          p_import_id?: string
+          p_project_id?: string
+          p_proposal?: Json
+        }
+        Returns: Json
+      }
       action_schedule_inspection: {
         Args: {
           p_class_item_ref?: string
@@ -1449,6 +1778,19 @@ export type Database = {
           p_scheduled_date?: string
           p_title: string
           p_work_package_id?: string
+        }
+        Returns: Json
+      }
+      action_set_part_details: {
+        Args: {
+          p_clear?: string[]
+          p_designation?: string
+          p_kind?: string
+          p_part_id: string
+          p_project_id?: string
+          p_reason?: string
+          p_safety_critical?: boolean
+          p_space_id?: string
         }
         Returns: Json
       }
@@ -1669,6 +2011,7 @@ export type Database = {
         | "PROJECT_MEMBER"
         | "ACTION_ITEM"
         | "PART"
+        | "SPACE"
       project_phase:
         | "PRE_SURVEY"
         | "HAUL_OUT"
@@ -1933,6 +2276,7 @@ export const Constants = {
         "PROJECT_MEMBER",
         "ACTION_ITEM",
         "PART",
+        "SPACE",
       ],
       project_phase: [
         "PRE_SURVEY",
