@@ -1778,3 +1778,39 @@ from what Lucky Bird's sheets actually show; and in the browser against
 mocks, including pdf.js rendering the real sheet 11.1 with the part
 highlighted. The model passes themselves can only be exercised against the
 real API, from the deployed function.
+
+## 36. YAManagement: the project as one model (`/app/model`)
+
+The interface the /ontology page promises, inside the app. Two tabs:
+
+- **Vessel.** A 3D view (three.js through `@react-three/fiber` and `drei`,
+  lazy-loaded, ~235 kB gzipped, so nobody else downloads it). The hull is
+  procedural, drawn from `vessels.loa / beam / draft` (defaults flagged when
+  missing): stations of a half-beam curve that peaks at 45 % of the length and
+  closes at the stem, a canoe body, and for a sailing yacht a fin keel, rudder
+  and mast. Spaces are boxes and parts are spheres, placed by reading their
+  names (`src/lib/vessel-model.ts`): "aft peak SB" goes aft and to starboard,
+  "E/R" low a third of the way forward, anything under "Rig & sails" up the
+  mast. A part goes in its own space, else the nearest ancestor's, else where
+  the names along its path point; the panel says which. Systems and
+  assemblies are drawn only when a connection touches them. Picking a system
+  lights up its parts and connections; picking a part shows its path, space,
+  make, connections both ways and open NCRs. Colour by system or by status
+  (open NCR, work in progress, nothing open).
+- **Object graph.** The registry graph with this project's record counts on
+  each node; click a type to list its records and jump to them, or to a part
+  on the boat.
+
+**The frame** is fixed now so stored positions survive a scan later: metres,
+x forward (stern at -LOA/2), y up from the waterline, z to starboard.
+Nothing is stored yet; every position is recomputed from names. Storing them
+(an Action that sets a space's box or a part's position, by dragging) is the
+next step, then a scan registered into the same frame.
+
+**The /ontology graph** was redrawn for 14 types: a 4×4 grid (people left,
+project and asset centre, the cascade right), one loop per self-linked type
+carrying every self-link's name, and labels that move along their edge until
+clear. `SUBCONTRACTOR` duplicated `PROJECT_MEMBER` (same table, no actions);
+migration 029 drops it but is **pending**: the Supabase MCP holds deletes
+for a confirmation, which timed out in the cloud session.
+

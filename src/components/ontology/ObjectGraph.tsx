@@ -114,6 +114,8 @@ interface Props {
   pinned: string | null
   onHover: (key: string | null) => void
   onPin: (key: string | null) => void
+  /** Live record counts per type; shown in place of the table name when given. */
+  counts?: Record<string, number | undefined>
 }
 
 export default function ObjectGraph({
@@ -123,6 +125,7 @@ export default function ObjectGraph({
   pinned,
   onHover,
   onPin,
+  counts,
 }: Props) {
   // A type added in SQL but missing from LAYOUT still has to appear, or the
   // graph would quietly under-report the model it claims to describe.
@@ -426,7 +429,9 @@ export default function ObjectGraph({
                   className="text-[10px] font-mono"
                   fill="hsl(var(--muted-foreground))"
                 >
-                  {t.table_name}
+                  {counts && counts[t.key] !== undefined
+                    ? `${counts[t.key]} ${counts[t.key] === 1 ? 'record' : 'records'}`
+                    : t.table_name}
                 </text>
               </g>
             )
