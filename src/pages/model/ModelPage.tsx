@@ -1,14 +1,16 @@
-import { Suspense, lazy, useMemo, useState, type ReactNode } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowRight, Box, FileUp, Move, Network, RotateCcw, Scaling, ShieldAlert } from 'lucide-react'
+import { ArrowRight, Box, ChevronRight, FileUp, Maximize2, Move, Network, PanelRightOpen, RotateCcw, Scaling, ShieldAlert, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import ObjectGraph from '@/components/ontology/ObjectGraph'
-import type { SceneOptions } from '@/components/model/VesselScene'
+import type { CameraGoal, SceneOptions } from '@/components/model/VesselScene'
+import { PartDetail, PartDialog } from '@/pages/parts/PartsPage'
 import {
   useApprovals,
   useChangeOrders,
@@ -70,6 +72,19 @@ function Panel({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 
+/** True while the media query matches; follows rotation and resizing. */
+function useMedia(query: string) {
+  const [match, setMatch] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches)
+  useEffect(() => {
+    const m = window.matchMedia(query)
+    const on = () => setMatch(m.matches)
+    on()
+    m.addEventListener('change', on)
+    return () => m.removeEventListener('change', on)
+  }, [query])
+  return match
+}
+
 function Toggle({ checked, onChange, children }: { checked: boolean; onChange: (v: boolean) => void; children: ReactNode }) {
   return (
     <label className="flex cursor-pointer items-center gap-2 text-sm">
@@ -102,6 +117,14 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
   const [editMode, setEditMode] = useState<'move' | 'resize'>('move')
   const placeSpace = usePlaceSpace()
   const placePart = usePlacePart()
+  // The full record of what is selected: a side sheet on a desktop, a sheet
+  // from the bottom on a phone, where the panel beside the boat would sit
+  // below the fold.
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [dialog, setDialog] = useState<{ editing: Part | null; parentId: string } | null>(null)
+  const [fitKey, setFitKey] = useState(0)
+  const narrow = useMedia('(max-width: 1023px)')
+  const phone = useMedia('(max-width: 767px)')
   const failed = (what: string) => (e: unknown) =>
     toast.error(`Could not ${what}: ${e instanceof Error ? e.message : String(e)}`)
 
@@ -147,6 +170,32 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
   const selectedSpace = selectedSpaceId ? model.spaces.find((p) => p.space.id === selectedSpaceId) ?? null : null
   const { dims } = model
   const touch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
+
+  // A picked space lights up what is in it, its sub-spaces included.
+  const spaceFocus = useMemo(() => {
+    if (!selectedSpaceId) return null
+    const inside = new Set([selectedSpaceId])
+    for (let grew = true; grew; ) {
+      grew = false
+      for (const sp of spaces) {
+        if (sp.parent_id && inside.has(sp.parent_id) && !inside.has(sp.id) && !sp.removed_at) {
+          inside.add(sp.id)
+          grew = true
+        }
+      }
+    }
+    return new Set(parts.filter((p) => p.space_id && inside.has(p.space_id)).map((p) => p.id))
+  }, [selectedSpaceId, spaces, parts])
+
+  // Where the camera goes when something is picked: close enough to read it.
+  const goal = useMemo<CameraGoal | null>(() => {
+    if (placed) return { key: `p:${placed.part.id}`, target: placed.position, distance: Math.max(3.5, dims.loa * 0.3) }
+    if (selectedSpace) {
+      const b = selectedSpace.box
+      return { key: `s:${selectedSpace.space.id}`, target: b.center, distance: Math.max(4, Math.max(b.size.x, b.size.y, b.size.z) * 3.2) }
+    }
+    return null
+  }, [placed, selectedSpace, dims.loa])
 
   // One thing selected at a time: picking a space drops the part and back.
   const selectSpace = (id: string | null) =>
@@ -270,7 +319,7 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
           <Suspense fallback={<div className="flex h-full items-center justify-center text-sm" style={muted}>Loading the 3D view…</div>}>
             <VesselScene
               model={model}
-              focus={focus}
+              focus={spaceFocus ?? focus}
               selectedPartId={selectedPartId}
               colourOf={colourOf}
               options={options}
@@ -282,6 +331,8 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
               onMoveSpace={(id, box) =>
                 placeSpace.mutate({ id, box: boxToStored(box) }, { onError: failed('save the space') })
               }
+              goal={goal}
+              fitKey={fitKey}
               onMovePart={(id, position) =>
                 placePart.mutate(
                   { id, position: { x: +position.x.toFixed(2), y: +position.y.toFixed(2), z: +position.z.toFixed(2) } },
@@ -290,7 +341,15 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
               }
             />
           </Suspense>
-          <div className="pointer-events-none absolute left-2 top-2 rounded bg-background/80 px-2 py-1 text-[11px]" style={muted}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="absolute right-2 top-2 h-8 bg-background/90 px-2 text-xs"
+            onClick={() => setFitKey((k) => k + 1)}
+          >
+            <Maximize2 size={13} className="mr-1" /> Whole boat
+          </Button>
+          <div className="pointer-events-none absolute bottom-2 left-2 max-w-[calc(100%-1rem)] rounded bg-background/80 px-2 py-1 text-[11px]" style={muted}>
             {touch
               ? 'Drag to orbit · pinch to zoom · two fingers to pan · tap a part'
               : 'Drag to orbit · scroll to zoom · right-drag to pan · click a part'}
@@ -312,7 +371,7 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
 
       {/* Right: the selection */}
       <div className="order-2 space-y-3 lg:order-none">
-        {selectedSpace ? (
+        {narrow && (selectedSpace || selected) ? null : selectedSpace ? (
           spacePanel(selectedSpace)
         ) : selected ? (
           partPanel(selected, placed, byId, selectPart)
@@ -330,8 +389,176 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
           </Panel>
         )}
       </div>
+
+      {narrow && (selectedSpace || selected) && (
+        <>
+          {/* Room under the page so the floating card never hides its end. */}
+          <div className="order-4 h-28" aria-hidden />
+          {peekCard()}
+        </>
+      )}
+
+      <Sheet open={detailsOpen && !!(selectedSpace || selected)} onOpenChange={setDetailsOpen}>
+        <SheetContent
+          side={narrow ? 'bottom' : 'right'}
+          className={narrow ? 'h-[88dvh] overflow-y-auto rounded-t-xl p-4 pt-6' : 'w-full overflow-y-auto sm:max-w-xl'}
+        >
+          <SheetTitle className="sr-only">{selected?.name ?? selectedSpace?.space.name ?? 'Details'}</SheetTitle>
+          {selected ? (
+            <PartDetail
+              part={selected}
+              parts={parts}
+              onSelect={selectPart}
+              onEdit={() => setDialog({ editing: selected, parentId: selected.parent_id ?? '' })}
+              onAddChild={() => setDialog({ editing: null, parentId: selected.id })}
+            />
+          ) : selectedSpace ? (
+            spaceDetails(selectedSpace)
+          ) : null}
+        </SheetContent>
+      </Sheet>
+
+      <PartDialog
+        open={dialog !== null}
+        onOpenChange={(o) => !o && setDialog(null)}
+        editing={dialog?.editing ?? null}
+        defaultParentId={dialog?.parentId ?? ''}
+        parts={parts}
+        onSaved={(p) => selectPart(p.id)}
+      />
     </div>
   )
+
+  // What is picked, floating above the bottom bar on a phone so it is seen
+  // the moment it is tapped, with the way into everything about it.
+  function peekCard() {
+    const clear = () => (selectedSpace ? selectSpace(null) : selectPart(null))
+    let kind = 'Space'
+    let title: ReactNode = selectedSpace?.space.name
+    let line = ''
+    if (selected) {
+      kind = selected.kind ? selected.kind.toLowerCase() : 'Part'
+      title = (
+        <>
+          {selected.designation && <span className="mr-1 font-mono text-xs" style={muted}>{selected.designation}</span>}
+          {selected.name}
+        </>
+      )
+      const sp = spaces.find((x) => x.id === selected.space_id)
+      const st = status.get(selected.id)
+      line = [partPath(selected, byId), sp?.name, st === 'ncr' ? 'open NCR' : st === 'wp' ? 'work in progress' : null]
+        .filter(Boolean)
+        .join(' · ')
+    } else if (selectedSpace) {
+      const n = spaceFocus?.size ?? 0
+      line = `${n} part${n === 1 ? '' : 's'} · ${selectedSpace.stored ? 'placed by hand' : 'placed from its name'}`
+    }
+    return (
+      <div
+        className="fixed inset-x-3 z-20 rounded-xl border bg-background/95 p-3 shadow-lg backdrop-blur"
+        style={{ bottom: phone ? 'calc(58px + env(safe-area-inset-bottom) + 8px)' : 16 }}
+      >
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="text-[11px] font-semibold uppercase tracking-wide" style={muted}>{kind}</div>
+            <div className="truncate font-semibold">{title}</div>
+            {line && <div className="truncate text-xs" style={muted}>{line}</div>}
+          </div>
+          <button type="button" aria-label="Clear selection" className="rounded p-1 hover:bg-muted" onClick={clear}>
+            <X size={16} />
+          </button>
+        </div>
+        <div className="mt-2 flex gap-2">
+          <Button size="sm" className="flex-1" onClick={() => setDetailsOpen(true)}>
+            Details <ChevronRight size={14} className="ml-1" />
+          </Button>
+          {editing && (selected ? placed?.source === 'stored' : selectedSpace?.stored) && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                selected
+                  ? placePart.mutate({ id: selected.id, position: null }, { onError: failed('reset the part') })
+                  : placeSpace.mutate({ id: selectedSpace!.space.id, box: null }, { onError: failed('reset the space') })
+              }
+            >
+              <RotateCcw size={13} className="mr-1" /> Guess
+            </Button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // Everything about a space: where it is, what is inside, what is open.
+  function spaceDetails(s: (typeof model.spaces)[number]) {
+    const byIdSpace = new Map(spaces.map((x) => [x.id, x]))
+    const path: string[] = []
+    for (let cur = byIdSpace.get(s.space.parent_id ?? ''); cur && path.length < 8; cur = byIdSpace.get(cur.parent_id ?? '')) {
+      path.unshift(cur.name)
+    }
+    const subSpaces = spaces.filter((x) => x.parent_id === s.space.id && !x.removed_at)
+    const inside = parts
+      .filter((p) => spaceFocus?.has(p.id) && !p.removed_at)
+      .sort((a, b) => Number(status.has(b.id)) - Number(status.has(a.id)) || a.name.localeCompare(b.name))
+    const ncrs = inside.filter((p) => status.get(p.id) === 'ncr').length
+    const busy = inside.filter((p) => status.get(p.id) === 'wp').length
+    return (
+      <div className="flex flex-col gap-4">
+        <div>
+          {path.length > 0 && <div className="text-xs" style={muted}>{path.join(' › ')}</div>}
+          <h2 className="text-xl font-bold">{s.space.name}</h2>
+          <div className="text-xs" style={muted}>
+            {s.stored ? 'Placed by hand' : s.guessed ? 'Guessed: its name gave no clue' : 'Placed from its name'} ·{' '}
+            {s.box.size.x.toFixed(1)} × {s.box.size.z.toFixed(1)} × {s.box.size.y.toFixed(1)} m
+          </div>
+          {s.space.notes && <p className="mt-2 whitespace-pre-wrap text-sm">{s.space.notes}</p>}
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="rounded-lg border p-2"><div className="text-lg font-bold">{inside.length}</div><div className="text-[11px]" style={muted}>parts</div></div>
+          <div className="rounded-lg border p-2"><div className="text-lg font-bold" style={{ color: ncrs ? STATUS_COLOURS.ncr : undefined }}>{ncrs}</div><div className="text-[11px]" style={muted}>with an open NCR</div></div>
+          <div className="rounded-lg border p-2"><div className="text-lg font-bold" style={{ color: busy ? STATUS_COLOURS.wp : undefined }}>{busy}</div><div className="text-[11px]" style={muted}>being worked on</div></div>
+        </div>
+        {subSpaces.length > 0 && (
+          <div>
+            <h3 className="mb-1.5 text-sm font-semibold">Inside it</h3>
+            <div className="flex flex-wrap gap-1.5">
+              {subSpaces.map((c) => (
+                <button key={c.id} type="button" onClick={() => selectSpace(c.id)} className="rounded-full border px-2.5 py-0.5 text-xs hover:bg-muted">
+                  {c.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        <div>
+          <h3 className="mb-1.5 text-sm font-semibold">Parts</h3>
+          {inside.length === 0 ? (
+            <p className="text-sm" style={muted}>No parts recorded in it.</p>
+          ) : (
+            <ul className="divide-y rounded-lg border">
+              {inside.map((p) => {
+                const st = status.get(p.id)
+                return (
+                  <li key={p.id}>
+                    <button type="button" onClick={() => selectPart(p.id)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted">
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: STATUS_COLOURS[st ?? 'clear'] }} />
+                      <span className="min-w-0 flex-1 truncate">
+                        {p.designation && <span className="mr-1 font-mono text-xs" style={muted}>{p.designation}</span>}
+                        {p.name}
+                      </span>
+                      {p.safety_critical && <ShieldAlert size={13} style={{ color: STATUS_COLOURS.ncr }} />}
+                      <ChevronRight size={14} style={muted} />
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   function spacePanel(s: (typeof model.spaces)[number]) {
     const inside = model.parts.filter((p) => p.part.space_id === s.space.id)
@@ -357,6 +584,9 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
         ) : (
           <p className="text-sm" style={muted}>No parts recorded in it.</p>
         )}
+        <Button size="sm" className="w-full" onClick={() => setDetailsOpen(true)}>
+          <PanelRightOpen size={13} className="mr-1" /> All details
+        </Button>
         {editing && s.stored && (
           <Button
             size="sm"
@@ -465,6 +695,9 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
             <RotateCcw size={13} className="mr-1" /> Back to the guess
           </Button>
         )}
+        <Button size="sm" className="w-full" onClick={() => setDetailsOpen(true)}>
+          <PanelRightOpen size={13} className="mr-1" /> All details
+        </Button>
         <Button size="sm" variant="outline" asChild className="w-full">
           <Link to={`/app/parts?part=${part.id}`}>Open in Parts <ArrowRight size={13} className="ml-1" /></Link>
         </Button>

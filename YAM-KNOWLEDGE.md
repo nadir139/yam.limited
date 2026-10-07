@@ -1833,6 +1833,15 @@ follow it; a stored part also anchors the connection-based placement of its
 neighbours. The camera backs off to fit the hull across whatever frame it
 has, so a phone held upright sees the whole boat.
 
+**Picking something in 3D.** The camera glides to it (0.7 s, keeping the
+angle; "Whole boat" frames everything again), space names thin out to the
+picked space or the picked part's, and a picked space dims everything not
+in it. All details opens the Parts page's own `PartDetail` (record,
+connections, drawings, history, edit, sub-part) in a sheet: from the right
+on a desktop, from the bottom on a phone, where a card above the bottom bar
+shows what was tapped. A space's details list its parts by status (open
+NCR, work in progress) with the counts; tapping one opens that part.
+
 ## 37. On a phone
 
 The app is used on the boat, so every page was checked at 390 px against

@@ -149,7 +149,7 @@ const formFrom = (p: Part): FormState => ({
   notes: p.notes ?? '',
 })
 
-function PartDialog({
+export function PartDialog({
   open,
   onOpenChange,
   editing,
@@ -456,7 +456,7 @@ function LinkRecord({ part }: { part: Part }) {
   )
 }
 
-function PartDetail({
+export function PartDetail({
   part,
   parts,
   onEdit,

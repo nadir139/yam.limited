@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
-import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber'
+import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { Html, Line, OrbitControls, TransformControls } from '@react-three/drei'
 import {
   CONNECTION_COLOURS,
@@ -37,7 +37,20 @@ interface Props {
   editMode: 'move' | 'resize'
   onMoveSpace: (id: string, box: Box) => void
   onMovePart: (id: string, position: Vec3) => void
+  /** What the camera should fly to: the selected part or space. */
+  goal: CameraGoal | null
+  /** Bumped to frame the whole boat again. */
+  fitKey: number
 }
+
+export interface CameraGoal {
+  /** Fly again only when this changes, not every time the data refetches. */
+  key: string
+  target: Vec3
+  distance: number
+}
+
+type Controls = { target: THREE.Vector3; update: () => void }
 
 /** The object a TransformControls drag moved, from its mouseUp event. */
 const dragged = (e?: THREE.Event) =>
@@ -129,9 +142,9 @@ function Hull({ model }: { model: VesselModel }) {
  * held upright is a narrow window, so it needs to stand much further away
  * than a desktop. Runs when the frame changes shape, not on every orbit.
  */
-function FitCamera({ loa, target }: { loa: number; target: [number, number, number] }) {
+function FitCamera({ loa, target, fitKey }: { loa: number; target: [number, number, number]; fitKey: number }) {
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera
-  const controls = useThree((s) => s.controls) as unknown as { target: THREE.Vector3; update: () => void } | null
+  const controls = useThree((s) => s.controls) as unknown as Controls | null
   const aspect = useThree((s) => s.size.width / Math.max(1, s.size.height))
   useEffect(() => {
     const vfov = THREE.MathUtils.degToRad(camera.fov)
@@ -144,7 +157,42 @@ function FitCamera({ loa, target }: { loa: number; target: [number, number, numb
     controls?.target.set(...target)
     controls?.update()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aspect, loa, camera, controls])
+  }, [aspect, loa, camera, controls, fitKey])
+  return null
+}
+
+/**
+ * Glides the camera to what was just picked, keeping the angle it was seen
+ * from, so tapping a part on a phone brings it up close instead of leaving a
+ * dot among two hundred. Eased over 0.7 s; a drag mid-flight takes over.
+ */
+function FlyTo({ goal }: { goal: CameraGoal | null }) {
+  const camera = useThree((s) => s.camera)
+  const controls = useThree((s) => s.controls) as unknown as Controls | null
+  const flight = useRef<{ fromT: THREE.Vector3; toT: THREE.Vector3; fromP: THREE.Vector3; toP: THREE.Vector3; t: number } | null>(null)
+  useEffect(() => {
+    if (!goal || !controls) return
+    const toT = v(goal.target)
+    const dir = camera.position.clone().sub(controls.target).normalize()
+    flight.current = {
+      fromT: controls.target.clone(),
+      toT,
+      fromP: camera.position.clone(),
+      toP: toT.clone().addScaledVector(dir, goal.distance),
+      t: 0,
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [goal?.key, controls])
+  useFrame((_, dt) => {
+    const f = flight.current
+    if (!f || !controls) return
+    f.t = Math.min(1, f.t + dt / 0.7)
+    const k = 1 - Math.pow(1 - f.t, 3)
+    controls.target.lerpVectors(f.fromT, f.toT, k)
+    camera.position.lerpVectors(f.fromP, f.toP, k)
+    controls.update()
+    if (f.t >= 1) flight.current = null
+  })
   return null
 }
 
@@ -161,6 +209,8 @@ export default function VesselScene({
   editMode,
   onMoveSpace,
   onMovePart,
+  goal,
+  fitKey,
 }: Props) {
   const [hovered, setHovered] = useState<string | null>(null)
   const { dims } = model
@@ -178,6 +228,22 @@ export default function VesselScene({
     }
     return out
   }, [model.connections, selectedPartId])
+
+  // Space names: every one when nothing is picked or the layout is being
+  // edited (they are the handles); otherwise only the picked space and what
+  // is inside it, or the space the picked part sits in. Up close, twenty
+  // labels hide the very thing that was picked.
+  const labelled = useMemo(() => {
+    if (editing || (!selectedSpaceId && !selectedPartId)) return null
+    const keep = new Set<string>()
+    if (selectedSpaceId) {
+      keep.add(selectedSpaceId)
+      for (const sp of model.spaces) if (sp.space.parent_id === selectedSpaceId) keep.add(sp.space.id)
+    }
+    const sid = selectedPartId ? byId.get(selectedPartId)?.part.space_id : null
+    if (sid) keep.add(sid)
+    return keep
+  }, [editing, selectedSpaceId, selectedPartId, model.spaces, byId])
 
   const inFocus = (id: string) => !focus || focus.has(id) || neighbours.has(id) || id === selectedPartId
 
@@ -201,7 +267,8 @@ export default function VesselScene({
       <ambientLight intensity={0.9} />
       <directionalLight position={[10, 20, 10]} intensity={0.8} />
       <OrbitControls makeDefault target={[0, dims.freeboard * 0.5, 0]} enableDamping maxDistance={dims.loa * 8} />
-      <FitCamera loa={dims.loa} target={[0, dims.freeboard * 0.5, 0]} />
+      <FitCamera loa={dims.loa} target={[0, dims.freeboard * 0.5, 0]} fitKey={fitKey} />
+      <FlyTo goal={goal} />
 
       {options.showHull && <Hull model={model} />}
 
@@ -221,7 +288,8 @@ export default function VesselScene({
               </lineSegments>
               {/* The label is the handle for picking a space: the box itself
                   would swallow taps meant for the parts inside it. */}
-              <Html position={[0, s.box.size.y / 2, 0]} center distanceFactor={dims.loa * 0.9} zIndexRange={[10, 0]}>
+              {(!labelled || labelled.has(id)) && (
+              <Html position={[0, s.box.size.y / 2, 0]} center zIndexRange={[10, 0]}>
                 <button
                   type="button"
                   onClick={() => onSelectSpace(sel ? null : id)}
@@ -233,6 +301,7 @@ export default function VesselScene({
                   {s.guessed ? ' ?' : ''}
                 </button>
               </Html>
+              )}
             </>
           )
           if (editing && sel) {
@@ -290,7 +359,7 @@ export default function VesselScene({
         const focused = inFocus(id)
         const selected = id === selectedPartId
         const colour = focused ? colourOf(p) : '#94a3b8'
-        const r = selected ? radius * 2 : hovered === id ? radius * 1.6 : focused ? radius : radius * 0.6
+        const r = selected ? radius * 1.5 : hovered === id ? radius * 1.4 : focused ? radius : radius * 0.6
         const handle = editing && selected
         const marker = (
           <mesh
