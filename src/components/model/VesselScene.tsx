@@ -1,12 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import * as THREE from 'three'
-import { Canvas, type ThreeEvent } from '@react-three/fiber'
-import { Html, Line, OrbitControls } from '@react-three/drei'
+import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber'
+import { Html, Line, OrbitControls, TransformControls } from '@react-three/drei'
 import {
   CONNECTION_COLOURS,
   hullRings,
   xAt,
   sheerAt,
+  type Box,
   type PlacedPart,
   type Vec3,
   type VesselModel,
@@ -29,7 +30,22 @@ interface Props {
   colourOf: (p: PlacedPart) => string
   options: SceneOptions
   onSelectPart: (id: string | null) => void
+  selectedSpaceId: string | null
+  onSelectSpace: (id: string | null) => void
+  /** Layout editing: the selected space or part carries a drag handle. */
+  editing: boolean
+  editMode: 'move' | 'resize'
+  onMoveSpace: (id: string, box: Box) => void
+  onMovePart: (id: string, position: Vec3) => void
 }
+
+/** The object a TransformControls drag moved, from its mouseUp event. */
+const dragged = (e?: THREE.Event) =>
+  (e?.target as unknown as { object?: THREE.Object3D } | undefined)?.object ?? null
+
+// Remount the drag handle whenever the stored value changes, so the moved
+// group starts again from the saved position and scale rather than adding to it.
+const boxKey = (b: Box) => [b.center.x, b.center.y, b.center.z, b.size.x, b.size.y, b.size.z].map((n) => n.toFixed(2)).join(',')
 
 const v = (p: Vec3) => new THREE.Vector3(p.x, p.y, p.z)
 
@@ -108,7 +124,44 @@ function Hull({ model }: { model: VesselModel }) {
   )
 }
 
-export default function VesselScene({ model, focus, selectedPartId, colourOf, options, onSelectPart }: Props) {
+/**
+ * Backs the camera off until the whole hull fits across the frame. A phone
+ * held upright is a narrow window, so it needs to stand much further away
+ * than a desktop. Runs when the frame changes shape, not on every orbit.
+ */
+function FitCamera({ loa, target }: { loa: number; target: [number, number, number] }) {
+  const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera
+  const controls = useThree((s) => s.controls) as unknown as { target: THREE.Vector3; update: () => void } | null
+  const aspect = useThree((s) => s.size.width / Math.max(1, s.size.height))
+  useEffect(() => {
+    const vfov = THREE.MathUtils.degToRad(camera.fov)
+    const hfov = 2 * Math.atan(Math.tan(vfov / 2) * aspect)
+    // The hull seen three-quarters on is about 0.62 LOA either side of centre.
+    const distance = Math.max(loa * 1.4, (loa * 0.62) / Math.tan(hfov / 2))
+    const dir = new THREE.Vector3(0.8, 0.65, 1.3).normalize()
+    camera.position.set(target[0], target[1], target[2]).addScaledVector(dir, distance)
+    camera.lookAt(...target)
+    controls?.target.set(...target)
+    controls?.update()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aspect, loa, camera, controls])
+  return null
+}
+
+export default function VesselScene({
+  model,
+  focus,
+  selectedPartId,
+  colourOf,
+  options,
+  onSelectPart,
+  selectedSpaceId,
+  onSelectSpace,
+  editing,
+  editMode,
+  onMoveSpace,
+  onMovePart,
+}: Props) {
   const [hovered, setHovered] = useState<string | null>(null)
   const { dims } = model
   const byId = useMemo(() => new Map(model.parts.map((p) => [p.part.id, p])), [model.parts])
@@ -142,32 +195,74 @@ export default function VesselScene({ model, focus, selectedPartId, colourOf, op
   )
 
   return (
-    <Canvas camera={camera} dpr={[1, 2]} onPointerMissed={() => onSelectPart(null)}>
+    // While editing, a tap that misses everything keeps the selection: on a
+    // phone it is too easy to miss the handle by a few pixels.
+    <Canvas camera={camera} dpr={[1, 2]} onPointerMissed={() => !editing && onSelectPart(null)}>
       <ambientLight intensity={0.9} />
       <directionalLight position={[10, 20, 10]} intensity={0.8} />
-      <OrbitControls makeDefault target={[0, dims.freeboard * 0.5, 0]} enableDamping maxDistance={dims.loa * 6} />
+      <OrbitControls makeDefault target={[0, dims.freeboard * 0.5, 0]} enableDamping maxDistance={dims.loa * 8} />
+      <FitCamera loa={dims.loa} target={[0, dims.freeboard * 0.5, 0]} />
 
       {options.showHull && <Hull model={model} />}
 
       {options.showSpaces &&
-        model.spaces.map((s) => (
-          <group key={s.space.id} position={[s.box.center.x, s.box.center.y, s.box.center.z]}>
-            <mesh>
-              <boxGeometry args={[s.box.size.x, s.box.size.y, s.box.size.z]} />
-              <meshBasicMaterial color="#84cc16" transparent opacity={0.05} depthWrite={false} />
-            </mesh>
-            <lineSegments>
-              <edgesGeometry args={[new THREE.BoxGeometry(s.box.size.x, s.box.size.y, s.box.size.z)]} />
-              <lineBasicMaterial color="#65a30d" transparent opacity={s.guessed ? 0.3 : 0.6} />
-            </lineSegments>
-            <Html position={[0, s.box.size.y / 2, 0]} center distanceFactor={dims.loa * 0.9} zIndexRange={[10, 0]}>
-              <div className="pointer-events-none whitespace-nowrap rounded bg-background/80 px-1 text-[10px] font-medium text-lime-700 dark:text-lime-400">
-                {s.space.name}
-                {s.guessed ? ' ?' : ''}
-              </div>
-            </Html>
-          </group>
-        ))}
+        model.spaces.map((s) => {
+          const id = s.space.id
+          const sel = id === selectedSpaceId
+          const body = (
+            <>
+              <mesh>
+                <boxGeometry args={[s.box.size.x, s.box.size.y, s.box.size.z]} />
+                <meshBasicMaterial color={sel ? '#14b8a6' : '#84cc16'} transparent opacity={sel ? 0.12 : 0.05} depthWrite={false} />
+              </mesh>
+              <lineSegments>
+                <edgesGeometry args={[new THREE.BoxGeometry(s.box.size.x, s.box.size.y, s.box.size.z)]} />
+                <lineBasicMaterial color={sel ? '#0d9488' : '#65a30d'} transparent opacity={sel ? 1 : s.guessed ? 0.3 : 0.6} />
+              </lineSegments>
+              {/* The label is the handle for picking a space: the box itself
+                  would swallow taps meant for the parts inside it. */}
+              <Html position={[0, s.box.size.y / 2, 0]} center distanceFactor={dims.loa * 0.9} zIndexRange={[10, 0]}>
+                <button
+                  type="button"
+                  onClick={() => onSelectSpace(sel ? null : id)}
+                  className={`whitespace-nowrap rounded px-1 text-[10px] font-medium ${
+                    sel ? 'bg-teal-600 text-white' : 'bg-background/80 text-lime-700 dark:text-lime-400'
+                  }`}
+                >
+                  {s.space.name}
+                  {s.guessed ? ' ?' : ''}
+                </button>
+              </Html>
+            </>
+          )
+          if (editing && sel) {
+            return (
+              <TransformControls
+                key={`${id}:${boxKey(s.box)}:${editMode}`}
+                position={[s.box.center.x, s.box.center.y, s.box.center.z]}
+                mode={editMode === 'resize' ? 'scale' : 'translate'}
+                translationSnap={0.05}
+                scaleSnap={0.05}
+                size={0.9}
+                onMouseUp={(e) => {
+                  const o = dragged(e)
+                  if (!o) return
+                  onMoveSpace(id, {
+                    center: { x: o.position.x, y: o.position.y, z: o.position.z },
+                    size: { x: s.box.size.x * o.scale.x, y: s.box.size.y * o.scale.y, z: s.box.size.z * o.scale.z },
+                  })
+                }}
+              >
+                {body}
+              </TransformControls>
+            )
+          }
+          return (
+            <group key={id} position={[s.box.center.x, s.box.center.y, s.box.center.z]}>
+              {body}
+            </group>
+          )
+        })}
 
       {options.showConnections &&
         visibleConnections.map((c) => {
@@ -196,10 +291,11 @@ export default function VesselScene({ model, focus, selectedPartId, colourOf, op
         const selected = id === selectedPartId
         const colour = focused ? colourOf(p) : '#94a3b8'
         const r = selected ? radius * 2 : hovered === id ? radius * 1.6 : focused ? radius : radius * 0.6
-        return (
+        const handle = editing && selected
+        const marker = (
           <mesh
             key={id}
-            position={[p.position.x, p.position.y, p.position.z]}
+            position={handle ? [0, 0, 0] : [p.position.x, p.position.y, p.position.z]}
             onClick={(e: ThreeEvent<MouseEvent>) => {
               e.stopPropagation()
               onSelectPart(selected ? null : id)
@@ -231,6 +327,22 @@ export default function VesselScene({ model, focus, selectedPartId, colourOf, op
               </Html>
             )}
           </mesh>
+        )
+        if (!handle) return marker
+        return (
+          <TransformControls
+            key={`${id}:${p.position.x.toFixed(2)},${p.position.y.toFixed(2)},${p.position.z.toFixed(2)}`}
+            position={[p.position.x, p.position.y, p.position.z]}
+            mode="translate"
+            translationSnap={0.05}
+            size={0.9}
+            onMouseUp={(e) => {
+              const o = dragged(e)
+              if (o) onMovePart(id, { x: o.position.x, y: o.position.y, z: o.position.z })
+            }}
+          >
+            {marker}
+          </TransformControls>
         )
       })}
     </Canvas>

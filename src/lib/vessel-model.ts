@@ -43,6 +43,8 @@ export interface PlacedSpace {
   box: Box
   /** The name gave no clue; the box was put in a free slot. */
   guessed: boolean
+  /** Someone placed it by hand (spaces.model_box); not a guess at all. */
+  stored: boolean
 }
 
 export interface PlacedPart {
@@ -52,7 +54,7 @@ export interface PlacedPart {
    * How the position was found: its own space, an ancestor's, beside the
    * parts it is connected to, or from the names along its path.
    */
-  source: 'space' | 'ancestor' | 'connection' | 'name'
+  source: 'stored' | 'space' | 'ancestor' | 'connection' | 'name'
 }
 
 export interface VesselModel {
@@ -193,6 +195,34 @@ export function readName(name: string): NameHint {
 
 // ─── Placing spaces and parts ────────────────────────────────────────────────
 
+const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
+
+/** A box someone stored (migration 030), or null when there is none or it is malformed. */
+export function storedBox(raw: unknown): Box | null {
+  const b = raw as Record<string, unknown> | null
+  if (!b || typeof b !== 'object') return null
+  const { x, y, z, sx, sy, sz } = b
+  if (![x, y, z, sx, sy, sz].every(isNum) || !((sx as number) > 0 && (sy as number) > 0 && (sz as number) > 0)) return null
+  return { center: { x: x as number, y: y as number, z: z as number }, size: { x: sx as number, y: sy as number, z: sz as number } }
+}
+
+/** A position someone stored (migration 030), or null. */
+export function storedPosition(raw: unknown): Vec3 | null {
+  const p = raw as Record<string, unknown> | null
+  if (!p || typeof p !== 'object') return null
+  const { x, y, z } = p
+  return [x, y, z].every(isNum) ? { x: x as number, y: y as number, z: z as number } : null
+}
+
+/** The stored form of a box, rounded to the centimetre the database keeps. */
+export function boxToStored(b: Box) {
+  const r = (v: number) => Math.round(v * 100) / 100
+  return {
+    x: r(b.center.x), y: r(b.center.y), z: r(b.center.z),
+    sx: Math.max(0.05, r(b.size.x)), sy: Math.max(0.05, r(b.size.y)), sz: Math.max(0.05, r(b.size.z)),
+  }
+}
+
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 
 /** A box for a hint, sized to the hull at that point. */
@@ -292,7 +322,15 @@ export function placeSpaces(spaces: Space[], dims: HullDims, assetName: string |
     !taken.some((o) => o.level === level && Math.abs(o.t - t) < step * 0.95 && (o.side === side || o.side === 0 || side === 0))
   const guessSlots = [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8, 0.45, 0.55, 0.35, 0.65]
   let guessIndex = 0
+  // Spaces placed by hand claim their slots first, so guesses go round them.
   for (const s of top) {
+    const box = storedBox(s.model_box)
+    if (!box) continue
+    taken.push({ t: clamp((box.center.x + dims.loa / 2) / dims.loa, 0, 1), side: Math.sign(box.center.z) as -1 | 0 | 1, level: 'interior' })
+    out.push({ space: s, box, guessed: false, stored: true })
+  }
+  for (const s of top) {
+    if (storedBox(s.model_box)) continue
     const hint = readName(s.name)
     // A mast space runs up the mast; its base or step sits on deck.
     const level: Level =
@@ -306,7 +344,7 @@ export function placeSpaces(spaces: Space[], dims: HullDims, assetName: string |
     }
     if (!free(t, hint.side, level)) t = wanted
     taken.push({ t, side: hint.side, level })
-    out.push({ space: s, box: zoneBox(dims, t, hint.side, level, length * 0.95), guessed })
+    out.push({ space: s, box: zoneBox(dims, t, hint.side, level, length * 0.95), guessed, stored: false })
   }
 
   // Inside a space: sided children split it across, the rest share it along.
@@ -340,7 +378,10 @@ export function placeSpaces(spaces: Space[], dims: HullDims, assetName: string |
           size: { ...box.size, y: b.size.y / 2 * 0.9 },
         }
       }
-      const placed: PlacedSpace = { space: k, box, guessed: parent.guessed }
+      const own = storedBox(k.model_box)
+      const placed: PlacedSpace = own
+        ? { space: k, box: own, guessed: false, stored: true }
+        : { space: k, box, guessed: parent.guessed, stored: false }
       out.push(placed)
       placeChildren(placed, depth + 1)
     })
@@ -363,8 +404,14 @@ export function placeParts(
   const clueless = new Set<string>()
   for (const part of parts) {
     if (part.removed_at) continue
-    // Its own space, else the nearest ancestor's, else what the names along
-    // its path say ("Port primary winch" under "Deck & fittings").
+    // Where someone put it, else its own space, else the nearest ancestor's,
+    // else what the names along its path say ("Port primary winch" under
+    // "Deck & fittings").
+    const pinned = storedPosition(part.model_position)
+    if (pinned) {
+      out.push({ part, position: pinned, source: 'stored' })
+      continue
+    }
     let box = part.space_id ? boxes.get(part.space_id) : undefined
     let source: PlacedPart['source'] = 'space'
     const chain: Part[] = []

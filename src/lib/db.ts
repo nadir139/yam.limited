@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import type { Json } from './database.types'
 import type {
   Vessel,
   WorkPackageDependency,
@@ -478,6 +479,42 @@ export async function setPartDetails(
     p_clear: clear.length ? clear : undefined,
   })
   return (unwrap(data, error, 'Set part details') as unknown as { part: Part }).part
+}
+
+/** A box on the 3D model, metres: centre and size (vessel-model.ts frame). */
+export interface ModelBox {
+  x: number
+  y: number
+  z: number
+  sx: number
+  sy: number
+  sz: number
+}
+
+/** Puts a space where it really is on the model; null hands it back to the guess. */
+export async function placeSpace(projectId: string, spaceId: string, box: ModelBox | null): Promise<Space> {
+  const { data, error } = await supabase.rpc('action_place_space', {
+    p_space_id: spaceId,
+    p_project_id: projectId,
+    p_box: (box ?? undefined) as unknown as Json,
+    p_clear: box === null,
+  })
+  return (unwrap(data, error, 'Place space') as unknown as { space: Space }).space
+}
+
+/** Puts a part where it really is on the model; null hands it back to the guess. */
+export async function placePart(
+  projectId: string,
+  partId: string,
+  position: { x: number; y: number; z: number } | null,
+): Promise<Part> {
+  const { data, error } = await supabase.rpc('action_place_part', {
+    p_part_id: partId,
+    p_project_id: projectId,
+    p_position: (position ?? undefined) as unknown as Json,
+    p_clear: position === null,
+  })
+  return (unwrap(data, error, 'Place part') as unknown as { part: Part }).part
 }
 
 export async function connectParts(

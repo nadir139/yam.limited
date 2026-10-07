@@ -203,6 +203,7 @@ applied by hand in the Supabase SQL editor, in this order:
 29. `supabase-migration-027-parts.sql` — the asset's parts tree (belongs to the vessel, so it carries across projects), part links to work packages / NCRs / inspections / change orders / documents, and their Actions
 30. `supabase-migration-028-document-import.sql` — spaces (where things are), part connections (powers / protects / controls / signals / flows to), drawing references (document, page, grid, box), and import drafts applied in one transaction by `action_apply_part_import`
 31. `supabase-migration-029-drop-stakeholder-type.sql` — **pending, run by hand**: drops the duplicate `SUBCONTRACTOR` ("Stakeholder") registry type, which described `project_members` a second time
+32. `supabase-migration-030-model-positions.sql` — `spaces.model_box` and `parts.model_position` in the 3D model frame, set by dragging in YAManagement through `action_place_space` / `action_place_part`
 
 Migrations 006–008 are the important ones. After 008 the `authenticated` and
 `anon` roles hold **zero** `INSERT`/`UPDATE`/`DELETE` grants on the domain

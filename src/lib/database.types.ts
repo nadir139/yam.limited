@@ -992,6 +992,7 @@ export type Database = {
           location: string | null
           manufacturer: string | null
           model: string | null
+          model_position: Json | null
           name: string
           notes: string | null
           parent_id: string | null
@@ -1017,6 +1018,7 @@ export type Database = {
           location?: string | null
           manufacturer?: string | null
           model?: string | null
+          model_position?: Json | null
           name: string
           notes?: string | null
           parent_id?: string | null
@@ -1042,6 +1044,7 @@ export type Database = {
           location?: string | null
           manufacturer?: string | null
           model?: string | null
+          model_position?: Json | null
           name?: string
           notes?: string | null
           parent_id?: string | null
@@ -1218,6 +1221,7 @@ export type Database = {
           created_by: string | null
           created_by_name: string | null
           id: string
+          model_box: Json | null
           name: string
           notes: string | null
           parent_id: string | null
@@ -1232,6 +1236,7 @@ export type Database = {
           created_by?: string | null
           created_by_name?: string | null
           id?: string
+          model_box?: Json | null
           name: string
           notes?: string | null
           parent_id?: string | null
@@ -1246,6 +1251,7 @@ export type Database = {
           created_by?: string | null
           created_by_name?: string | null
           id?: string
+          model_box?: Json | null
           name?: string
           notes?: string | null
           parent_id?: string | null
@@ -1681,6 +1687,24 @@ export type Database = {
           p_lag_days?: number
           p_predecessor_id: string
           p_successor_id: string
+        }
+        Returns: Json
+      }
+      action_place_part: {
+        Args: {
+          p_clear?: boolean
+          p_part_id: string
+          p_position?: Json
+          p_project_id?: string
+        }
+        Returns: Json
+      }
+      action_place_space: {
+        Args: {
+          p_box?: Json
+          p_clear?: boolean
+          p_project_id?: string
+          p_space_id: string
         }
         Returns: Json
       }
