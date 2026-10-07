@@ -319,6 +319,8 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
               ? 'in its space'
               : placed?.source === 'ancestor'
               ? 'in the space of the system above it'
+              : placed?.source === 'connection'
+              ? 'beside what it is connected to'
               : 'from its name (approximate)'}
           </dd>
         </dl>
