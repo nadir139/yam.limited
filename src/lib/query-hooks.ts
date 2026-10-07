@@ -524,6 +524,25 @@ export function useSetPartDetails() {
   })
 }
 
+export function usePlaceSpace() {
+  const invalidate = usePartsInvalidation()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (v: { id: string; box: db.ModelBox | null }) => db.placeSpace(projectId, v.id, v.box),
+    onSuccess: invalidate,
+  })
+}
+
+export function usePlacePart() {
+  const invalidate = usePartsInvalidation()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (v: { id: string; position: { x: number; y: number; z: number } | null }) =>
+      db.placePart(projectId, v.id, v.position),
+    onSuccess: invalidate,
+  })
+}
+
 export function useConnectParts() {
   const invalidate = usePartsInvalidation()
   const projectId = useProjectId()

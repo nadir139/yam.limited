@@ -1819,3 +1819,17 @@ clear. `SUBCONTRACTOR` duplicated `PROJECT_MEMBER` (same table, no actions);
 migration 029 drops it but is **pending**: the Supabase MCP holds deletes
 for a confirmation, which timed out in the cloud session.
 
+**Stored positions (migration 030).** `spaces.model_box` {x, y, z, sx, sy,
+sz} and `parts.model_position` {x, y, z}, metres in the model frame, rounded
+to the centimetre. Set through `action_place_space` / `action_place_part`
+(same roles as recording parts; not agent-usable: the agent has no picture to
+place against), which check the shape (`model_vector_ok`: the listed numeric
+keys only, within 500 m, sizes positive) and write SPACE_PLACED / PART_PLACED
+events; `p_clear` hands an object back to the guess. In the app: Edit layout,
+tap a space's name or a part, drag the handle (Move, or Resize for a space);
+it saves on release. A stored box wins over the name; stored spaces claim
+their slots before the guesses are laid out; children of a placed space
+follow it; a stored part also anchors the connection-based placement of its
+neighbours. The camera backs off to fit the hull across whatever frame it
+has, so a phone held upright sees the whole boat.
+

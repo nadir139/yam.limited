@@ -1,7 +1,8 @@
 import { Suspense, lazy, useMemo, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowRight, Box, FileUp, Network, ShieldAlert } from 'lucide-react'
+import { ArrowRight, Box, FileUp, Move, Network, RotateCcw, Scaling, ShieldAlert } from 'lucide-react'
+import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -17,6 +18,9 @@ import {
   usePartConnections,
   usePartLinks,
   useParts,
+  usePermissions,
+  usePlacePart,
+  usePlaceSpace,
   useProject,
   useSpaces,
   useTeam,
@@ -28,6 +32,7 @@ import { buildPartTree, descendantIds, partPath, partSystem } from '@/lib/parts'
 import {
   CONNECTION_COLOURS,
   SYSTEM_PALETTE,
+  boxToStored,
   buildVesselModel,
   type PlacedPart,
 } from '@/lib/vessel-model'
@@ -90,6 +95,15 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
   const selectedPartId = params.get('part')
   const [colourBy, setColourBy] = useState<'system' | 'status'>('system')
   const [options, setOptions] = useState<SceneOptions>({ showHull: true, showSpaces: true, showConnections: true })
+  const selectedSpaceId = params.get('space')
+  const { can } = usePermissions()
+  const canPlace = can('action_place_space') && can('action_place_part')
+  const [editing, setEditing] = useState(false)
+  const [editMode, setEditMode] = useState<'move' | 'resize'>('move')
+  const placeSpace = usePlaceSpace()
+  const placePart = usePlacePart()
+  const failed = (what: string) => (e: unknown) =>
+    toast.error(`Could not ${what}: ${e instanceof Error ? e.message : String(e)}`)
 
   const setParam = (key: string, value: string | null) =>
     setParams((p) => {
@@ -130,7 +144,27 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
   const isProperty = project?.project_type === 'PROPERTY'
   const selected = selectedPartId ? byId.get(selectedPartId) ?? null : null
   const placed = selected ? model.parts.find((p) => p.part.id === selected.id) : undefined
+  const selectedSpace = selectedSpaceId ? model.spaces.find((p) => p.space.id === selectedSpaceId) ?? null : null
   const { dims } = model
+  const touch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
+
+  // One thing selected at a time: picking a space drops the part and back.
+  const selectSpace = (id: string | null) =>
+    setParams((p) => {
+      const next = new URLSearchParams(p)
+      if (id) next.set('space', id)
+      else next.delete('space')
+      if (id) next.delete('part')
+      return next
+    })
+  const selectPart = (id: string | null) =>
+    setParams((p) => {
+      const next = new URLSearchParams(p)
+      if (id) next.set('part', id)
+      else next.delete('part')
+      if (id) next.delete('space')
+      return next
+    })
 
   if (isProperty) {
     return (
@@ -147,9 +181,10 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
   }
 
   return (
+    // On a phone the boat comes first, then what is selected, then the filters.
     <div className="grid gap-4 lg:grid-cols-[250px_minmax(0,1fr)_300px]">
       {/* Left: what to look at */}
-      <div className="space-y-3">
+      <div className="order-3 space-y-3 lg:order-none">
         <Panel title="Systems">
           <button
             onClick={() => setParam('system', null)}
@@ -208,8 +243,30 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
       </div>
 
       {/* Centre: the boat */}
-      <div className="space-y-2">
-        <div className="relative h-[460px] overflow-hidden rounded-lg border bg-muted/20 sm:h-[620px]">
+      <div className="order-1 min-w-0 space-y-2 lg:order-none">
+        {canPlace && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" variant={editing ? 'default' : 'outline'} onClick={() => setEditing((e) => !e)}>
+              <Move size={14} className="mr-1" /> {editing ? 'Done editing' : 'Edit layout'}
+            </Button>
+            {editing && (
+              <>
+                <div className="flex gap-1">
+                  <Button size="sm" variant={editMode === 'move' ? 'secondary' : 'ghost'} onClick={() => setEditMode('move')}>
+                    <Move size={14} className="mr-1" /> Move
+                  </Button>
+                  <Button size="sm" variant={editMode === 'resize' ? 'secondary' : 'ghost'} onClick={() => setEditMode('resize')} disabled={!selectedSpace}>
+                    <Scaling size={14} className="mr-1" /> Resize
+                  </Button>
+                </div>
+                <span className="text-xs" style={muted}>
+                  Tap a space's name or a part, then drag the arrows. Saved when you let go.
+                </span>
+              </>
+            )}
+          </div>
+        )}
+        <div className="relative h-[62vh] min-h-[340px] overflow-hidden rounded-lg border bg-muted/20 sm:h-[620px]">
           <Suspense fallback={<div className="flex h-full items-center justify-center text-sm" style={muted}>Loading the 3D view…</div>}>
             <VesselScene
               model={model}
@@ -217,11 +274,26 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
               selectedPartId={selectedPartId}
               colourOf={colourOf}
               options={options}
-              onSelectPart={(id) => setParam('part', id)}
+              onSelectPart={selectPart}
+              selectedSpaceId={selectedSpaceId}
+              onSelectSpace={selectSpace}
+              editing={editing}
+              editMode={selectedSpace ? editMode : 'move'}
+              onMoveSpace={(id, box) =>
+                placeSpace.mutate({ id, box: boxToStored(box) }, { onError: failed('save the space') })
+              }
+              onMovePart={(id, position) =>
+                placePart.mutate(
+                  { id, position: { x: +position.x.toFixed(2), y: +position.y.toFixed(2), z: +position.z.toFixed(2) } },
+                  { onError: failed('save the part') },
+                )
+              }
             />
           </Suspense>
-          <div className="pointer-events-none absolute left-3 top-3 rounded bg-background/80 px-2 py-1 text-xs" style={muted}>
-            Drag to orbit · scroll to zoom · right-drag to pan · click a part
+          <div className="pointer-events-none absolute left-2 top-2 rounded bg-background/80 px-2 py-1 text-[11px]" style={muted}>
+            {touch
+              ? 'Drag to orbit · pinch to zoom · two fingers to pan · tap a part'
+              : 'Drag to orbit · scroll to zoom · right-drag to pan · click a part'}
           </div>
         </div>
         <p className="text-xs" style={muted}>
@@ -233,20 +305,22 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
               <Link to="/app/project" className="underline">record her dimensions</Link>)
             </>
           )}
-          . Spaces and parts are placed from their names; a space marked “?” had nothing to go on.
-          A 3D scan of the boat can replace this hull once it is loaded.
+          . Spaces and parts sit where someone placed them, else where their names point; a space
+          marked “?” had nothing to go on. A 3D scan of the boat can replace this hull once it is loaded.
         </p>
       </div>
 
       {/* Right: the selection */}
-      <div className="space-y-3">
-        {selected ? (
-          partPanel(selected, placed, byId, (id) => setParam('part', id))
+      <div className="order-2 space-y-3 lg:order-none">
+        {selectedSpace ? (
+          spacePanel(selectedSpace)
+        ) : selected ? (
+          partPanel(selected, placed, byId, selectPart)
         ) : (
           <Panel title="Selection">
             <p className="text-sm" style={muted}>
-              Click a part on the boat to see what it is, where it sits and what it is connected to.
-              Pick a system on the left to light up its parts and their connections.
+              Tap a part on the boat to see what it is, where it sits and what it is connected to, or a
+              space's name to see what is in it. Pick a system to light up its parts and their connections.
             </p>
             {!parts.length && !isLoading && (
               <Button size="sm" variant="outline" asChild>
@@ -258,6 +332,44 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
       </div>
     </div>
   )
+
+  function spacePanel(s: (typeof model.spaces)[number]) {
+    const inside = model.parts.filter((p) => p.part.space_id === s.space.id)
+    return (
+      <Panel title="Space">
+        <div className="text-base font-semibold">{s.space.name}</div>
+        <div className="text-xs" style={muted}>
+          {s.stored ? 'Placed by hand' : s.guessed ? 'Guessed: its name gave no clue' : 'Placed from its name'}
+          {' · '}
+          {s.box.size.x.toFixed(1)} × {s.box.size.z.toFixed(1)} × {s.box.size.y.toFixed(1)} m
+        </div>
+        {inside.length > 0 ? (
+          <ul className="max-h-60 space-y-1 overflow-y-auto border-t pt-2 text-sm">
+            {inside.map((p) => (
+              <li key={p.part.id}>
+                <button className="text-left hover:underline" onClick={() => selectPart(p.part.id)}>
+                  {p.part.designation && <span className="mr-1 font-mono text-xs" style={muted}>{p.part.designation}</span>}
+                  {p.part.name}
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm" style={muted}>No parts recorded in it.</p>
+        )}
+        {editing && s.stored && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full"
+            onClick={() => placeSpace.mutate({ id: s.space.id, box: null }, { onError: failed('reset the space') })}
+          >
+            <RotateCcw size={13} className="mr-1" /> Back to the guess
+          </Button>
+        )}
+      </Panel>
+    )
+  }
 
   // A render helper rather than a component, so it can read the view's data
   // without being remounted on every render.
@@ -315,7 +427,9 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
           )}
           <dt style={muted}>Placed</dt>
           <dd className="text-xs">
-            {placed?.source === 'space'
+            {placed?.source === 'stored'
+              ? 'by hand'
+              : placed?.source === 'space'
               ? 'in its space'
               : placed?.source === 'ancestor'
               ? 'in the space of the system above it'
@@ -340,6 +454,16 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
               </li>
             ))}
           </ul>
+        )}
+        {editing && placed?.source === 'stored' && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full"
+            onClick={() => placePart.mutate({ id: part.id, position: null }, { onError: failed('reset the part') })}
+          >
+            <RotateCcw size={13} className="mr-1" /> Back to the guess
+          </Button>
         )}
         <Button size="sm" variant="outline" asChild className="w-full">
           <Link to={`/app/parts?part=${part.id}`}>Open in Parts <ArrowRight size={13} className="ml-1" /></Link>

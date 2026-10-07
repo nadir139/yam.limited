@@ -31,9 +31,8 @@ Ordered by impact over effort. Most items are a day or less.
 6. ~~YAManagement~~ — `/app/model`: the boat in 3D (hull from LOA/beam/draft, spaces and parts placed
    from their names, connections coloured by kind, colour by system or by open NCR / work), and the
    object graph with live counts and the records behind each type.
-7. **Next for the model.** Store positions: `spaces.model_box` and `parts.model_position` in the
-   model frame, set by dragging in the 3D view through an Action, so placement stops being a guess.
-   Then a `vessel_models` slot for a scan (decimated, Draco-compressed GLB under the 50 MB bucket limit,
+7. ~~Stored positions~~ — migration 030: drag a space or part in the 3D view (Edit layout) and it
+   is saved in the model frame; "Back to the guess" clears it. **Next for the model:** a `vessel_models` slot for a scan (decimated, Draco-compressed GLB under the 50 MB bucket limit,
    or a point cloud tiled with Potree / 3D Tiles), registered to the same frame by three picked points.
 8. **Next on this track.** Procedures from manuals (start engine, pump out) as checklists linked to
    parts; re-import a newer revision as a diff against what is recorded; messages and photos on a part;
