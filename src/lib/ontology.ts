@@ -70,7 +70,6 @@ const FALLBACK: Omit<OntologySnapshot, 'live' | 'permissions'> = {
     { key: 'CHANGE_ORDER', label: 'Change Order', table_name: 'change_orders', description: 'A costed, scheduled change to the agreed scope.', display_order: 6 },
     { key: 'OWNER_APPROVAL', label: 'Owner Approval', table_name: 'owner_approvals', description: 'A decision the owner must make, tiered by cost, with a deadline.', display_order: 7 },
     { key: 'DOCUMENT', label: 'Document', table_name: 'documents', description: 'Evidence attached to any other object.', display_order: 8 },
-    { key: 'SUBCONTRACTOR', label: 'Stakeholder', table_name: 'project_members', description: 'A party to the project and the role they hold.', display_order: 9 },
     { key: 'MESSAGE', label: 'Message', table_name: 'messages', description: 'What people said, attached to the object they said it about. Site knowledge, decisions, and work done outside the plan.', display_order: 10 },
   ],
   links: [
@@ -84,7 +83,6 @@ const FALLBACK: Omit<OntologySnapshot, 'live' | 'permissions'> = {
     { from_type: 'CHANGE_ORDER', to_type: 'OWNER_APPROVAL', label: 'gated by', cardinality: 'ONE_TO_ONE', via_column: 'approval_id' },
     { from_type: 'OWNER_APPROVAL', to_type: 'CHANGE_ORDER', label: 'authorises', cardinality: 'ONE_TO_ONE', via_column: 'change_order_id' },
     { from_type: 'DOCUMENT', to_type: 'PROJECT', label: 'filed under', cardinality: 'MANY_TO_ONE', via_column: 'project_id' },
-    { from_type: 'SUBCONTRACTOR', to_type: 'PROJECT', label: 'works on', cardinality: 'MANY_TO_ONE', via_column: 'project_id' },
     { from_type: 'MESSAGE', to_type: 'PROJECT', label: 'posted in', cardinality: 'MANY_TO_ONE', via_column: 'project_id' },
   ],
   actions: [

@@ -4,7 +4,7 @@ import { typeColor } from '@/lib/ontology'
 
 // The object graph, laid out by hand rather than by force simulation.
 //
-// Nine nodes is few enough that a deliberate composition beats anything a
+// Fourteen nodes is few enough that a deliberate composition beats anything a
 // physics solver produces, and a fixed layout does not jitter between renders
 // or reflow when someone hovers a node. The arrangement carries meaning: the
 // structural spine (Vessel → Project → Work Package) runs left, and the
@@ -12,26 +12,34 @@ import { typeColor } from '@/lib/ontology'
 // runs across the top right. That corner is the whole product.
 
 const VIEW_W = 960
-const VIEW_H = 520
+const VIEW_H = 620
 const NODE_W = 152
 const NODE_H = 48
 const HW = NODE_W / 2
 const HH = NODE_H / 2
 
+// Four columns, four rows. The asset (Vessel, Space, Part) runs down the left
+// middle beside the work done to it; the cascade keeps the top right; the
+// people and what they say sit along the bottom. Every registered type has a
+// cell, so nothing falls into an overflow row and lands on top of another.
 const LAYOUT: Record<string, { x: number; y: number }> = {
-  VESSEL: { x: 110, y: 80 },
-  // The asset's own structure sits beside it: what the work is done to.
-  PART: { x: 360, y: 80 },
-  SPACE: { x: 360, y: 500 },
-  PROJECT: { x: 110, y: 250 },
-  SUBCONTRACTOR: { x: 110, y: 430 },
-  WORK_PACKAGE: { x: 360, y: 250 },
-  DOCUMENT: { x: 360, y: 430 },
-  INSPECTION_EVENT: { x: 600, y: 250 },
-  DEFECT_RECORD: { x: 600, y: 80 },
-  CHANGE_ORDER: { x: 845, y: 80 },
-  OWNER_APPROVAL: { x: 845, y: 250 },
-  MESSAGE: { x: 600, y: 430 },
+  // People and conversation on the left, the project and the asset in the
+  // middle, the inspection → defect → change cascade on the right. Every hub
+  // edge then joins neighbouring cells instead of crossing the graph.
+  PROJECT_MEMBER: { x: 110, y: 80 },
+  MESSAGE: { x: 360, y: 80 },
+  VESSEL: { x: 600, y: 80 },
+  SPACE: { x: 845, y: 80 },
+  ACTION_ITEM: { x: 110, y: 240 },
+  PROJECT: { x: 360, y: 240 },
+  PART: { x: 600, y: 240 },
+  INSPECTION_EVENT: { x: 845, y: 240 },
+  SUBCONTRACTOR: { x: 110, y: 400 },
+  DOCUMENT: { x: 360, y: 400 },
+  WORK_PACKAGE: { x: 600, y: 400 },
+  DEFECT_RECORD: { x: 845, y: 400 },
+  OWNER_APPROVAL: { x: 600, y: 560 },
+  CHANGE_ORDER: { x: 845, y: 560 },
 }
 
 /** Object types the cascade runs through — drawn with a heavier edge. */
@@ -61,6 +69,8 @@ interface Edge {
   y1: number
   x2: number
   y2: number
+  /** A type linked to itself (a part inside a part): drawn as a loop. */
+  loop: boolean
 }
 
 /**
@@ -70,9 +80,9 @@ interface Edge {
  * the text readable erases the arrow underneath. Offsetting perpendicular keeps
  * both legible: text beside a vertical edge, above a horizontal one.
  */
-function labelAnchor(e: Pick<Edge, 'x1' | 'y1' | 'x2' | 'y2'>, distance = 14) {
-  const mx = (e.x1 + e.x2) / 2
-  const my = (e.y1 + e.y2) / 2
+function labelAnchor(e: Pick<Edge, 'x1' | 'y1' | 'x2' | 'y2'>, distance = 14, t = 0.5) {
+  const mx = e.x1 + (e.x2 - e.x1) * t
+  const my = e.y1 + (e.y2 - e.y1) * t
   const dx = e.x2 - e.x1
   const dy = e.y2 - e.y1
   const len = Math.hypot(dx, dy) || 1
@@ -120,7 +130,8 @@ export default function ObjectGraph({
     const out: Record<string, { x: number; y: number }> = {}
     let spare = 0
     for (const t of types) {
-      out[t.key] = LAYOUT[t.key] ?? { x: 180 + (spare++ % 4) * 220, y: 500 }
+      // A type with no cell yet takes the next free one in the bottom row.
+      out[t.key] = LAYOUT[t.key] ?? { x: [110, 360][spare++ % 2], y: 560 }
     }
     return out
   }, [types])
@@ -143,12 +154,38 @@ export default function ObjectGraph({
       const canonical = reverse
         ? [link.from_type, link.to_type].sort().join('|')
         : pairKey(link.from_type, link.to_type)
-      if (drawn.has(canonical)) continue
-      drawn.add(canonical)
+      // Self-links all share one key; they merge into one loop below instead.
+      if (link.from_type !== link.to_type) {
+        if (drawn.has(canonical)) continue
+        drawn.add(canonical)
+      }
 
+      if (link.from_type === link.to_type) {
+        // Out of the right edge, round and back into the top. A type linked
+        // to itself twice (a part inside a part, a part feeding a part) gets
+        // one loop carrying both names.
+        const existing = out.find((e) => e.loop && e.from === link.from_type)
+        if (existing) {
+          existing.label = `${existing.label} · ${link.label}`
+          continue
+        }
+        out.push({
+          from: link.from_type,
+          to: link.to_type,
+          label: link.label,
+          reverseLabel: null,
+          x1: a.x + HW,
+          y1: a.y - 8,
+          x2: a.x + HW - 26,
+          y2: a.y - HH,
+          loop: true,
+        })
+        continue
+      }
       const start = clipToBox(a.x, a.y, b.x, b.y)
       const end = clipToBox(b.x, b.y, a.x, a.y)
       out.push({
+        loop: false,
         from: link.from_type,
         to: link.to_type,
         label: link.label,
@@ -161,6 +198,39 @@ export default function ObjectGraph({
     }
     return out
   }, [links, positions])
+
+  // Two edges that cross at their midpoints would print their names on top
+  // of each other ("affects" over "inspects"). Each label takes the first spot
+  // along its edge that is clear of the labels already placed.
+  const labels = useMemo(() => {
+    const placed: Array<{ x: number; y: number }> = []
+    const out = new Map<Edge, ReturnType<typeof labelAnchor>>()
+    for (const e of edges) {
+      if (e.loop) {
+        // Right of the loop, unless that runs off the canvas (a type in the
+        // last column): then above the node, ending where the loop lands.
+        const fits = e.x1 + 22 + e.label.length * 6.5 < VIEW_W
+        const anchor = fits
+          ? { x: e.x1 + 22, y: e.y2 - 18, textAnchor: 'start' as const }
+          : { x: e.x2 - 10, y: e.y2 - 10, textAnchor: 'end' as const }
+        placed.push(anchor)
+        out.set(e, anchor)
+        continue
+      }
+      let chosen = labelAnchor(e)
+      for (const t of [0.5, 0.36, 0.64, 0.26, 0.74]) {
+        const candidate = labelAnchor(e, 14, t)
+        const clear = placed.every((p) => Math.abs(p.x - candidate.x) > 70 || Math.abs(p.y - candidate.y) > 22)
+        if (clear) {
+          chosen = candidate
+          break
+        }
+      }
+      placed.push(chosen)
+      out.set(e, chosen)
+    }
+    return out
+  }, [edges])
 
   const isDimmed = (key: string) => {
     if (!selected) return false
@@ -222,13 +292,22 @@ export default function ObjectGraph({
             const highlighted = Boolean(selected) && active
             const onCascade =
               CASCADE_PATH.has(e.from) && CASCADE_PATH.has(e.to)
-            const anchor = labelAnchor(e)
+            const anchor = labels.get(e) ?? labelAnchor(e)
 
             return (
               <g
                 key={`${e.from}-${e.to}`}
                 style={{ opacity: active ? 1 : 0.15, transition: 'opacity 200ms' }}
               >
+                {e.loop ? (
+                  <path
+                    d={`M ${e.x1} ${e.y1} C ${e.x1 + 34} ${e.y1 - 6}, ${e.x2 + 12} ${e.y2 - 40}, ${e.x2} ${e.y2}`}
+                    fill="none"
+                    stroke={highlighted ? 'hsl(var(--accent))' : 'hsl(var(--border))'}
+                    strokeWidth={highlighted ? 2 : 1.25}
+                    markerEnd={`url(#${highlighted ? 'og-arrow-active' : 'og-arrow'})`}
+                  />
+                ) : (
                 <line
                   x1={e.x1}
                   y1={e.y1}
@@ -249,6 +328,7 @@ export default function ObjectGraph({
                       : undefined
                   }
                 />
+                )}
                 <text
                   x={anchor.x}
                   y={e.reverseLabel ? anchor.y - 6 : anchor.y}

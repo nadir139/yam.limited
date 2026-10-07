@@ -920,7 +920,7 @@ update ontology_object_types
 insert into ontology_links (from_type, to_type, label, cardinality, via_column) values
   ('PART', 'SPACE', 'sits in', 'MANY_TO_ONE', 'space_id'),
   ('SPACE', 'SPACE', 'is inside', 'MANY_TO_ONE', 'parent_id'),
-  ('PART', 'PART', 'powers / protects / controls / signals / flows into', 'ONE_TO_MANY', 'part_connections'),
+  ('PART', 'PART', 'connects to', 'ONE_TO_MANY', 'part_connections'),
   ('PART', 'DOCUMENT', 'is drawn in', 'ONE_TO_MANY', 'part_references')
 on conflict (from_type, to_type, via_column) do update set
   label = excluded.label, cardinality = excluded.cardinality;
