@@ -34,7 +34,10 @@ Ordered by impact over effort. Most items are a day or less.
 7. ~~Stored positions~~ — migration 030: drag a space or part in the 3D view (Edit layout) and it
    is saved in the model frame; "Back to the guess" clears it. **Next for the model:** a `vessel_models` slot for a scan (decimated, Draco-compressed GLB under the 50 MB bucket limit,
    or a point cloud tiled with Potree / 3D Tiles), registered to the same frame by three picked points.
-8. **Next on this track.** Procedures from manuals (start engine, pump out) as checklists linked to
+8. ~~Schedule you can trust~~ — drops land where they are let go (planForDrop), work under way
+   ends on its planned end, optimistic moves with consequences, and a month Calendar of the same
+   record. Redeploy the `agent` function so its forecast matches.
+9. **Next on this track.** Procedures from manuals (start engine, pump out) as checklists linked to
    parts; re-import a newer revision as a diff against what is recorded; messages and photos on a part;
    service intervals; a property asset record so a building's parts outlive its project too.
 
