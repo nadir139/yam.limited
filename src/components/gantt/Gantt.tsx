@@ -378,16 +378,25 @@ export default function Gantt({
             {ticks.top.map((t) => (
               <div
                 key={`t${t.day}`}
-                className="absolute top-0 truncate px-1.5 text-[11px] font-semibold"
+                className="absolute top-0 text-[11px] font-semibold"
                 style={{ left: x(t.day), width: t.span * dw, height: HEADER / 2, lineHeight: `${HEADER / 2}px`, borderLeft: `1px solid ${border}` }}
               >
-                {t.span * dw > 40 ? t.label : ''}
+                {/* The month's name stays in view while its days are, instead
+                    of scrolling off with its first day ("…26"). */}
+                {t.span * dw > 40 && (
+                  <span className="sticky inline-block max-w-full truncate px-1.5" style={{ left: LEFT }}>
+                    {t.label}
+                  </span>
+                )}
               </div>
             ))}
             {ticks.bottom.map((t) => (
               <div
                 key={`b${t.day}`}
-                className="absolute truncate text-center text-[10px]"
+                // A day's label sits on the day. A week's or month's sits at its
+                // first day, against the line that marks that day: centred in
+                // the span, "7" read as the 10th and bars looked a few days off.
+                className={`absolute truncate text-[10px] ${t.span === 1 ? 'text-center' : 'pl-1 text-left'}`}
                 style={{
                   left: x(t.day),
                   width: t.span * dw,
@@ -395,7 +404,7 @@ export default function Gantt({
                   height: HEADER / 2,
                   lineHeight: `${HEADER / 2}px`,
                   color: zoom === 'day' && isWeekend(t.day) ? 'hsl(var(--muted-foreground) / 0.6)' : muted,
-                  borderLeft: `1px solid ${t.strong ? border : 'transparent'}`,
+                  borderLeft: `1px solid ${t.strong || t.span > 1 ? border : 'transparent'}`,
                   fontWeight: t.day === schedule.today ? 700 : 400,
                 }}
               >
@@ -409,6 +418,11 @@ export default function Gantt({
         <div className="relative">
           {/* Weekend shading and vertical lines, behind the rows */}
           <div className="pointer-events-none absolute top-0 bottom-0" style={{ left: LEFT, width: trackWidth }}>
+            {/* A faint line down from each week (or month) so a bar's ends can be read against the header. */}
+            {zoom !== 'day' &&
+              ticks.bottom.map((t) => (
+                <div key={`v${t.day}`} className="absolute top-0 bottom-0" style={{ left: x(t.day), width: 0, borderLeft: `1px solid hsl(var(--border) / 0.6)` }} />
+              ))}
             {zoom !== 'month' &&
               Array.from({ length: totalDays }, (_, i) => from + i)
                 .filter(isWeekend)

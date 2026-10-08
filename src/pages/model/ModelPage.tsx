@@ -456,7 +456,7 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
     return (
       <div
         className="fixed inset-x-3 z-20 rounded-xl border bg-background/95 p-3 shadow-lg backdrop-blur"
-        style={{ bottom: phone ? 'calc(58px + env(safe-area-inset-bottom) + 8px)' : 16 }}
+        style={{ bottom: phone ? 'calc(62px + env(safe-area-inset-bottom) + 8px)' : 16 }}
       >
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">

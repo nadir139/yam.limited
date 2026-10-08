@@ -25,6 +25,9 @@ export default function AppShell({ children }: AppShellProps) {
   // Better to say so once and offer the way out.
   const { hasNoProjects, activeProjectId } = useActiveProject()
   const { pathname } = useLocation()
+  // The agent is a conversation: it scrolls inside itself with the input fixed
+  // under it, so the page around it must not scroll as well.
+  const fullHeight = pathname === '/app/agent'
   useRealtimeSync()
   // Stamps first_seen_at on the first visit and keeps last_seen_at fresh, which
   // is what "here now" on the team page is derived from.
@@ -60,13 +63,19 @@ export default function AppShell({ children }: AppShellProps) {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
         <Topbar onMenuClick={() => setSidebarOpen(true)} />
         <main
-          className="p-4 md:p-6"
+          className={fullHeight ? undefined : 'p-4 md:p-6'}
           style={{
             flex: 1,
-            overflowY: 'auto',
+            minHeight: 0,
+            overflowY: fullHeight ? 'hidden' : 'auto',
             overscrollBehavior: 'contain',
-            // Room for the bottom bar, so the last thing on a page is reachable.
-            paddingBottom: isMobile ? `calc(${MOBILE_NAV_HEIGHT + 16}px + env(safe-area-inset-bottom))` : undefined,
+            display: fullHeight ? 'flex' : undefined,
+            flexDirection: fullHeight ? 'column' : undefined,
+            // Room for the bottom bar, so the last thing on a page is reachable
+            // (and the agent's input sits right on top of it).
+            paddingBottom: isMobile
+              ? `calc(${MOBILE_NAV_HEIGHT + (fullHeight ? 0 : 16)}px + env(safe-area-inset-bottom))`
+              : undefined,
           }}
         >
           {/* Scoped to the page: a failure here keeps the sidebar and switcher,
@@ -79,7 +88,7 @@ export default function AppShell({ children }: AppShellProps) {
           </ErrorBoundary>
         </main>
       </div>
-      {isMobile && <MobileNav onMenu={() => setSidebarOpen(true)} />}
+      {isMobile && <MobileNav />}
     </div>
   )
 }

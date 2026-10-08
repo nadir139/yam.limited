@@ -328,10 +328,12 @@ export default function AgentConsole() {
     // Don't yank a restored conversation to the bottom before it has painted;
     // only follow along for turns that arrive while you are watching.
     if (restored.current) {
+      // A chat opens on its latest message, without animating down to it.
       restored.current = false
+      requestAnimationFrame(() => endRef.current?.scrollIntoView({ block: 'end' }))
       return
     }
-    endRef.current?.scrollIntoView({ behavior: 'smooth' })
+    endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [turns, busy, progress.length])
 
   const togglePanel = (turnIndex: number) => (number: string, _target: ObjectRef) => {
@@ -436,7 +438,10 @@ export default function AgentConsole() {
   const tooLong = prompt.trim().length > MAX_PROMPT_CHARS
 
   return (
-    <div style={{ maxWidth: 860, margin: '0 auto', padding: '24px 20px 40px' }}>
+    // A chat: the conversation scrolls in its own area and the input is fixed
+    // beneath it on a solid background, so nothing slides behind it.
+    <div className="mx-auto flex min-h-0 w-full max-w-[860px] flex-1 flex-col">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4 pt-4 sm:px-5 sm:pt-6">
       <div style={{ marginBottom: 20 }}>
         <h1
           style={{
@@ -451,12 +456,14 @@ export default function AgentConsole() {
           <Sparkles size={22} style={{ color: 'hsl(var(--accent))' }} />
           World Model Agent
         </h1>
+        {turns.length === 0 && (
         <p style={{ fontSize: 14, color: 'hsl(var(--muted-foreground))' }}>
           Ask about the project, or tell it what changed. It reads the live world
           model and acts through the same typed Actions you do — under your
           identity, with every change recorded against your name. Click any
           reference to open it here without leaving the conversation.
         </p>
+        )}
         {turns.length > 0 && (
           <button
             onClick={clearConversation}
@@ -670,15 +677,15 @@ export default function AgentConsole() {
         )}
         <div ref={endRef} />
       </div>
+      </div>
 
-      {/* Stays under the thumb while the conversation scrolls; on a phone it
-          sits just above the bottom bar. */}
+      {/* Fixed under the conversation, on its own solid strip. */}
       <form
         onSubmit={(e) => {
           e.preventDefault()
           ask(prompt)
         }}
-        className="sticky bottom-[calc(58px+env(safe-area-inset-bottom))] z-10 bg-background py-2 md:bottom-0"
+        className="shrink-0 border-t bg-background px-4 py-3 sm:px-5"
         style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}
       >
         <Textarea
