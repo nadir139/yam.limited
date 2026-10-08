@@ -36,7 +36,7 @@ Ordered by impact over effort. Most items are a day or less.
    or a point cloud tiled with Potree / 3D Tiles), registered to the same frame by three picked points.
 8. ~~Schedule you can trust~~ — drops land where they are let go (planForDrop), work under way
    ends on its planned end, optimistic moves with consequences, and a month Calendar of the same
-   record. Redeploy the `agent` function so its forecast matches.
+   record.
 9. **Next on this track.** Procedures from manuals (start engine, pump out) as checklists linked to
    parts; re-import a newer revision as a diff against what is recorded; messages and photos on a part;
    service intervals; a property asset record so a building's parts outlive its project too.

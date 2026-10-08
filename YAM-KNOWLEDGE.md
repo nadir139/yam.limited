@@ -1901,8 +1901,24 @@ started, was dragged into August and stayed at today.
   their day; a day lists everything on it. Dragging a bar uses the same
   `planForDrop` and Action as the timeline.
 
-**Pending:** the agent Edge Function (v9) still bundles the previous
-schedule.ts, so for work under way it quotes the finish as actual start +
-planned duration. Redeploy `agent` (index.ts unchanged + schedule.ts) to
-bring it in line.
+**Agent v10 (deployed 8 Oct).** v9 still ran the old engine and told the
+owner WP-MECH-001's finish "stays 7 Dec" while the chart said 10 Dec. v10
+bundles the new engine (verified byte-identical to the repo's computeSchedule;
+the deployed schedule.ts leaves out planForDrop, which the agent does not
+use) and its prompt says work under way keeps its actual start: give it more
+days by moving only its planned end.
+
+**Reading the timeline.** Week and month labels sit at their first day,
+against the line marking it (centred, "7" read as the 10th and bars looked
+days off); a faint line runs down from each; the month name sticks at the
+left while its days are on screen.
+
+**Agent as a chat.** The conversation scrolls in its own area and the input
+is fixed beneath it on a solid strip (AppShell gives /app/agent a
+non-scrolling main); a restored conversation opens on its latest message.
+
+**Phone navigation.** Dashboard · Schedule · Agent (raised, centre) ·
+YAManagement · More. More is a bottom sheet of every other section with its
+count (open NCRs, owner decisions, items asked of you); the More tab carries
+their total.
 

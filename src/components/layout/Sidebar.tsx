@@ -31,7 +31,7 @@ interface SidebarProps {
 
 // Labels are translation keys rather than English strings, so the navigation
 // follows the language menu instead of staying English around translated pages.
-const NAV_ITEMS = [
+export const NAV_ITEMS = [
   { icon: Sparkles, labelKey: 'nav.agent', path: '/app/agent' },
   { icon: LayoutDashboard, labelKey: 'nav.dashboard', path: '/app/dashboard' },
   { icon: Anchor, labelKey: 'nav.project', path: '/app/project' },
