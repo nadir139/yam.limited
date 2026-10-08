@@ -20,6 +20,11 @@ export interface ProjectSchedule {
   lines: GanttLine[]
   isLoading: boolean
   error: unknown
+  /**
+   * The whole schedule as it would be with one package re-planned: what a
+   * move will do to it, its successors and the finish, before it is saved.
+   */
+  predict: (workPackageId: string, plannedStart: string, plannedEnd: string) => ScheduleResult
 }
 
 /**
@@ -48,12 +53,15 @@ export function useProjectSchedule(): ProjectSchedule {
     const changeOrders = cos.data ?? []
     const defectRows = defects.data ?? []
 
-    const schedule = computeSchedule({
-      workPackages,
-      dependencies,
-      delays: delaysFromChangeOrders(changeOrders, defectRows),
-      today,
-    })
+    const delays = delaysFromChangeOrders(changeOrders, defectRows)
+    const schedule = computeSchedule({ workPackages, dependencies, delays, today })
+    const predict = (id: string, plannedStart: string, plannedEnd: string) =>
+      computeSchedule({
+        workPackages: workPackages.map((w) => (w.id === id ? { ...w, planned_start: plannedStart, planned_end: plannedEnd } : w)),
+        dependencies,
+        delays,
+        today,
+      })
 
     const markers: GanttMarker[] = []
 
@@ -122,6 +130,7 @@ export function useProjectSchedule(): ProjectSchedule {
       dependencies,
       markers,
       lines,
+      predict,
       isLoading: project.isLoading || wps.isLoading || deps.isLoading,
       error: project.error ?? wps.error ?? deps.error,
     }

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import * as db from './db'
 import { useActiveProject, useProjectId } from '@/contexts/ProjectContext'
 import { useAuth } from '@/contexts/AuthContext'
-import type { DefectRecord, InspectionEvent, ObjectType } from './types'
+import type { DefectRecord, InspectionEvent, ObjectType, WorkPackage } from './types'
 
 /** Re-exported so a page needs one import to reach the active project. */
 export { useActiveProject, useProjectId }
@@ -300,10 +300,34 @@ function useScheduleInvalidation() {
 
 export function useRescheduleWorkPackage() {
   const invalidate = useScheduleInvalidation()
+  const qc = useQueryClient()
+  const projectId = useProjectId()
+  type Vars = { id: string; start: string | null; end: string | null; reason?: string | null }
   return useMutation({
-    mutationFn: (v: { id: string; start: string | null; end: string | null; reason?: string | null }) =>
-      db.rescheduleWorkPackage(v.id, v.start, v.end, v.reason),
-    onSuccess: invalidate,
+    mutationFn: (v: Vars) => db.rescheduleWorkPackage(v.id, v.start, v.end, v.reason),
+    // The bar stays where it was dropped while the Action runs, instead of
+    // jumping back to its old dates until the refetch lands. A refusal puts
+    // it back.
+    onMutate: async (v: Vars) => {
+      const key = QUERY_KEYS.workPackages(projectId)
+      await qc.cancelQueries({ queryKey: key })
+      const previous = qc.getQueryData<WorkPackage[]>(key)
+      if (previous) {
+        qc.setQueryData<WorkPackage[]>(
+          key,
+          previous.map((w) =>
+            w.id === v.id
+              ? { ...w, planned_start: v.start ?? w.planned_start, planned_end: v.end ?? w.planned_end }
+              : w,
+          ),
+        )
+      }
+      return { previous, key }
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.previous) qc.setQueryData(ctx.key, ctx.previous)
+    },
+    onSettled: invalidate,
   })
 }
 

@@ -1869,3 +1869,40 @@ rather than each page:
   Home Screen opens YAM full screen on the dashboard. There is no service
   worker, so it needs a connection.
 
+## 38. The schedule you can trust: drop where you mean, calendar beside it
+
+**What was wrong.** The chart draws the *forecast*; the record stores the
+*plan*. A drop added the dragged distance to the plan, so whenever the two
+differed the bar did not land where it was let go and the stored dates
+drifted. The event log showed it: WP-MECH-001 (under way since 6 Oct) was
+dragged 12 times and never moved, because work under way is drawn from its
+actual start, while its planned start walked to 13 Nov; WP-RIG-001, not
+started, was dragged into August and stayed at today.
+
+**What is true now.**
+- `planForDrop` (schedule.ts, shared, Deno-tested) works back from the
+  dropped bar to the plan that produces it: change-order days stay on the
+  end, work not started cannot begin before today, work under way keeps its
+  start and only its finish moves (its start handle is gone).
+- Work under way finishes on its **planned end** (plus change-order days).
+  It used to count the planned duration from the actual start, which is why
+  moving the end of a started bar changed nothing visible.
+- The bar previews exactly what will be saved, with a live date label;
+  dragging counts the chart scrolling under the pointer and scrolls by
+  itself at the edges; on touch a bar is tapped to select, then dragged
+  (other bars let a swipe scroll).
+- The move is optimistic (the bar stays put while the Action runs, rolls
+  back on refusal) and the confirmation says what the record now says:
+  held by a predecessor, which packages moved with it, the new forecast
+  finish, and inspections now booked outside the work.
+- **Calendar** (Schedule → Calendar): a month of the same record. Work
+  packages are bars across their forecast days; inspections, owner
+  decisions due, open action items due and the project's milestones sit on
+  their day; a day lists everything on it. Dragging a bar uses the same
+  `planForDrop` and Action as the timeline.
+
+**Pending:** the agent Edge Function (v9) still bundles the previous
+schedule.ts, so for work under way it quotes the finish as actual start +
+planned duration. Redeploy `agent` (index.ts unchanged + schedule.ts) to
+bring it in line.
+

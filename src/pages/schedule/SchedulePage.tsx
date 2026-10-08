@@ -1,16 +1,21 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { CalendarRange, Link2, Flag, GitBranch, Lock, AlertTriangle, Crosshair } from 'lucide-react'
+import { CalendarDays, CalendarRange, Link2, Flag, GitBranch, Lock, AlertTriangle, Crosshair, GanttChart } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Gantt, { type GroupBy } from '@/components/gantt/Gantt'
 import ScheduleDetailPanel from '@/components/gantt/ScheduleDetailPanel'
+import ScheduleCalendar, { type CalendarEvent } from '@/components/gantt/ScheduleCalendar'
 import { plural, shortDate, type Zoom } from '@/components/gantt/scale'
 import { useProjectSchedule } from '@/lib/use-schedule'
-import { fromDay } from '@/lib/schedule'
+import { fromDay, toDay } from '@/lib/schedule'
 import { workPackageSystems } from '@/lib/parts'
 import {
+  useApprovals,
+  useInspections,
   useLinkWorkPackages,
+  useProject,
+  useProjectActionItems,
   usePartLinks,
   useParts,
   usePermissions,
@@ -49,7 +54,77 @@ function Stat({ label, value, tone, hint }: { label: string; value: string; tone
 
 export default function SchedulePage() {
   const navigate = useNavigate()
-  const { schedule, dependencies, markers, lines, isLoading, error } = useProjectSchedule()
+  const { schedule, dependencies, markers, lines, isLoading, error, predict } = useProjectSchedule()
+  const { data: inspections = [] } = useInspections()
+  const { data: approvals = [] } = useApprovals()
+  const { data: actionItems = [] } = useProjectActionItems()
+  const { data: project } = useProject()
+  const [params, setParams] = useSearchParams()
+  const view = params.get('view') === 'calendar' ? 'calendar' : 'timeline'
+  const setView = (v: 'timeline' | 'calendar') =>
+    setParams((p) => {
+      const next = new URLSearchParams(p)
+      if (v === 'calendar') next.set('view', 'calendar')
+      else next.delete('view')
+      return next
+    })
+
+  // Everything else in the model that has a date, for the calendar: the
+  // attendances booked, the owner's decisions due, what people owe by when,
+  // and the project's own milestones.
+  const events = useMemo<CalendarEvent[]>(() => {
+    const out: CalendarEvent[] = []
+    for (const i of inspections) {
+      const day = toDay(i.actual_date ?? i.scheduled_date)
+      if (day === null) continue
+      out.push({
+        id: `i${i.id}`,
+        day,
+        kind: 'inspection',
+        label: `${i.inspection_number} ${i.title}`,
+        tone: i.result === 'PASS' ? 'ok' : i.result === 'FAIL' ? 'bad' : i.result === 'CONDITIONAL_PASS' ? 'warn' : 'neutral',
+        href: i.work_package_id ? `/app/work-packages/${i.work_package_id}` : '/app/inspections',
+      })
+    }
+    for (const a of approvals) {
+      const day = toDay(a.status === 'PENDING' ? a.deadline : a.decision_date)
+      if (day === null) continue
+      out.push({
+        id: `a${a.id}`,
+        day,
+        kind: 'approval',
+        label: `${a.approval_number} ${a.status === 'PENDING' ? 'decision due' : a.status.toLowerCase()}`,
+        tone: a.status === 'PENDING' ? (day < schedule.today ? 'bad' : 'warn') : a.status === 'APPROVED' ? 'ok' : 'neutral',
+        href: '/app/approvals',
+      })
+    }
+    for (const it of actionItems) {
+      const day = toDay(it.due_date)
+      if (day === null || it.status === 'DONE' || it.status === 'DECLINED') continue
+      out.push({
+        id: `t${it.id}`,
+        day,
+        kind: 'action',
+        label: `${it.assignee_name}: ${it.body}`,
+        tone: day < schedule.today ? 'bad' : 'neutral',
+        href: '/app/action-items',
+      })
+    }
+    const ps = toDay(project?.planned_start)
+    const pd = toDay(project?.planned_delivery)
+    if (ps !== null) out.push({ id: 'm-start', day: ps, kind: 'milestone', label: 'Project planned start', tone: 'neutral' })
+    if (pd !== null) out.push({ id: 'm-delivery', day: pd, kind: 'milestone', label: 'Planned delivery', tone: 'neutral' })
+    if (schedule.forecastFinish !== null && schedule.forecastFinish !== pd) {
+      out.push({
+        id: 'm-forecast',
+        day: schedule.forecastFinish,
+        kind: 'milestone',
+        label: 'Forecast finish',
+        tone: pd !== null && schedule.forecastFinish > pd ? 'bad' : 'ok',
+      })
+    }
+    return out
+  }, [inspections, approvals, actionItems, project, schedule.today, schedule.forecastFinish])
   const { can } = usePermissions()
   const reschedule = useRescheduleWorkPackage()
   const link = useLinkWorkPackages()
@@ -79,14 +154,59 @@ export default function SchedulePage() {
     }
   }, [schedule])
 
-  const doReschedule = (id: string, start: number, end: number, reason?: string) => {
+  // What a move does to the rest of the model, in words: the record is
+  // connected, so moving one package can hold it behind a predecessor, push
+  // the packages after it, move the finish, or strand an inspection booked
+  // inside its old dates.
+  const consequences = (id: string, start: number, end: number, adjusted?: string | null) => {
+    const next = predict(id, fromDay(start), fromDay(end))
+    const it = next.byId[id]
+    const notes: string[] = []
+    if (adjusted) notes.push(`${adjusted}.`)
+    if (it && !it.started && it.forecastStart !== null && it.forecastStart > start && it.drivenBy && it.drivenBy !== 'not started') {
+      notes.push(`It waits on ${it.drivenBy}, so it cannot start before ${shortDate(it.forecastStart)}.`)
+    }
+    const moved = next.items
+      .filter((o) => o.id !== id)
+      .filter((o) => {
+        const was = schedule.byId[o.id]
+        return was && (o.forecastStart !== was.forecastStart || o.forecastEnd !== was.forecastEnd)
+      })
+      .map((o) => o.wpNumber)
+    if (moved.length) {
+      notes.push(`Also moves ${moved.slice(0, 4).join(', ')}${moved.length > 4 ? ` and ${moved.length - 4} more` : ''}.`)
+    }
+    if (next.forecastFinish !== null && next.forecastFinish !== schedule.forecastFinish) {
+      notes.push(`Forecast finish ${shortDate(schedule.forecastFinish)} → ${shortDate(next.forecastFinish)}.`)
+    }
+    if (it && it.forecastStart !== null && it.forecastEnd !== null) {
+      const outside = inspections.filter((i) => {
+        if (i.work_package_id !== id || i.actual_date || i.result !== 'PENDING') return false
+        const d = toDay(i.scheduled_date)
+        return d !== null && (d < it.forecastStart! || d > it.forecastEnd!)
+      })
+      if (outside.length) {
+        notes.push(
+          `${outside.map((i) => `${i.inspection_number} (${shortDate(toDay(i.scheduled_date))})`).join(', ')} now falls outside the work.`,
+        )
+      }
+    }
+    return { notes, item: it }
+  }
+
+  const doReschedule = (id: string, start: number, end: number, reason?: string, adjusted?: string | null) => {
     const item = schedule.byId[id]
     const before = { start: item.plannedStart, end: item.plannedEnd }
+    const { notes, item: after } = consequences(id, start, end, adjusted)
     reschedule.mutate(
       { id, start: fromDay(start), end: fromDay(end), reason: reason ?? 'Moved on the schedule' },
       {
         onSuccess: () => {
-          toast.success(`${item.wpNumber} → ${shortDate(start)} – ${shortDate(end)}`, {
+          // Say where the bar now is (the forecast), not just what was stored.
+          const shown = after?.forecastStart != null ? `${shortDate(after.forecastStart)} – ${shortDate(after.forecastEnd)}` : `${shortDate(start)} – ${shortDate(end)}`
+          toast.success(`${item.wpNumber} → ${shown}`, {
+            description: notes.length ? notes.join(' ') : undefined,
+            duration: notes.length ? 9000 : 5000,
             action:
               before.start !== null && before.end !== null
                 ? {
@@ -188,6 +308,27 @@ export default function SchedulePage() {
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="inline-flex overflow-hidden rounded-md border" style={{ borderColor: 'hsl(var(--border))' }}>
+          {([
+            ['timeline', 'Timeline', GanttChart],
+            ['calendar', 'Calendar', CalendarDays],
+          ] as const).map(([key, label, Icon]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setView(key)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium"
+              style={{
+                background: view === key ? 'hsl(var(--primary))' : 'transparent',
+                color: view === key ? 'hsl(var(--primary-foreground))' : undefined,
+              }}
+            >
+              <Icon size={13} /> {label}
+            </button>
+          ))}
+        </div>
+        {view === 'timeline' && (
+        <>
+        <div className="inline-flex overflow-hidden rounded-md border" style={{ borderColor: 'hsl(var(--border))' }}>
           {ZOOMS.map((z) => (
             <button
               key={z.key}
@@ -228,6 +369,8 @@ export default function SchedulePage() {
             <Link2 size={13} className="mr-1.5" /> {linkMode ? 'Linking… (click to stop)' : 'Link packages'}
           </Button>
         )}
+        </>
+        )}
 
         <div className="ml-auto flex flex-wrap items-center gap-3 text-[11px]" style={{ color: 'hsl(var(--muted-foreground))' }}>
           <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-4 rounded-sm" style={{ boxShadow: '0 0 0 2px hsl(0 72% 51%)' }} /> Critical</span>
@@ -240,6 +383,17 @@ export default function SchedulePage() {
         </div>
       </div>
 
+      {view === 'calendar' ? (
+        <ScheduleCalendar
+          schedule={schedule}
+          events={events}
+          editable={canReschedule}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          onReschedule={(id, s, e, adjusted) => doReschedule(id, s, e, 'Moved on the calendar', adjusted)}
+          onOpen={(href) => navigate(href)}
+        />
+      ) : (
       <Gantt
         schedule={schedule}
         dependencies={dependencies}
@@ -254,10 +408,15 @@ export default function SchedulePage() {
         linkMode={linkMode}
         selectedId={selectedId}
         onSelect={setSelectedId}
-        onReschedule={(id, s, e) => doReschedule(id, s, e)}
-        onPlace={(id, day) => doReschedule(id, day, day + 4, 'Placed on the schedule')}
+        onReschedule={(id, s, e, adjusted) => doReschedule(id, s, e, 'Moved on the schedule', adjusted)}
+        onPlace={(id, day) => {
+          // Work not started cannot be placed in the past.
+          const d = Math.max(day, schedule.today)
+          doReschedule(id, d, d + 4, 'Placed on the schedule', d !== day ? 'It cannot begin before today' : null)
+        }}
         onLink={doLink}
       />
+      )}
 
       {!canReschedule && (
         <p className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>

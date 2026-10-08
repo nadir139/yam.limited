@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { Lock, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react'
-import type { ScheduleDependency, ScheduleItem, ScheduleResult } from '@/lib/schedule'
+import { planForDrop, type DragMode, type ScheduleDependency, type ScheduleItem, type ScheduleResult } from '@/lib/schedule'
 import { DAY_WIDTH, headerTicks, isWeekend, plural, shortDate, type Zoom } from './scale'
 
 // The Gantt is a view of the world model in time, not a separate plan.
@@ -51,7 +51,8 @@ export interface GanttProps {
   compact?: boolean
   /** Only these items, in this order (the mini chart). Defaults to all. */
   onlyIds?: string[]
-  onReschedule?: (id: string, start: number, end: number) => void
+  /** Planned dates that put the bar where it was dropped (see planForDrop), and why they differ from the drop if they do. */
+  onReschedule?: (id: string, start: number, end: number, adjusted?: string | null) => void
   onPlace?: (id: string, day: number) => void
   onLink?: (predecessorId: string, successorId: string) => void
   onSelect?: (id: string) => void
@@ -59,7 +60,7 @@ export interface GanttProps {
   focusDay?: number | null
 }
 
-const STATUS_COLOR: Record<string, string> = {
+export const STATUS_COLOR: Record<string, string> = {
   DRAFT: 'hsl(215 20% 62%)',
   SCOPED: 'hsl(215 55% 52%)',
   ACTIVE: 'hsl(185 60% 40%)',
@@ -88,11 +89,18 @@ type Row =
 
 interface Drag {
   id: string
-  mode: 'move' | 'start' | 'end'
+  mode: DragMode
+  /** Pointer x and the scroll position when the drag began: the distance
+      dragged counts the chart scrolling under the pointer too. */
   originX: number
+  originScroll: number
+  clientX: number
   delta: number
   moved: boolean
 }
+
+/** How close to the edge (px) the pointer must be for the chart to scroll on its own. */
+const EDGE = 48
 
 export default function Gantt({
   schedule,
@@ -217,43 +225,87 @@ export default function Gantt({
   }, [from])
 
   // ── Dragging ─────────────────────────────────────────────────────────────
-  const beginDrag = (e: ReactPointerEvent, item: ScheduleItem, mode: Drag['mode']) => {
+  // Mouse: press and drag any bar. Touch: a swipe scrolls the chart, so a bar
+  // is picked up only once it is selected (first tap selects, then drag).
+  const dragRef = useRef<Drag | null>(null)
+  dragRef.current = drag
+
+  const beginDrag = (e: ReactPointerEvent, item: ScheduleItem, mode: DragMode) => {
     if (linkMode) return
     e.stopPropagation()
     if (!editable || item.complete || !item.scheduled) {
       onSelect?.(item.id)
       return
     }
+    if (e.pointerType === 'touch' && selectedId !== item.id) {
+      onSelect?.(item.id)
+      return
+    }
+    // Work under way keeps its start: whichever part is grabbed moves the finish.
+    const m: DragMode = item.started && mode === 'start' ? 'end' : mode
     ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
-    setDrag({ id: item.id, mode, originX: e.clientX, delta: 0, moved: false })
+    setDrag({
+      id: item.id,
+      mode: m,
+      originX: e.clientX,
+      originScroll: scrollRef.current?.scrollLeft ?? 0,
+      clientX: e.clientX,
+      delta: 0,
+      moved: false,
+    })
+  }
+
+  const recompute = (d: Drag, clientX: number): Drag => {
+    const px = clientX - d.originX + ((scrollRef.current?.scrollLeft ?? 0) - d.originScroll)
+    const delta = Math.round(px / dw)
+    const moved = d.moved || Math.abs(px) > 3
+    return delta === d.delta && moved === d.moved && clientX === d.clientX ? d : { ...d, clientX, delta, moved }
   }
 
   const moveDrag = (e: ReactPointerEvent) => {
-    if (!drag) return
-    const px = e.clientX - drag.originX
-    const delta = Math.round(px / dw)
-    if (delta !== drag.delta || (!drag.moved && Math.abs(px) > 3)) {
-      setDrag({ ...drag, delta, moved: drag.moved || Math.abs(px) > 3 })
-    }
+    const d = dragRef.current
+    if (!d) return
+    const next = recompute(d, e.clientX)
+    if (next !== d) setDrag(next)
   }
 
-  const endDrag = () => {
-    if (!drag) return
-    const item = schedule.byId[drag.id]
-    if (!drag.moved) {
-      onSelect?.(drag.id)
-    } else if (drag.delta !== 0 && item.plannedStart !== null && item.plannedEnd !== null) {
-      let start = item.plannedStart
-      let end = item.plannedEnd
-      if (drag.mode === 'move') {
-        start += drag.delta
-        end += drag.delta
-      } else if (drag.mode === 'end') {
-        end = Math.max(start, end + drag.delta)
-      } else {
-        start = Math.min(end, start + drag.delta)
+  // Near either edge the chart scrolls by itself, so a bar can be carried
+  // further than the visible weeks.
+  useEffect(() => {
+    if (!drag?.moved) return
+    let raf = 0
+    const tick = () => {
+      const d = dragRef.current
+      const el = scrollRef.current
+      if (!d || !el) return
+      const rect = el.getBoundingClientRect()
+      const leftEdge = rect.left + LEFT
+      let speed = 0
+      if (d.clientX < leftEdge + EDGE) speed = -Math.ceil((leftEdge + EDGE - d.clientX) / 6)
+      else if (d.clientX > rect.right - EDGE) speed = Math.ceil((d.clientX - (rect.right - EDGE)) / 6)
+      if (speed) {
+        el.scrollLeft += speed
+        const next = recompute(d, d.clientX)
+        if (next !== d) setDrag(next)
       }
-      onReschedule?.(item.id, start, end)
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drag?.moved, drag?.id])
+
+  const endDrag = () => {
+    const d = dragRef.current
+    if (!d) return
+    const item = schedule.byId[d.id]
+    if (!d.moved) {
+      onSelect?.(d.id)
+    } else if (d.delta !== 0 && item) {
+      const plan = planForDrop(item, d.mode, d.delta, schedule.today)
+      if (plan && (plan.start !== item.plannedStart || plan.end !== item.plannedEnd)) {
+        onReschedule?.(item.id, plan.start, plan.end, plan.adjusted)
+      }
     }
     setDrag(null)
   }
@@ -273,12 +325,17 @@ export default function Gantt({
     if (it.forecastStart === null || it.forecastEnd === null) return null
     let s = it.forecastStart
     let e = it.forecastEnd
+    // While dragging, draw what saving will produce, not the raw pointer:
+    // the same translation the drop uses, so preview and result agree.
     if (drag && drag.id === it.id && drag.moved) {
-      if (drag.mode === 'move') {
-        s += drag.delta
-        e += drag.delta
-      } else if (drag.mode === 'end') e = Math.max(s, e + drag.delta)
-      else s = Math.min(e, s + drag.delta)
+      const plan = planForDrop(it, drag.mode, drag.delta, schedule.today)
+      if (plan) {
+        if (it.started) e = Math.max(plan.end + it.delayDays, schedule.today, s)
+        else {
+          s = plan.start
+          e = plan.end + it.delayDays
+        }
+      }
     }
     return { left: x(s), width: Math.max(dw, (e - s + 1) * dw), s, e }
   }
@@ -515,9 +572,12 @@ export default function Gantt({
                           isSelected || isLinkSource ? '0 0 0 2px hsl(var(--foreground))' : '',
                           isHighlighted ? '0 0 0 3px hsl(38 90% 50% / 0.6)' : '',
                         ].filter(Boolean).join(', ') || undefined,
-                        cursor: linkMode ? 'crosshair' : editable && !it.complete ? 'grab' : 'pointer',
+                        cursor: linkMode ? 'crosshair' : editable && !it.complete ? (drag?.id === it.id ? 'grabbing' : 'grab') : 'pointer',
                         opacity: drag?.id === it.id ? 0.85 : 1,
                         zIndex: 5,
+                        // A selected bar takes the touch (so it can be dragged);
+                        // the others let a swipe scroll the chart.
+                        touchAction: editable && isSelected ? 'none' : 'pan-x pan-y',
                       }}
                     >
                       {/* Progress to today on work under way */}
@@ -544,17 +604,30 @@ export default function Gantt({
 
                       {editable && !it.complete && !linkMode && (
                         <>
-                          <div
-                            onPointerDown={(e) => beginDrag(e, it, 'start')}
-                            className="absolute inset-y-0 left-0 w-1.5 cursor-ew-resize hover:bg-white/40"
-                          />
+                          {/* Work under way has no start handle: its start is a fact. */}
+                          {!it.started && (
+                            <div
+                              onPointerDown={(e) => beginDrag(e, it, 'start')}
+                              className={`absolute inset-y-0 left-0 cursor-ew-resize hover:bg-white/40 ${isSelected ? 'w-3 bg-white/25' : 'w-1.5'}`}
+                            />
+                          )}
                           <div
                             onPointerDown={(e) => beginDrag(e, it, 'end')}
-                            className="absolute inset-y-0 right-0 w-1.5 cursor-ew-resize hover:bg-white/40"
+                            className={`absolute inset-y-0 right-0 cursor-ew-resize hover:bg-white/40 ${isSelected ? 'w-3 bg-white/25' : 'w-1.5'}`}
                           />
                         </>
                       )}
                     </div>
+                  )}
+
+                  {/* While dragging: the dates it will be saved with */}
+                  {g && drag?.id === it.id && drag.moved && (
+                    <span
+                      className="pointer-events-none absolute z-20 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-semibold shadow"
+                      style={{ left: g.left, top: -2, transform: 'translateY(-100%)', background: 'hsl(var(--foreground))', color: 'hsl(var(--background))' }}
+                    >
+                      {shortDate(g.s)} → {shortDate(g.e)} · {plural(g.e - g.s + 1, 'day')}
+                    </span>
                   )}
 
                   {/* Bar label outside, when the bar is too short to hold it */}

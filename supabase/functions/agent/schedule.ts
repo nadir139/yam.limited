@@ -231,7 +231,15 @@ export function computeSchedule(input: {
       }
     }
 
-    let end = start + duration + it.delayDays
+    // Work under way finishes when its plan says it finishes: the planned
+    // end is the commitment, and a start that slipped does not quietly move
+    // it. (Counting the planned duration from the actual start instead meant
+    // dragging the end of a started bar on the chart changed nothing you
+    // could see.) Work not yet started keeps its duration from wherever it
+    // can really begin.
+    let end = it.started
+      ? Math.max(start, it.plannedEnd!) + it.delayDays
+      : start + duration + it.delayDays
     if (it.started && !it.complete && end < today) {
       it.overdue = true
       end = today
@@ -321,4 +329,69 @@ export function delaysFromChangeOrders(
     })
   }
   return out
+}
+
+// ─── From a drop on the chart to a plan ─────────────────────────────────────
+
+export type DragMode = 'move' | 'start' | 'end'
+
+export interface DropPlan {
+  /** Planned dates to store, as day numbers. */
+  start: number
+  end: number
+  /** Why the plan is not exactly what was dropped, when it is not. */
+  adjusted: string | null
+}
+
+/**
+ * The planned dates that put a bar where it was let go of.
+ *
+ * The chart draws the forecast; the record stores the plan. They differ for
+ * work under way (it runs from its actual start), for work that is late to
+ * start (it cannot begin before today), for work held by a predecessor and
+ * for work carrying change-order days (drawn on the end of the bar). Adding
+ * the drag distance to the plan, as the chart used to, therefore moved the
+ * record somewhere other than where the bar was dropped. This works back from
+ * the dropped bar instead.
+ *
+ * `delta` is in days. Returns null when the item cannot be moved that way
+ * (complete, unscheduled, or the start of work already under way).
+ */
+export function planForDrop(it: ScheduleItem, mode: DragMode, delta: number, today: number): DropPlan | null {
+  if (it.complete || it.forecastStart === null || it.forecastEnd === null || it.plannedStart === null || it.plannedEnd === null) {
+    return null
+  }
+  const delay = it.delayDays
+
+  if (it.started) {
+    // Under way: the start is a fact. Only the finish moves, whichever part
+    // of the bar was dragged.
+    if (mode === 'start') return null
+    const end = Math.max(it.forecastStart, it.forecastEnd + delta - delay)
+    return {
+      start: Math.min(it.plannedStart, end),
+      end,
+      adjusted: mode === 'move' ? 'Work under way keeps its start; its finish moved' : null,
+    }
+  }
+
+  let s = it.forecastStart
+  let e = it.forecastEnd
+  if (mode === 'move') {
+    s += delta
+    e += delta
+  } else if (mode === 'start') {
+    s = Math.min(e - delay, s + delta)
+  } else {
+    e = Math.max(s + delay, e + delta)
+  }
+
+  // Work not started cannot be planned to start in the past.
+  let adjusted: string | null = null
+  if (s < today) {
+    adjusted = 'It has not started, so it cannot begin before today'
+    if (mode === 'move') e += today - s
+    s = today
+  }
+  return { start: s, end: Math.max(s, e - delay), adjusted }
 }
