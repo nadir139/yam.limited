@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label'
 import { useCreateProject } from '@/lib/query-hooks'
 import { useTranslation } from '@/lib/i18n'
 import type { Project } from '@/lib/types'
+import { DateField } from '@/components/ui/date-field'
 
 // Starting a project.
 //
@@ -135,21 +136,17 @@ export default function CreateProjectForm({ onDone }: { onDone: () => void }) {
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="np-start">{t('project.plannedStart')}</Label>
-          <Input
+          <DateField
             id="np-start"
-            type="date"
             value={plannedStart}
-            onChange={(e) => setPlannedStart(e.target.value)}
-          />
+            onChange={(v) => setPlannedStart(v)} />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="np-delivery">{t('project.plannedDelivery')}</Label>
-          <Input
+          <DateField
             id="np-delivery"
-            type="date"
             value={plannedDelivery}
-            onChange={(e) => setPlannedDelivery(e.target.value)}
-          />
+            onChange={(v) => setPlannedDelivery(v)} />
         </div>
       </div>
 

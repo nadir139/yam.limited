@@ -9,10 +9,19 @@ import { fromDay, toDay, type ScheduleItem, type ScheduleResult } from '@/lib/sc
 import { useLinkWorkPackages, useUnlinkWorkPackages } from '@/lib/query-hooks'
 import type { WorkPackageDependency } from '@/lib/types'
 import { plural, shortDate } from './scale'
+import { DateField } from '@/components/ui/date-field'
 
-// One work package in time: where it was planned, where it will land and why,
-// what it waits on and what waits on it. Exact dates are typed here; the bars
-// are for rough moves.
+// One work package in time: when it starts and finishes, why that differs
+// from the plan if it does, what it waits on and what waits on it. Exact
+// dates are picked here; the bars are for rough moves.
+//
+// One pair of dates, not two. The record keeps a plan (what was intended) and
+// the engine derives the forecast (what will really happen once the actual
+// start, today, predecessors and change orders are counted). Showing both
+// side by side read as two answers to one question ("Planned 15 Nov, Forecast
+// 6 Oct"), so the dates shown are the real ones, and the plan appears only as
+// the reason they moved. Work under way has started: its start is a fact,
+// shown, not edited.
 
 const selectStyle = {
   borderColor: 'hsl(var(--border))',
@@ -64,6 +73,7 @@ export default function ScheduleDetailPanel({
   const [lag, setLag] = useState('0')
 
   useEffect(() => {
+    // Under way, the start field is not shown; the finish is what is edited.
     setStart(item?.plannedStart != null ? fromDay(item.plannedStart) : '')
     setEnd(item?.plannedEnd != null ? fromDay(item.plannedEnd) : '')
     setReason('')
@@ -87,7 +97,9 @@ export default function ScheduleDetailPanel({
   }
 
   const saveDates = () => {
-    const s = toDay(start)
+    // Work under way: its start is its actual start, and the stored plan is
+    // brought in line with it, so no stale planned start lingers.
+    const s = item.started ? item.actualStart ?? item.forecastStart ?? toDay(start) : toDay(start)
     const e = toDay(end || start)
     if (s === null || e === null) {
       toast.error('Enter a start date')
@@ -140,12 +152,34 @@ export default function ScheduleDetailPanel({
           <section>
             <Row label="Status" value={item.status.replace(/_/g, ' ')} />
             <Row label="Discipline" value={item.discipline.replace(/_/g, ' ')} />
-            <Row label="Planned" value={item.scheduled ? `${shortDate(item.plannedStart)} → ${shortDate(item.plannedEnd)}` : 'Not scheduled'} />
-            <Row
-              label="Forecast"
-              value={item.forecastStart !== null ? `${shortDate(item.forecastStart)} → ${shortDate(item.forecastEnd)}` : '—'}
-              tone={item.slipDays !== null && item.slipDays > 0 ? 'bad' : undefined}
-            />
+            {!item.scheduled ? (
+              <Row label="Dates" value="Not scheduled" />
+            ) : (
+              <>
+                <Row
+                  label={item.complete ? 'Started' : item.started ? 'Started' : 'Starts'}
+                  value={shortDate(item.forecastStart)}
+                />
+                <Row
+                  label={item.complete ? 'Finished' : 'Finishes'}
+                  value={shortDate(item.forecastEnd)}
+                  tone={item.slipDays !== null && item.slipDays > 0 ? 'bad' : undefined}
+                />
+                {/* The plan, only where the real dates moved away from it, and why. */}
+                {!item.started && item.forecastStart !== item.plannedStart && (
+                  <Row
+                    label="Planned start"
+                    value={`${shortDate(item.plannedStart)} · ${
+                      item.drivenBy === 'not started' ? 'passed without starting' : item.drivenBy ? `held by ${item.drivenBy}` : 'moved'
+                    }`}
+                    tone="warn"
+                  />
+                )}
+                {item.overdue && (
+                  <Row label="Planned finish" value={`${shortDate(item.plannedEnd)} · passed, not complete`} tone="bad" />
+                )}
+              </>
+            )}
             {item.baselineEnd !== null && (
               <Row label="Baseline" value={`${shortDate(item.baselineStart)} → ${shortDate(item.baselineEnd)}`} />
             )}
@@ -163,33 +197,38 @@ export default function ScheduleDetailPanel({
                 tone={item.critical ? 'warn' : undefined}
               />
             )}
-            {item.drivenBy && (
-              <Row
-                label="Pushed by"
-                value={item.drivenBy === 'not started' ? 'Planned start passed, not started' : item.drivenBy}
-                tone="warn"
-              />
-            )}
             {item.delayDays > 0 && (
               <Row label="Change orders" value={`+${plural(item.delayDays, 'day')} · ${item.delaySources.join(', ')}`} tone="bad" />
             )}
             {item.awaitingApproval && <Row label="Owner decision" value="Pending" tone="warn" />}
-            {item.overdue && <Row label="Overdue" value="Past its end, not complete" tone="bad" />}
+
           </section>
 
           {canReschedule && !item.complete && (
             <section className="flex flex-col gap-2">
-              <h3 className="text-sm font-semibold">Dates</h3>
+              <h3 className="text-sm font-semibold">Change the dates</h3>
               <div className="grid grid-cols-2 gap-2">
                 <div className="flex flex-col gap-1">
-                  <Label htmlFor="sd-start" className="text-xs">Planned start</Label>
-                  <Input id="sd-start" type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+                  <Label htmlFor="sd-start" className="text-xs">Start</Label>
+                  {item.started ? (
+                    // A fact, not a plan: it started on this day.
+                    <div className="flex h-10 items-center rounded-md border border-dashed px-3 text-sm" style={{ borderColor: 'hsl(var(--border))', color: 'hsl(var(--muted-foreground))' }}>
+                      Started {shortDate(item.actualStart ?? item.forecastStart)}
+                    </div>
+                  ) : (
+                    <DateField id="sd-start" value={start} onChange={(v) => setStart(v)} required />
+                  )}
                 </div>
                 <div className="flex flex-col gap-1">
-                  <Label htmlFor="sd-end" className="text-xs">Planned end</Label>
-                  <Input id="sd-end" type="date" value={end} onChange={(e) => setEnd(e.target.value)} />
+                  <Label htmlFor="sd-end" className="text-xs">Finish</Label>
+                  <DateField id="sd-end" value={end} onChange={(v) => setEnd(v)} required />
                 </div>
               </div>
+              {item.delayDays > 0 && (
+                <p className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                  Change orders add {plural(item.delayDays, 'day')} after this finish.
+                </p>
+              )}
               <Input placeholder="Reason (kept in the history)" value={reason} onChange={(e) => setReason(e.target.value)} />
               <Button size="sm" onClick={saveDates} className="self-start">
                 Save dates

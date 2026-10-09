@@ -490,8 +490,11 @@ export default function Gantt({
             const isHighlighted = highlight?.has(it.id)
             const isLinkSource = linkFrom === it.id
             const rowMarkers = markersByRow.get(it.id) ?? []
+            // The plan drawn behind the bar only where it still means something:
+            // work under way runs from its actual start, so its old planned
+            // start is history, not a second place it might be.
             const ghostShift =
-              it.plannedStart !== null && it.forecastStart !== null &&
+              !it.started && it.plannedStart !== null && it.forecastStart !== null &&
               (it.plannedStart !== it.forecastStart || it.plannedEnd !== it.forecastEnd)
 
             return (

@@ -369,7 +369,10 @@ export function planForDrop(it: ScheduleItem, mode: DragMode, delta: number, tod
     if (mode === 'start') return null
     const end = Math.max(it.forecastStart, it.forecastEnd + delta - delay)
     return {
-      start: Math.min(it.plannedStart, end),
+      // The plan's start is brought in line with the fact, so a stale planned
+      // start (WP-MECH-001 kept "15 Nov" after starting on 6 Oct) cannot
+      // linger and contradict the chart.
+      start: it.actualStart ?? it.forecastStart,
       end,
       adjusted: mode === 'move' ? 'Work under way keeps its start; its finish moved' : null,
     }

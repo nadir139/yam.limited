@@ -72,6 +72,7 @@ import { day } from '@/lib/format'
 import { useTranslation } from '@/lib/i18n'
 import type { Discipline, Part, PartConnection, Space } from '@/lib/types'
 import { Constants } from '@/lib/database.types'
+import { DateField } from '@/components/ui/date-field'
 
 // The asset, as a tree of the things work is done to.
 //
@@ -280,7 +281,7 @@ export function PartDialog({
           </div>
           <div className="flex flex-col gap-1">
             <Label htmlFor="part-installed">Installed</Label>
-            <Input id="part-installed" type="date" value={form.installed_on} onChange={(e) => set('installed_on')(e.target.value)} />
+            <DateField id="part-installed"  value={form.installed_on} onChange={(v) => set('installed_on')(v)} />
           </div>
           <div className="col-span-2 flex flex-col gap-1">
             <Label htmlFor="part-notes">Notes</Label>

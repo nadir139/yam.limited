@@ -22,6 +22,8 @@ import WorkPackageStatusControl from '@/components/actions/WorkPackageStatusCont
 import ObjectHistory from '@/components/ObjectHistory'
 import MessageThread from '@/components/MessageThread'
 import PartLinks from '@/components/parts/PartLinks'
+import { useProjectSchedule } from '@/lib/use-schedule'
+import { shortDate } from '@/components/gantt/scale'
 
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -53,6 +55,9 @@ export default function WorkPackageDetail() {
   const navigate = useNavigate()
 
   const { data: wp, isLoading: wpLoading } = useWorkPackage(id ?? '')
+  // The same dates the schedule shows: when the work really starts and
+  // finishes, not the plan's dates side by side with them.
+  const { schedule } = useProjectSchedule()
   const { data: allInspections = [], isLoading: inspLoading } = useInspections()
   const { data: allDefects = [], isLoading: defectsLoading } = useDefects()
   const { data: allDocuments = [], isLoading: docsLoading } = useDocuments()
@@ -157,14 +162,42 @@ export default function WorkPackageDetail() {
               <div style={{ color: 'hsl(var(--muted-foreground))' }}>Contractor</div>
               <div className="font-medium">{wp.trade_contractor || '—'}</div>
             </div>
-            <div>
-              <div style={{ color: 'hsl(var(--muted-foreground))' }}>Planned Start</div>
-              <div className="font-medium">{day(wp.planned_start)}</div>
-            </div>
-            <div>
-              <div style={{ color: 'hsl(var(--muted-foreground))' }}>Planned End</div>
-              <div className="font-medium">{day(wp.planned_end)}</div>
-            </div>
+            {(() => {
+              const it = schedule.byId[wp.id]
+              if (!it || it.forecastStart === null) {
+                return (
+                  <div>
+                    <div style={{ color: 'hsl(var(--muted-foreground))' }}>Dates</div>
+                    <div className="font-medium">Not scheduled</div>
+                  </div>
+                )
+              }
+              const moved = !it.started && it.plannedStart !== it.forecastStart
+              return (
+                <>
+                  <div>
+                    <div style={{ color: 'hsl(var(--muted-foreground))' }}>{it.started ? 'Started' : 'Starts'}</div>
+                    <div className="font-medium">{shortDate(it.forecastStart)}</div>
+                    {moved && (
+                      <div className="text-xs" style={{ color: 'hsl(38 90% 45%)' }}>
+                        planned {shortDate(it.plannedStart)}
+                        {it.drivenBy === 'not started' ? ', not started' : it.drivenBy ? `, waits on ${it.drivenBy}` : ''}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <div style={{ color: 'hsl(var(--muted-foreground))' }}>{it.complete ? 'Finished' : 'Finishes'}</div>
+                    <div className="font-medium" style={{ color: it.slipDays !== null && it.slipDays > 0 ? 'hsl(0 72% 51%)' : undefined }}>
+                      {shortDate(it.forecastEnd)}
+                    </div>
+                    {it.delayDays > 0 && (
+                      <div className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>incl. {it.delayDays}d from change orders</div>
+                    )}
+                    {it.overdue && <div className="text-xs" style={{ color: 'hsl(0 72% 51%)' }}>planned {shortDate(it.plannedEnd)}, overdue</div>}
+                  </div>
+                </>
+              )
+            })()}
             {wp.class_item_ref && (
               <div>
                 <div style={{ color: 'hsl(var(--muted-foreground))' }}>Class Ref</div>

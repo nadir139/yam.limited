@@ -1922,3 +1922,25 @@ YAManagement · More. More is a bottom sheet of every other section with its
 count (open NCRs, owner decisions, items asked of you); the More tab carries
 their total.
 
+**Plan and forecast: one pair of dates on screen.** The record keeps a
+*plan* (what someone committed to; what you edit; what a baseline freezes)
+and the engine derives a *forecast* (when the work will really happen once
+the actual start, today, predecessors and change-order days are counted).
+Both are needed in the model: the plan is the promise, the forecast is the
+consequence, and slip is the gap. On screen they read as two answers to one
+question ("Planned 15 Nov, Forecast 6 Oct"), so the panel and the work
+package page now show one Start and one Finish (the forecast), and the plan
+only where the real dates moved away from it, with the reason ("held by
+WP-N", "passed without starting", "overdue"). Work under way shows
+"Started 6 Oct" as a fact, not a field: only its finish is edited, and
+saving (or dragging) it writes the actual start into the plan's start, so a
+stale planned start cannot linger. The Gantt no longer draws a planned
+ghost behind work under way.
+
+**Dates are day first, everywhere.** `<input type="date">` draws in the
+browser's locale; on a US-English machine it showed 11/15/2026, and on 9 Oct
+a planned start was saved as 15 Oct and then 15 Nov within 35 seconds.
+`DateField` (components/ui/date-field.tsx) replaces every date input: it
+shows "15 Nov 2026", picks from a Monday-first calendar, and passes the same
+'YYYY-MM-DD' value as before. Displays already used 'd MMM yyyy'.
+

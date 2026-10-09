@@ -16,6 +16,7 @@ import { useRecordInspectionResult, usePermissions } from '@/lib/query-hooks'
 import RaiseDefectForm from './RaiseDefectForm'
 import type { InspectionEvent, InspectionResult } from '@/lib/types'
 import { localToday } from '@/lib/format'
+import { DateField } from '@/components/ui/date-field'
 
 const RESULT_OPTIONS: {
   value: InspectionResult
@@ -209,13 +210,11 @@ export default function RecordInspectionResult({ inspection, onSuccess }: Props)
                 {/* Date */}
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="insp-date">Inspection Date *</Label>
-                  <Input
+                  <DateField
                     id="insp-date"
-                    type="date"
                     value={actualDate}
-                    onChange={(e) => setActualDate(e.target.value)}
-                    required
-                  />
+                    onChange={(v) => setActualDate(v)}
+                    required />
                 </div>
 
                 {/* Notes */}

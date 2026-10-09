@@ -7,6 +7,7 @@ import { useRecordInspectionResult, usePermissions } from '@/lib/query-hooks'
 import RaiseDefectForm from '@/components/actions/RaiseDefectForm'
 import type { InspectionEvent, InspectionResult } from '@/lib/types'
 import { localToday } from '@/lib/format'
+import { DateField } from '@/components/ui/date-field'
 
 // Recording an inspection result from inside the conversation.
 //
@@ -150,13 +151,12 @@ export default function InlineInspectionResult({
             {o.label}
           </button>
         ))}
-        <Input
-          type="date"
+        <DateField
           value={actualDate}
-          onChange={(e) => setActualDate(e.target.value)}
+          onChange={(v) => setActualDate(v)}
           required
-          className="h-7 w-auto text-xs"
-        />
+          size="sm"
+          className="w-auto" />
       </div>
 
       <Textarea
