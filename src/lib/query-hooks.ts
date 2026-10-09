@@ -567,6 +567,56 @@ export function usePlacePart() {
   })
 }
 
+export function useSizePart() {
+  const invalidate = usePartsInvalidation()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (v: { id: string; size: { sx: number; sy: number; sz: number } | null }) =>
+      db.sizePart(projectId, v.id, v.size),
+    onSuccess: invalidate,
+  })
+}
+
+/** Uploading, aligning and removing the boat's own 3D file all change the vessel row. */
+function useVesselInvalidation() {
+  const qc = useQueryClient()
+  return () => {
+    qc.invalidateQueries({ queryKey: ['vessel'] })
+    qc.invalidateQueries({ queryKey: ['project'] })
+    qc.invalidateQueries({ queryKey: ['events'] })
+  }
+}
+
+export function useUploadVesselModel() {
+  const invalidate = useVesselInvalidation()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (file: File) => db.uploadVesselModel(projectId, file),
+    onSuccess: invalidate,
+  })
+}
+
+export function useSetVesselModelTransform() {
+  const invalidate = useVesselInvalidation()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (t: Parameters<typeof db.setVesselModelTransform>[1]) => db.setVesselModelTransform(projectId, t),
+    onSuccess: invalidate,
+  })
+}
+
+/** The bytes of the boat's 3D file. A path never changes content (uploads never overwrite), so it is fetched once. */
+export function useVesselModelFile(path: string | null) {
+  return useQuery({
+    queryKey: ['vessel-model-file', path],
+    queryFn: () => db.downloadVesselModel(path!),
+    enabled: !!path,
+    staleTime: Infinity,
+    gcTime: 30 * 60_000,
+    retry: 1,
+  })
+}
+
 export function useConnectParts() {
   const invalidate = usePartsInvalidation()
   const projectId = useProjectId()

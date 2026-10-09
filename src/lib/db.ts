@@ -517,6 +517,84 @@ export async function placePart(
   return (unwrap(data, error, 'Place part') as unknown as { part: Part }).part
 }
 
+/** Gives a part its measured size in metres; null hands it back to the typical size. */
+export async function sizePart(
+  projectId: string,
+  partId: string,
+  size: { sx: number; sy: number; sz: number } | null,
+): Promise<Part> {
+  const { data, error } = await supabase.rpc('action_size_part', {
+    p_part_id: partId,
+    p_project_id: projectId,
+    p_size: (size ?? undefined) as unknown as Json,
+  })
+  return (unwrap(data, error, 'Size part') as unknown as { part: Part }).part
+}
+
+// ─── The boat's own 3D file ───────────────────────────────────────────────────
+//
+// Added in migration 031. The file goes to Storage under the project's
+// VESSEL_MODEL folder (member-only, never overwritten or deleted, migration
+// 023), then an Action records it on the vessel so the change is in the log.
+
+/** The largest file Storage accepts on this project (the bucket's limit). */
+export const MODEL_FILE_LIMIT = 50 * 1024 * 1024
+
+const MODEL_CONTENT_TYPES = { glb: 'model/gltf-binary', stl: 'model/stl', obj: 'model/obj' } as const
+export type ModelFileFormat = keyof typeof MODEL_CONTENT_TYPES
+
+/** The format from the file name, or null for anything the viewer cannot read. */
+export function modelFormatOf(fileName: string): ModelFileFormat | null {
+  const ext = fileName.toLowerCase().split('.').pop() ?? ''
+  return ext in MODEL_CONTENT_TYPES ? (ext as ModelFileFormat) : null
+}
+
+export async function uploadVesselModel(projectId: string, file: File): Promise<Vessel> {
+  const format = modelFormatOf(file.name)
+  if (!format) throw new Error('Use a GLB, STL or OBJ file (export GLB from Rhino, Blender or most CAD tools)')
+  if (file.size > MODEL_FILE_LIMIT) {
+    throw new Error(`The file is ${(file.size / 1048576).toFixed(0)} MB; the limit is 50 MB. Export a lighter GLB (Draco compression or fewer polygons).`)
+  }
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+  const path = `${projectId}/VESSEL_MODEL/${Date.now()}_${safeName}`
+  // Browsers give .glb and .stl no type at all, and the bucket only takes
+  // listed types. Sent as bytes: for a File, supabase-js posts a multipart
+  // form whose part carries the File's own (empty) type and ignores contentType.
+  const { error: storageError } = await supabase.storage
+    .from('project-documents')
+    .upload(path, await file.arrayBuffer(), { upsert: false, contentType: MODEL_CONTENT_TYPES[format] })
+  if (storageError) throw new Error(`Storage upload failed: ${storageError.message}`)
+
+  const { data, error } = await supabase.rpc('action_set_vessel_model', {
+    p_project_id: projectId,
+    p_path: path,
+    p_name: file.name,
+    p_format: format,
+    p_bytes: file.size,
+  })
+  return (unwrap(data, error, 'Set vessel model') as unknown as { vessel: Vessel }).vessel
+}
+
+/** Saves how the file sits on the model frame, or (null) removes the file and goes back to the drawn hull. */
+export async function setVesselModelTransform(
+  projectId: string,
+  transform: { scale: number; rx: number; ry: number; rz: number; x: number; y: number; z: number } | null,
+): Promise<Vessel> {
+  const { data, error } = await supabase.rpc('action_set_vessel_model', {
+    p_project_id: projectId,
+    p_transform: (transform ?? undefined) as unknown as Json,
+    p_clear: transform === null,
+  })
+  return (unwrap(data, error, 'Set vessel model') as unknown as { vessel: Vessel }).vessel
+}
+
+/** The file's bytes, read through Storage's member-only policy. */
+export async function downloadVesselModel(path: string): Promise<ArrayBuffer> {
+  const { data, error } = await supabase.storage.from('project-documents').download(path)
+  if (error || !data) throw new Error(`Could not load the 3D model: ${error?.message ?? 'no data'}`)
+  return data.arrayBuffer()
+}
+
 export async function connectParts(
   projectId: string,
   fromId: string,

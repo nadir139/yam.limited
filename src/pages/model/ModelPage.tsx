@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowRight, Box, ChevronRight, FileUp, Maximize2, Move, Network, PanelRightOpen, RotateCcw, Scaling, ShieldAlert, X } from 'lucide-react'
@@ -9,7 +9,9 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import ObjectGraph from '@/components/ontology/ObjectGraph'
-import type { CameraGoal, SceneOptions } from '@/components/model/VesselScene'
+import type { CameraGoal, SceneFile, SceneOptions } from '@/components/model/VesselScene'
+import { Input } from '@/components/ui/input'
+import VesselFilePanel from './VesselFilePanel'
 import { PartDetail, PartDialog } from '@/pages/parts/PartsPage'
 import {
   useApprovals,
@@ -24,9 +26,11 @@ import {
   usePlacePart,
   usePlaceSpace,
   useProject,
+  useSizePart,
   useSpaces,
   useTeam,
   useVessel,
+  useVesselModelFile,
   useWorkPackages,
 } from '@/lib/query-hooks'
 import { FALLBACK_ONTOLOGY, fetchOntology } from '@/lib/ontology'
@@ -36,7 +40,15 @@ import {
   SYSTEM_PALETTE,
   boxToStored,
   buildVesselModel,
+  fitTransform,
+  initialRotation,
+  sizeToStored,
+  storedTransform,
+  vesselFileInfo,
+  type Bounds,
+  type ModelTransform,
   type PlacedPart,
+  type Vec3,
 } from '@/lib/vessel-model'
 import type { Part } from '@/lib/types'
 
@@ -94,6 +106,77 @@ function Toggle({ checked, onChange, children }: { checked: boolean; onChange: (
   )
 }
 
+const roundPosition = (p: Vec3) => ({ x: +p.x.toFixed(2), y: +p.y.toFixed(2), z: +p.z.toFixed(2) })
+
+/** Length × width × height, as a yard writes it; centimetres below a metre. */
+function fmtSize(v: Vec3) {
+  const big = Math.max(v.x, v.y, v.z) >= 1
+  const f = (n: number) => (big ? n.toFixed(2) : String(+(n * 100).toFixed(1)))
+  return `${f(v.x)} × ${f(v.z)} × ${f(v.y)} ${big ? 'm' : 'cm'}`
+}
+
+/**
+ * The size from a datasheet or a tape measure, in centimetres: dragging the
+ * handles is quick, typing what the manual says is exact.
+ */
+function SizeEditor({
+  size,
+  measured,
+  saving,
+  onSave,
+}: {
+  size: Vec3
+  measured: boolean
+  saving: boolean
+  onSave: (size: Vec3 | null) => void
+}) {
+  const cm = (n: number) => String(Math.round(n * 1000) / 10)
+  const [l, setL] = useState(cm(size.x))
+  const [w, setW] = useState(cm(size.z))
+  const [h, setH] = useState(cm(size.y))
+  const vals = [l, w, h].map(Number)
+  const valid = vals.every((n) => Number.isFinite(n) && n > 0 && n <= 50000)
+  return (
+    <div className="space-y-1.5 border-t pt-2">
+      <div className="text-xs font-medium">Size in cm (length × width × height)</div>
+      <div className="flex items-center gap-1">
+        {[
+          [l, setL, 'Length along the boat'],
+          [w, setW, 'Width across the boat'],
+          [h, setH, 'Height'],
+        ].map(([v, set, label], i) => (
+          <Input
+            key={i}
+            aria-label={label as string}
+            title={label as string}
+            type="number"
+            min={0.5}
+            step={0.5}
+            value={v as string}
+            onChange={(e) => (set as (s: string) => void)(e.target.value)}
+            className="h-7 px-1.5 text-xs"
+          />
+        ))}
+      </div>
+      <div className="flex gap-1">
+        <Button
+          size="sm"
+          className="h-7 flex-1 text-xs"
+          disabled={!valid || saving}
+          onClick={() => onSave({ x: vals[0] / 100, z: vals[1] / 100, y: vals[2] / 100 })}
+        >
+          Save size
+        </Button>
+        {measured && (
+          <Button size="sm" variant="outline" className="h-7 text-xs" disabled={saving} onClick={() => onSave(null)} title="Back to the usual size for what it is">
+            Typical
+          </Button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Vessel view ─────────────────────────────────────────────────────────────
 
 function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
@@ -109,7 +192,13 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
   const systemId = params.get('system')
   const selectedPartId = params.get('part')
   const [colourBy, setColourBy] = useState<'system' | 'status'>('system')
-  const [options, setOptions] = useState<SceneOptions>({ showHull: true, showSpaces: true, showConnections: true })
+  const [options, setOptions] = useState<SceneOptions>({
+    showHull: true,
+    showSpaces: true,
+    showConnections: true,
+    showFile: true,
+    realSize: true,
+  })
   const selectedSpaceId = params.get('space')
   const { can } = usePermissions()
   const canPlace = can('action_place_space') && can('action_place_part')
@@ -117,6 +206,9 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
   const [editMode, setEditMode] = useState<'move' | 'resize'>('move')
   const placeSpace = usePlaceSpace()
   const placePart = usePlacePart()
+  const sizePart = useSizePart()
+  const canSetModel = can('action_set_vessel_model')
+  const canSize = can('action_size_part')
   // The full record of what is selected: a side sheet on a desktop, a sheet
   // from the bottom on a phone, where the panel beside the boat would sit
   // below the fold.
@@ -138,6 +230,48 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
 
   const model = useMemo(() => buildVesselModel(vessel ?? null, parts, spaces, connections), [vessel, parts, spaces, connections])
   const byId = useMemo(() => new Map(parts.map((p) => [p.id, p])), [parts])
+
+  // The boat's own 3D file, when one is loaded: its bytes, its own box once
+  // parsed, and how it sits. What the scene shows is the unsaved alignment if
+  // someone is adjusting it, else the saved one, else a fit to LOA and draft.
+  const fileInfo = vesselFileInfo(vessel)
+  const fileQuery = useVesselModelFile(fileInfo?.path ?? null)
+  const [fileBounds, setFileBounds] = useState<Bounds | null>(null)
+  const [fileError, setFileError] = useState<string | null>(null)
+  const [draftTransform, setDraftTransform] = useState<ModelTransform | null>(null)
+  const [fileOpacity, setFileOpacity] = useState(0.35)
+  const savedTransform = storedTransform(vessel?.model_transform)
+  const autoTransform = useMemo(
+    () => (fileBounds && fileInfo ? fitTransform(fileBounds, initialRotation(fileBounds, fileInfo.format), model.dims) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [fileBounds, fileInfo?.format, model.dims.loa, model.dims.draft],
+  )
+  const fileTransform = draftTransform ?? savedTransform ?? autoTransform
+  const fileDirty = !!fileTransform && (draftTransform !== null || !savedTransform)
+  // A new file starts from scratch; with a file the drawn hull steps aside.
+  useEffect(() => {
+    setFileBounds(null)
+    setFileError(null)
+    setDraftTransform(null)
+    setOptions((o) => ({ ...o, showHull: !fileInfo, showFile: true }))
+    // The path is the file's identity; the record object is new on every refetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fileInfo?.path])
+  const onFileBounds = useCallback((b: Bounds) => setFileBounds(b), [])
+  const onFileError = useCallback((m: string) => setFileError(m), [])
+  const sceneFile: SceneFile | null =
+    fileInfo && fileQuery.data
+      ? {
+          key: fileInfo.path,
+          buffer: fileQuery.data,
+          format: fileInfo.format,
+          transform: fileTransform,
+          opacity: fileOpacity,
+          onBounds: onFileBounds,
+          onError: onFileError,
+        }
+      : null
+
   const systems = useMemo(() => buildPartTree(parts).map((n) => n.part), [parts])
   const systemColour = useMemo(
     () => new Map(systems.map((s, i) => [s.id, SYSTEM_PALETTE[i % SYSTEM_PALETTE.length]])),
@@ -278,7 +412,13 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
           )}
         </Panel>
         <Panel title="Layers">
-          <Toggle checked={options.showHull} onChange={(v) => setOptions((o) => ({ ...o, showHull: v }))}>Hull</Toggle>
+          {fileInfo && (
+            <Toggle checked={options.showFile} onChange={(v) => setOptions((o) => ({ ...o, showFile: v }))}>Her 3D model</Toggle>
+          )}
+          <Toggle checked={options.showHull} onChange={(v) => setOptions((o) => ({ ...o, showHull: v }))}>
+            {fileInfo ? 'Drawn hull' : 'Hull'}
+          </Toggle>
+          <Toggle checked={options.realSize} onChange={(v) => setOptions((o) => ({ ...o, realSize: v }))}>Parts at real size</Toggle>
           <Toggle checked={options.showSpaces} onChange={(v) => setOptions((o) => ({ ...o, showSpaces: v }))}>Spaces ({model.spaces.length})</Toggle>
           <Toggle checked={options.showConnections} onChange={(v) => setOptions((o) => ({ ...o, showConnections: v }))}>Connections ({model.connections.length})</Toggle>
           <div className="space-y-1 pt-1 text-xs">
@@ -288,6 +428,22 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
               </div>
             ))}
           </div>
+        </Panel>
+        <Panel title="3D model of the boat">
+          <VesselFilePanel
+            vessel={vessel}
+            dims={dims}
+            file={fileInfo}
+            canEdit={canSetModel}
+            bounds={fileBounds}
+            loading={!!fileInfo && (fileQuery.isLoading || (!!fileQuery.data && !fileBounds && !fileError))}
+            error={fileError ?? (fileQuery.error ? fileQuery.error.message : null)}
+            transform={fileTransform}
+            dirty={fileDirty}
+            onDraft={setDraftTransform}
+            opacity={fileOpacity}
+            onOpacity={setFileOpacity}
+          />
         </Panel>
       </div>
 
@@ -304,12 +460,12 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
                   <Button size="sm" variant={editMode === 'move' ? 'secondary' : 'ghost'} onClick={() => setEditMode('move')}>
                     <Move size={14} className="mr-1" /> Move
                   </Button>
-                  <Button size="sm" variant={editMode === 'resize' ? 'secondary' : 'ghost'} onClick={() => setEditMode('resize')} disabled={!selectedSpace}>
+                  <Button size="sm" variant={editMode === 'resize' ? 'secondary' : 'ghost'} onClick={() => setEditMode('resize')} disabled={!(selectedSpace || (selected && options.realSize && canSize))}>
                     <Scaling size={14} className="mr-1" /> Resize
                   </Button>
                 </div>
                 <span className="text-xs" style={muted}>
-                  Tap a space's name or a part, then drag the arrows. Saved when you let go.
+                  Tap a space's name or a part, then drag the handles. Saved when you let go.
                 </span>
               </>
             )}
@@ -327,18 +483,22 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
               selectedSpaceId={selectedSpaceId}
               onSelectSpace={selectSpace}
               editing={editing}
-              editMode={selectedSpace ? editMode : 'move'}
+              editMode={selectedSpace || (selected && options.realSize && canSize) ? editMode : 'move'}
               onMoveSpace={(id, box) =>
                 placeSpace.mutate({ id, box: boxToStored(box) }, { onError: failed('save the space') })
               }
               goal={goal}
               fitKey={fitKey}
               onMovePart={(id, position) =>
-                placePart.mutate(
-                  { id, position: { x: +position.x.toFixed(2), y: +position.y.toFixed(2), z: +position.z.toFixed(2) } },
-                  { onError: failed('save the part') },
-                )
+                placePart.mutate({ id, position: roundPosition(position) }, { onError: failed('save the part') })
               }
+              onResizePart={(id, position, size) => {
+                // Scaling about its centre moves nothing, but a snapped
+                // handle can: keep both, in the two facts they are.
+                placePart.mutate({ id, position: roundPosition(position) }, { onError: failed('save the part') })
+                sizePart.mutate({ id, size: sizeToStored(size) }, { onError: failed('save the size') })
+              }}
+              file={sceneFile}
             />
           </Suspense>
           <Button
@@ -356,7 +516,8 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
           </div>
         </div>
         <p className="text-xs" style={muted}>
-          Hull drawn from LOA {dims.loa} m, beam {dims.beam} m, draft {dims.draft} m
+          {fileInfo && options.showFile ? <>Her own 3D model ({fileInfo.name}); record </> : 'Hull drawn from '}
+          LOA {dims.loa} m, beam {dims.beam} m, draft {dims.draft} m
           {dims.assumed && (
             <>
               {' '}
@@ -365,7 +526,9 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
             </>
           )}
           . Spaces and parts sit where someone placed them, else where their names point; a space
-          marked “?” had nothing to go on. A 3D scan of the boat can replace this hull once it is loaded.
+          marked “?” had nothing to go on. Parts are drawn at their measured size, else the usual size
+          for what they are.
+          {!fileInfo && ' Load her own 3D model (GLB, STL or OBJ) under “3D model of the boat”.'}
         </p>
       </div>
 
@@ -655,6 +818,19 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
               <dd className="font-mono text-xs">{part.serial_number}</dd>
             </>
           )}
+          <dt style={muted}>Size</dt>
+          <dd className="text-xs">
+            {placed ? (
+              <>
+                {fmtSize(placed.size)}{' '}
+                <span style={muted}>
+                  {placed.sizeSource === 'stored' ? '(measured)' : placed.sizeSource === 'typical' ? '(typical)' : '(not known)'}
+                </span>
+              </>
+            ) : (
+              '—'
+            )}
+          </dd>
           <dt style={muted}>Placed</dt>
           <dd className="text-xs">
             {placed?.source === 'stored'
@@ -684,6 +860,15 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
               </li>
             ))}
           </ul>
+        )}
+        {editing && canSize && placed && (
+          <SizeEditor
+            key={`${part.id}:${fmtSize(placed.size)}`}
+            size={placed.size}
+            measured={placed.sizeSource === 'stored'}
+            saving={sizePart.isPending}
+            onSave={(size) => sizePart.mutate({ id: part.id, size: size && sizeToStored(size) }, { onError: failed('save the size') })}
+          />
         )}
         {editing && placed?.source === 'stored' && (
           <Button
