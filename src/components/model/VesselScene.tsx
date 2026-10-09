@@ -7,11 +7,15 @@ import {
   hullRings,
   xAt,
   sheerAt,
+  type Bounds,
   type Box,
+  type ModelFormat,
+  type ModelTransform,
   type PlacedPart,
   type Vec3,
   type VesselModel,
 } from '@/lib/vessel-model'
+import { disposeObject, parseVesselFile, rawBounds, setOpacity } from './vessel-file'
 
 // The 3D half of YAManagement. Loaded on its own (React.lazy) so three.js only
 // ships to people who open the model.
@@ -19,7 +23,26 @@ import {
 export interface SceneOptions {
   showSpaces: boolean
   showConnections: boolean
+  /** The hull drawn from LOA, beam and draft. */
   showHull: boolean
+  /** The boat's own 3D file, when one is loaded. */
+  showFile: boolean
+  /** Parts as boxes at their real size, or as same-size markers that are easy to see from afar. */
+  realSize: boolean
+}
+
+/** The boat's own 3D file, read from Storage, and how it sits on the model frame. */
+export interface SceneFile {
+  /** Changes when the file does; the bytes are parsed again only then. */
+  key: string
+  buffer: ArrayBuffer
+  format: ModelFormat
+  /** Null until the file has been measured and fitted. */
+  transform: ModelTransform | null
+  opacity: number
+  /** The file's own box, once parsed: the page fits and aligns from it. */
+  onBounds: (b: Bounds) => void
+  onError: (message: string) => void
 }
 
 interface Props {
@@ -37,6 +60,9 @@ interface Props {
   editMode: 'move' | 'resize'
   onMoveSpace: (id: string, box: Box) => void
   onMovePart: (id: string, position: Vec3) => void
+  /** A part resized with the handles: where it now is and its new size. */
+  onResizePart: (id: string, position: Vec3, size: Vec3) => void
+  file: SceneFile | null
   /** What the camera should fly to: the selected part or space. */
   goal: CameraGoal | null
   /** Bumped to frame the whole boat again. */
@@ -61,6 +87,44 @@ const dragged = (e?: THREE.Event) =>
 const boxKey = (b: Box) => [b.center.x, b.center.y, b.center.z, b.size.x, b.size.y, b.size.z].map((n) => n.toFixed(2)).join(',')
 
 const v = (p: Vec3) => new THREE.Vector3(p.x, p.y, p.z)
+
+/**
+ * The uploaded model of the boat, in place of the drawn hull. Parsed once per
+ * file; the alignment and opacity are applied to the same object afterwards,
+ * so nudging the waterline does not re-read 40 MB.
+ */
+function VesselFile({ file }: { file: SceneFile }) {
+  const [object, setObject] = useState<THREE.Object3D | null>(null)
+  const { buffer, format, onBounds, onError } = file
+  useEffect(() => {
+    let cancelled = false
+    let parsed: THREE.Object3D | null = null
+    parseVesselFile(buffer, format)
+      .then((o) => {
+        if (cancelled) return disposeObject(o)
+        const b = rawBounds(o)
+        if (!b) throw new Error('The file has no geometry in it')
+        parsed = o
+        onBounds(b)
+        setObject(o)
+      })
+      .catch((e: unknown) => !cancelled && onError(e instanceof Error ? e.message : String(e)))
+    return () => {
+      cancelled = true
+      if (parsed) disposeObject(parsed)
+      setObject(null)
+    }
+    // Parse again only for another file, not when the callbacks are recreated.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [file.key])
+  useEffect(() => {
+    if (object) setOpacity(object, file.opacity)
+  }, [object, file.opacity])
+  const t = file.transform
+  if (!object || !t) return null
+  const r = THREE.MathUtils.degToRad
+  return <primitive object={object} position={[t.x, t.y, t.z]} rotation={[r(t.rx), r(t.ry), r(t.rz)]} scale={t.scale} />
+}
 
 function Hull({ model }: { model: VesselModel }) {
   const { dims } = model
@@ -209,6 +273,8 @@ export default function VesselScene({
   editMode,
   onMoveSpace,
   onMovePart,
+  onResizePart,
+  file,
   goal,
   fitKey,
 }: Props) {
@@ -271,6 +337,7 @@ export default function VesselScene({
       <FlyTo goal={goal} />
 
       {options.showHull && <Hull model={model} />}
+      {options.showFile && file && <VesselFile file={file} />}
 
       {options.showSpaces &&
         model.spaces.map((s) => {
@@ -358,11 +425,27 @@ export default function VesselScene({
         const id = p.part.id
         const focused = inFocus(id)
         const selected = id === selectedPartId
+        const lit = selected || hovered === id
         const colour = focused ? colourOf(p) : '#94a3b8'
-        const r = selected ? radius * 1.5 : hovered === id ? radius * 1.4 : focused ? radius : radius * 0.6
         const handle = editing && selected
+        const real = options.realSize
+        // As markers, one size for all; at real size, the part's own box,
+        // with an invisible ball around anything smaller than a fingertip so
+        // a breaker can still be tapped from across the boat.
+        const r = selected ? radius * 1.5 : hovered === id ? radius * 1.4 : focused ? radius : radius * 0.6
+        const s = p.size
+        const top = real ? s.y / 2 : r
+        const material = (
+          <meshStandardMaterial
+            color={colour}
+            transparent={!focused}
+            opacity={focused ? 1 : 0.35}
+            emissive={lit ? colour : '#000000'}
+            emissiveIntensity={selected ? 0.5 : lit ? 0.25 : 0}
+          />
+        )
         const marker = (
-          <mesh
+          <group
             key={id}
             position={handle ? [0, 0, 0] : [p.position.x, p.position.y, p.position.z]}
             onClick={(e: ThreeEvent<MouseEvent>) => {
@@ -379,35 +462,57 @@ export default function VesselScene({
               document.body.style.cursor = ''
             }}
           >
-            <sphereGeometry args={[r, 14, 14]} />
-            <meshStandardMaterial
-              color={colour}
-              transparent={!focused}
-              opacity={focused ? 1 : 0.35}
-              emissive={selected ? colour : '#000000'}
-              emissiveIntensity={selected ? 0.5 : 0}
-            />
-            {(selected || hovered === id || (neighbours.has(id) && !!selectedPartId)) && (
-              <Html position={[0, r * 1.8, 0]} center zIndexRange={[20, 10]}>
+            {real ? (
+              <>
+                <mesh>
+                  <boxGeometry args={[s.x, s.y, s.z]} />
+                  {material}
+                </mesh>
+                {lit && (
+                  <lineSegments>
+                    <edgesGeometry args={[new THREE.BoxGeometry(s.x, s.y, s.z)]} />
+                    <lineBasicMaterial color={selected ? '#0f172a' : colour} />
+                  </lineSegments>
+                )}
+                {Math.max(s.x, s.y, s.z) < radius * 2 && (
+                  <mesh>
+                    <sphereGeometry args={[radius, 8, 8]} />
+                    <meshBasicMaterial transparent opacity={0} depthWrite={false} colorWrite={false} />
+                  </mesh>
+                )}
+              </>
+            ) : (
+              <mesh>
+                <sphereGeometry args={[r, 14, 14]} />
+                {material}
+              </mesh>
+            )}
+            {(lit || (neighbours.has(id) && !!selectedPartId)) && (
+              <Html position={[0, top + Math.max(r * 0.8, 0.05), 0]} center zIndexRange={[20, 10]}>
                 <div className="pointer-events-none whitespace-nowrap rounded border bg-background/95 px-1.5 py-0.5 text-[11px] font-medium shadow-sm">
                   {p.part.designation ? <span className="mr-1 font-mono text-muted-foreground">{p.part.designation}</span> : null}
                   {p.part.name}
                 </div>
               </Html>
             )}
-          </mesh>
+          </group>
         )
         if (!handle) return marker
+        const resizing = editMode === 'resize' && real
         return (
           <TransformControls
-            key={`${id}:${p.position.x.toFixed(2)},${p.position.y.toFixed(2)},${p.position.z.toFixed(2)}`}
+            key={`${id}:${[p.position.x, p.position.y, p.position.z, s.x, s.y, s.z].map((n) => n.toFixed(3)).join(',')}:${editMode}`}
             position={[p.position.x, p.position.y, p.position.z]}
-            mode="translate"
+            mode={resizing ? 'scale' : 'translate'}
             translationSnap={0.05}
+            scaleSnap={0.05}
             size={0.9}
             onMouseUp={(e) => {
               const o = dragged(e)
-              if (o) onMovePart(id, { x: o.position.x, y: o.position.y, z: o.position.z })
+              if (!o) return
+              const at = { x: o.position.x, y: o.position.y, z: o.position.z }
+              if (resizing) onResizePart(id, at, { x: s.x * o.scale.x, y: s.y * o.scale.y, z: s.z * o.scale.z })
+              else onMovePart(id, at)
             }}
           >
             {marker}

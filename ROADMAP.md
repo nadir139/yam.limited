@@ -32,8 +32,16 @@ Ordered by impact over effort. Most items are a day or less.
    from their names, connections coloured by kind, colour by system or by open NCR / work), and the
    object graph with live counts and the records behind each type.
 7. ~~Stored positions~~ — migration 030: drag a space or part in the 3D view (Edit layout) and it
-   is saved in the model frame; "Back to the guess" clears it. **Next for the model:** a `vessel_models` slot for a scan (decimated, Draco-compressed GLB under the 50 MB bucket limit,
-   or a point cloud tiled with Potree / 3D Tiles), registered to the same frame by three picked points.
+   is saved in the model frame; "Back to the guess" clears it.
+7a. ~~Real size, and her own model~~ — migration 031: parts are boxes at their measured size
+   (`parts.model_size`, typed in cm or dragged with Resize), else a typical size read from the name
+   (engine, battery, breaker…); a "markers" layer keeps the old dots. The boat's own GLB/STL/OBJ
+   (≤ 50 MB) loads in place of the drawn hull (`vessels.model_file`), with units guessed from the LOA,
+   quarter turns, offsets and a saved alignment (`vessels.model_transform`).
+   **Next for the model — the yacht ontology:** (1) a weight estimate import: each item's mass and
+   LCG/VCG/TCG become its position (and the space it sits in), so the estimate, not the name, places
+   things; (2) the owner's manual and the estimate as sources the agent reads and cites; (3) a scan
+   or point cloud (Potree / 3D Tiles) registered to the same frame by three picked points.
 8. ~~Schedule you can trust~~ — drops land where they are let go (planForDrop), work under way
    ends on its planned end, optimistic moves with consequences, and a month Calendar of the same
    record.

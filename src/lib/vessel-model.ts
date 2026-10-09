@@ -50,6 +50,10 @@ export interface PlacedSpace {
 export interface PlacedPart {
   part: Part
   position: Vec3
+  /** Length (x), height (y) and width (z) in metres. */
+  size: Vec3
+  /** Measured by someone (parts.model_size), typical for what its name says, or a placeholder. */
+  sizeSource: 'stored' | 'typical' | 'default'
   /**
    * How the position was found: its own space, an ancestor's, beside the
    * parts it is connected to, or from the names along its path.
@@ -212,6 +216,88 @@ export function storedPosition(raw: unknown): Vec3 | null {
   if (!p || typeof p !== 'object') return null
   const { x, y, z } = p
   return [x, y, z].every(isNum) ? { x: x as number, y: y as number, z: z as number } : null
+}
+
+/** A size someone stored (migration 031), or null. */
+export function storedSize(raw: unknown): Vec3 | null {
+  const p = raw as Record<string, unknown> | null
+  if (!p || typeof p !== 'object') return null
+  const { sx, sy, sz } = p
+  if (![sx, sy, sz].every(isNum) || !((sx as number) > 0 && (sy as number) > 0 && (sz as number) > 0)) return null
+  return { x: sx as number, y: sy as number, z: sz as number }
+}
+
+/** The stored form of a size, to the millimetre and never under 5 mm, as the database keeps it. */
+export function sizeToStored(v: Vec3) {
+  const r = (n: number) => Math.max(0.005, Math.round(n * 1000) / 1000)
+  return { sx: r(v.x), sy: r(v.y), sz: r(v.z) }
+}
+
+// ─── How big things are ──────────────────────────────────────────────────────
+//
+// What a thing usually measures, from its name: length along the boat (x),
+// height (y), width across (z), in metres. Sized for a 12–30 m yacht; a
+// measured size always wins. First match wins, so the small, specific things
+// ("battery charger", "fuel filter") sit above the large, general ones
+// ("battery", "fuel tank").
+const SMALL_ELECTRICAL: [RegExp, [number, number, number]] = [
+  /\b(breakers?|mcbs?|rcds?|rcbos?|fuses?|fuse holders?|relays?|contactors?|isolators?|switch|switches|potentiometers?|dimmers?|buzzers?|alarms?)\b/,
+  [0.05, 0.08, 0.04],
+]
+
+const TYPICAL_SIZES: Array<[RegExp, [number, number, number]]> = [
+  // Above the breakers: "switch board" is not a switch.
+  [/\b(switchboard|switch board|mainboard|main board|distribution board|consumer unit)\b/, [0.06, 0.6, 0.5]],
+  SMALL_ELECTRICAL,
+  [/\b(taps?|faucets?|mixers?|suction points?|deck fills?|fillers?|deck fittings?)\b/, [0.12, 0.08, 0.12]],
+  [/\b(sensors?|transducers?|senders?|probes?|thermostats?|gauges?)\b/, [0.08, 0.08, 0.08]],
+  [/\b(lights?|lamps?|led|leds|spotlights?|downlights?)\b/, [0.12, 0.05, 0.12]],
+  [/\b(valves?|seacocks?|through ?hulls?|skin fittings?)\b/, [0.12, 0.12, 0.12]],
+  [/\b(filters?|strainers?|separators?)\b/, [0.15, 0.25, 0.15]],
+  [/\b(alternators?|starters?|starter motors?)\b/, [0.25, 0.2, 0.2]],
+  [/\b(pumps?|hydrophores?)\b/, [0.25, 0.18, 0.18]],
+  [/\b(chargers?|inverters?|converters?|regulators?|controllers?|ecu|plc)\b/, [0.35, 0.15, 0.25]],
+  [/\b(batteries|battery|battery bank)\b/, [0.35, 0.25, 0.18]],
+  [/\b(panel|panels|rcp)\b/, [0.06, 0.4, 0.4]],
+  [/\b(displays?|screens?|plotters?|chartplotters?|mfds?|monitors?)\b/, [0.06, 0.25, 0.35]],
+  [/\b(vhf|radio|radios|ais|autopilot computer|instruments?)\b/, [0.15, 0.1, 0.2]],
+  [/\b(antennas?|aerials?)\b/, [0.05, 1.2, 0.05]],
+  [/\b(radar|radome)\b/, [0.6, 0.25, 0.6]],
+  [/\b(winch|winches)\b/, [0.25, 0.25, 0.25]],
+  [/\b(windlass|capstan)\b/, [0.4, 0.3, 0.3]],
+  [/\b(anchor)\b/, [0.6, 0.2, 0.35]],
+  [/\b(autopilot|drive unit|rams?|linear drive)\b/, [0.6, 0.15, 0.15]],
+  [/\b(liferaft|life raft)\b/, [0.7, 0.35, 0.5]],
+  [/\b(hatch|hatches|portlights?|ports)\b/, [0.6, 0.05, 0.6]],
+  [/\b(toilet|wc|heads|head unit)\b/, [0.5, 0.45, 0.4]],
+  [/\b(evaporators?|cold plates?|holding plates?)\b/, [0.4, 0.3, 0.06]],
+  [/\b(fridge|refrigerator|freezer|icebox|wine cooler)\b/, [0.55, 0.8, 0.55]],
+  [/\b(stove|oven|cooker|cooking plate|hob|microwave|dishwasher|washing machine|washer|dryer)\b/, [0.55, 0.6, 0.55]],
+  [/\b(compressors?)\b/, [0.35, 0.3, 0.3]],
+  [/\b(air ?con|aircon|air conditioning|chillers?|hvac|fan coils?)\b/, [0.6, 0.4, 0.45]],
+  [/\b(watermaker|water maker|desalinator)\b/, [0.6, 0.4, 0.3]],
+  [/\b(calorifier|water heater|boiler|heater)\b/, [0.55, 0.4, 0.4]],
+  [/\b(propellers?|props?)\b/, [0.15, 0.5, 0.5]],
+  [/\b(shaft|prop shaft|propeller shaft)\b/, [1.8, 0.06, 0.06]],
+  [/\b(gearbox|gear box|saildrive|sail drive)\b/, [0.45, 0.4, 0.35]],
+  [/\b(rudder)\b/, [0.45, 1.2, 0.08]],
+  [/\b(thrusters?)\b/, [0.35, 0.35, 0.35]],
+  [/\b(tanks?)\b/, [1.0, 0.5, 0.6]],
+  [/\b(generators?|genset|gen set)\b/, [0.9, 0.6, 0.55]],
+  [/\b(engines?|main engine|motor)\b/, [1.1, 0.75, 0.7]],
+]
+
+/** The size someone measured, else the usual size for what its name says, else 15 cm. */
+export function partSize(part: Part): { size: Vec3; source: PlacedPart['sizeSource'] } {
+  const stored = storedSize(part.model_size)
+  if (stored) return { size: stored, source: 'stored' }
+  const w = nameWords(part.name)
+  // Switchboard schedules name the device first and what it feeds after
+  // ("Breaker refrigerator", "Fuse winch SB"): that is a breaker, not a fridge.
+  const first = ` ${w.trim().split(' ')[0]} `
+  const hit = SMALL_ELECTRICAL[0].test(first) ? SMALL_ELECTRICAL : TYPICAL_SIZES.find(([re]) => re.test(w))
+  if (hit) return { size: { x: hit[1][0], y: hit[1][1], z: hit[1][2] }, source: 'typical' }
+  return { size: { x: 0.15, y: 0.15, z: 0.15 }, source: 'default' }
 }
 
 /** The stored form of a box, rounded to the centimetre the database keeps. */
@@ -407,9 +493,10 @@ export function placeParts(
     // Where someone put it, else its own space, else the nearest ancestor's,
     // else what the names along its path say ("Port primary winch" under
     // "Deck & fittings").
+    const { size, source: sizeSource } = partSize(part)
     const pinned = storedPosition(part.model_position)
     if (pinned) {
-      out.push({ part, position: pinned, source: 'stored' })
+      out.push({ part, position: pinned, source: 'stored', size, sizeSource })
       continue
     }
     let box = part.space_id ? boxes.get(part.space_id) : undefined
@@ -441,7 +528,7 @@ export function placeParts(
       // Parts with nothing to go on gather amidships, low in the boat.
       box = zoneBox(dims, t ?? 0.5, side, level ?? 'interior', dims.loa * 0.12)
     }
-    out.push({ part, position: insideBox(box, part.id), source })
+    out.push({ part, position: insideBox(box, part.id), source, size, sizeSource })
   }
 
   // A breaker with no space but wired to the switchboard sits by the
@@ -515,3 +602,157 @@ export const SYSTEM_PALETTE = [
   '#2563eb', '#16a34a', '#db2777', '#ea580c', '#7c3aed', '#0891b2',
   '#ca8a04', '#dc2626', '#4f46e5', '#059669', '#c026d3', '#65a30d',
 ]
+
+// ─── The boat's own 3D file ──────────────────────────────────────────────────
+//
+// A file uploaded in place of the drawn hull (migration 031) arrives in its
+// own units and axes: Rhino and most CAD exports are Z-up in millimetres, GLB
+// is Y-up in metres. It is set into the model frame by one uniform scale,
+// a rotation in quarter turns and an offset, stored as vessels.model_transform.
+// Fitting works on the file's bounding box alone, so it is pure and testable;
+// the scene only measures the box once the file is loaded.
+
+export interface ModelTransform {
+  /** Uniform: file units to metres. */
+  scale: number
+  /** Degrees about x, y, z, applied in that order (three.js 'XYZ' Euler). */
+  rx: number
+  ry: number
+  rz: number
+  /** Metres, applied after scale and rotation. */
+  x: number
+  y: number
+  z: number
+}
+
+export interface Bounds {
+  min: Vec3
+  max: Vec3
+}
+
+export type ModelFormat = 'glb' | 'stl' | 'obj'
+
+export const UNIT_SCALES: Record<'m' | 'cm' | 'mm' | 'in' | 'ft', number> = {
+  m: 1,
+  cm: 0.01,
+  mm: 0.001,
+  in: 0.0254,
+  ft: 0.3048,
+}
+
+/** The file record on vessels.model_file. */
+export interface VesselFileInfo {
+  path: string
+  name: string
+  format: ModelFormat
+  bytes: number | null
+}
+
+/** The stored file record, or null when there is none or it is malformed. */
+export function vesselFileInfo(vessel: Vessel | null | undefined): VesselFileInfo | null {
+  const f = vessel?.model_file as Record<string, unknown> | null | undefined
+  if (!f || typeof f.path !== 'string' || !['glb', 'stl', 'obj'].includes(f.format as string)) return null
+  return {
+    path: f.path,
+    name: typeof f.name === 'string' ? f.name : f.path,
+    format: f.format as VesselFileInfo['format'],
+    bytes: typeof f.bytes === 'number' ? f.bytes : null,
+  }
+}
+
+/** An alignment someone saved, or null when there is none or it is malformed. */
+export function storedTransform(raw: unknown): ModelTransform | null {
+  const t = raw as Record<string, unknown> | null
+  if (!t || typeof t !== 'object') return null
+  const { scale, rx, ry, rz, x, y, z } = t
+  if (![scale, rx, ry, rz, x, y, z].every(isNum) || !((scale as number) > 0)) return null
+  return t as unknown as ModelTransform
+}
+
+const rad = (deg: number) => (deg * Math.PI) / 180
+
+/** A point turned by an 'XYZ' Euler, as three.js applies it: Rx(Ry(Rz p)). */
+export function rotatePoint(p: Vec3, rx: number, ry: number, rz: number): Vec3 {
+  const [cx, sx, cy, sy, cz, sz] = [Math.cos(rad(rx)), Math.sin(rad(rx)), Math.cos(rad(ry)), Math.sin(rad(ry)), Math.cos(rad(rz)), Math.sin(rad(rz))]
+  let { x, y, z } = p
+  ;[x, y] = [x * cz - y * sz, x * sz + y * cz]
+  ;[x, z] = [x * cy + z * sy, -x * sy + z * cy]
+  ;[y, z] = [y * cx - z * sx, y * sx + z * cx]
+  return { x, y, z }
+}
+
+/** The box around a box once turned. Exact for quarter turns, which is all the app offers. */
+export function rotatedBounds(b: Bounds, rx: number, ry: number, rz: number): Bounds {
+  const min = { x: Infinity, y: Infinity, z: Infinity }
+  const max = { x: -Infinity, y: -Infinity, z: -Infinity }
+  for (const x of [b.min.x, b.max.x])
+    for (const y of [b.min.y, b.max.y])
+      for (const z of [b.min.z, b.max.z]) {
+        const p = rotatePoint({ x, y, z }, rx, ry, rz)
+        for (const k of ['x', 'y', 'z'] as const) {
+          min[k] = Math.min(min[k], p[k])
+          max[k] = Math.max(max[k], p[k])
+        }
+      }
+  return { min, max }
+}
+
+/** The unit that makes the file's length closest to the recorded LOA. */
+export function guessUnit(rawLength: number, loa: number): keyof typeof UNIT_SCALES {
+  let best: keyof typeof UNIT_SCALES = 'm'
+  let err = Infinity
+  for (const [unit, s] of Object.entries(UNIT_SCALES) as Array<[keyof typeof UNIT_SCALES, number]>) {
+    const e = Math.abs(Math.log((rawLength * s) / loa))
+    if (e < err) {
+      err = e
+      best = unit
+    }
+  }
+  return best
+}
+
+/**
+ * How a file most likely sits: GLB is Y-up by its specification; STL and OBJ
+ * usually come from Z-up CAD, so they are tipped upright. Then the longest
+ * horizontal side is turned to run fore and aft. Which end is the bow cannot
+ * be read from a box: the app offers a half turn for that.
+ */
+export function initialRotation(b: Bounds, format: ModelFormat): { rx: number; ry: number; rz: number } {
+  const rx = format === 'glb' ? 0 : -90
+  const r = rotatedBounds(b, rx, 0, 0)
+  const ry = r.max.z - r.min.z > r.max.x - r.min.x ? 90 : 0
+  return { rx, ry, rz: 0 }
+}
+
+/**
+ * Scale, then offset so the file is centred fore and aft and across, with its
+ * lowest point at the recorded draft below the waterline. Without a scale the
+ * unit is guessed from the LOA.
+ */
+export function fitTransform(
+  raw: Bounds,
+  rot: { rx: number; ry: number; rz: number },
+  dims: Pick<HullDims, 'loa' | 'draft'>,
+  scale?: number,
+): ModelTransform {
+  const r = rotatedBounds(raw, rot.rx, rot.ry, rot.rz)
+  const length = Math.max(1e-9, r.max.x - r.min.x)
+  const s = scale && scale > 0 ? scale : UNIT_SCALES[guessUnit(length, dims.loa)]
+  const round = (v: number) => Math.round(v * 1000) / 1000 || 0
+  // Only the angles from rot: callers pass a whole transform to keep its turn.
+  return {
+    scale: s,
+    rx: rot.rx,
+    ry: rot.ry,
+    rz: rot.rz,
+    x: round(-((r.min.x + r.max.x) / 2) * s),
+    y: round(-dims.draft - r.min.y * s),
+    z: round(-((r.min.z + r.max.z) / 2) * s),
+  }
+}
+
+/** The model frame's size of the file once placed: length, height, width in metres. */
+export function placedExtent(raw: Bounds, t: ModelTransform): Vec3 {
+  const r = rotatedBounds(raw, t.rx, t.ry, t.rz)
+  return { x: (r.max.x - r.min.x) * t.scale, y: (r.max.y - r.min.y) * t.scale, z: (r.max.z - r.min.z) * t.scale }
+}

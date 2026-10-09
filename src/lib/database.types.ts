@@ -855,6 +855,63 @@ export type Database = {
           },
         ]
       }
+      part_links: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          created_by_name: string | null
+          id: string
+          object_id: string
+          object_type: string
+          part_id: string
+          project_id: string
+          removed_at: string | null
+          removed_by_name: string | null
+          removed_reason: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          id?: string
+          object_id: string
+          object_type: string
+          part_id: string
+          project_id: string
+          removed_at?: string | null
+          removed_by_name?: string | null
+          removed_reason?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          id?: string
+          object_id?: string
+          object_type?: string
+          part_id?: string
+          project_id?: string
+          removed_at?: string | null
+          removed_by_name?: string | null
+          removed_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "part_links_part_id_fkey"
+            columns: ["part_id"]
+            isOneToOne: false
+            referencedRelation: "parts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "part_links_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       part_references: {
         Row: {
           bbox: number[] | null
@@ -922,63 +979,6 @@ export type Database = {
           },
         ]
       }
-      part_links: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          created_by_name: string | null
-          id: string
-          object_id: string
-          object_type: string
-          part_id: string
-          project_id: string
-          removed_at: string | null
-          removed_by_name: string | null
-          removed_reason: string | null
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          created_by_name?: string | null
-          id?: string
-          object_id: string
-          object_type: string
-          part_id: string
-          project_id: string
-          removed_at?: string | null
-          removed_by_name?: string | null
-          removed_reason?: string | null
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          created_by_name?: string | null
-          id?: string
-          object_id?: string
-          object_type?: string
-          part_id?: string
-          project_id?: string
-          removed_at?: string | null
-          removed_by_name?: string | null
-          removed_reason?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "part_links_part_id_fkey"
-            columns: ["part_id"]
-            isOneToOne: false
-            referencedRelation: "parts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "part_links_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       parts: {
         Row: {
           category: Database["public"]["Enums"]["discipline"] | null
@@ -993,6 +993,7 @@ export type Database = {
           manufacturer: string | null
           model: string | null
           model_position: Json | null
+          model_size: Json | null
           name: string
           notes: string | null
           parent_id: string | null
@@ -1019,6 +1020,7 @@ export type Database = {
           manufacturer?: string | null
           model?: string | null
           model_position?: Json | null
+          model_size?: Json | null
           name: string
           notes?: string | null
           parent_id?: string | null
@@ -1045,6 +1047,7 @@ export type Database = {
           manufacturer?: string | null
           model?: string | null
           model_position?: Json | null
+          model_size?: Json | null
           name?: string
           notes?: string | null
           parent_id?: string | null
@@ -1071,6 +1074,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parts_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "spaces"
             referencedColumns: ["id"]
           },
           {
@@ -1298,6 +1308,8 @@ export type Database = {
           hull_id: string | null
           id: string
           loa: number | null
+          model_file: Json | null
+          model_transform: Json | null
           name: string
           vessel_type: string | null
           year_built: number | null
@@ -1314,6 +1326,8 @@ export type Database = {
           hull_id?: string | null
           id?: string
           loa?: number | null
+          model_file?: Json | null
+          model_transform?: Json | null
           name: string
           vessel_type?: string | null
           year_built?: number | null
@@ -1330,6 +1344,8 @@ export type Database = {
           hull_id?: string | null
           id?: string
           loa?: number | null
+          model_file?: Json | null
+          model_transform?: Json | null
           name?: string
           vessel_type?: string | null
           year_built?: number | null
@@ -1567,6 +1583,10 @@ export type Database = {
         }
         Returns: Json
       }
+      action_apply_part_import: {
+        Args: { p_import_id: string; p_project_id?: string; p_proposal?: Json }
+        Returns: Json
+      }
       action_change_member_role: {
         Args: {
           p_member_id: string
@@ -1603,10 +1623,6 @@ export type Database = {
           p_project_id?: string
           p_serial_number?: string
         }
-        Returns: Json
-      }
-      action_apply_part_import: {
-        Args: { p_import_id: string; p_project_id?: string; p_proposal?: Json }
         Returns: Json
       }
       action_create_project: {
@@ -1660,7 +1676,11 @@ export type Database = {
         Returns: Json
       }
       action_disconnect_parts: {
-        Args: { p_connection_id: string; p_project_id?: string; p_reason?: string }
+        Args: {
+          p_connection_id: string
+          p_project_id?: string
+          p_reason?: string
+        }
         Returns: Json
       }
       action_invite_member: {
@@ -1840,6 +1860,22 @@ export type Database = {
         Args: { p_project_id?: string; p_reason?: string }
         Returns: Json
       }
+      action_set_vessel_model: {
+        Args: {
+          p_bytes?: number
+          p_clear?: boolean
+          p_format?: string
+          p_name?: string
+          p_path?: string
+          p_project_id?: string
+          p_transform?: Json
+        }
+        Returns: Json
+      }
+      action_size_part: {
+        Args: { p_part_id: string; p_project_id?: string; p_size?: Json }
+        Returns: Json
+      }
       action_unlink_part: {
         Args: {
           p_object_id: string
@@ -1912,6 +1948,11 @@ export type Database = {
         Args: { p_action_key: string; p_project_id: string }
         Returns: boolean
       }
+      can_read_part: {
+        Args: { p_project_id: string; p_vessel_id: string }
+        Returns: boolean
+      }
+      clean_text: { Args: { p: string }; Returns: string }
       current_actor_id: { Args: never; Returns: string }
       current_actor_name: { Args: never; Returns: string }
       current_actor_role: {
@@ -1929,6 +1970,22 @@ export type Database = {
           p_type: Database["public"]["Enums"]["object_type"]
         }
         Returns: Record<string, unknown>
+      }
+      model_vector_ok: { Args: { p: Json; p_keys: string[] }; Returns: boolean }
+      parse_discipline: {
+        Args: { p: string }
+        Returns: Database["public"]["Enums"]["discipline"]
+      }
+      part_is_on_project: {
+        Args: {
+          p_part: Database["public"]["Tables"]["parts"]["Row"]
+          p_project_id: string
+        }
+        Returns: boolean
+      }
+      project_of_object: {
+        Args: { p_object_id: string; p_object_type: string }
+        Returns: string
       }
       project_phases: {
         Args: { p_project_type: Database["public"]["Enums"]["project_type"] }
@@ -1951,6 +2008,13 @@ export type Database = {
         Returns: undefined
       }
       resolve_project: { Args: { p_explicit: string }; Returns: string }
+      space_is_on_project: {
+        Args: {
+          p_project_id: string
+          p_space: Database["public"]["Tables"]["spaces"]["Row"]
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       action_item_status: "OPEN" | "ACKNOWLEDGED" | "DONE" | "DECLINED"
