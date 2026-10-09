@@ -19,6 +19,7 @@ import {
 } from '@/lib/query-hooks'
 import { useTranslation } from '@/lib/i18n'
 import type { Discipline, WorkPackage } from '@/lib/types'
+import { DateField } from '@/components/ui/date-field'
 
 // Disciplines come from ontology_vocabulary, per project type: a building gets
 // planning, cadastral, energy and landscape; a vessel gets hull, rigging, paint
@@ -196,21 +197,17 @@ export default function CreateWorkPackageForm({
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1.5">
                     <Label htmlFor="wp-start">Planned start</Label>
-                    <Input
+                    <DateField
                       id="wp-start"
-                      type="date"
                       value={form.planned_start ?? ''}
-                      onChange={(e) => set('planned_start', str(e.target.value))}
-                    />
+                      onChange={(v) => set('planned_start', str(v))} />
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <Label htmlFor="wp-end">Planned end</Label>
-                    <Input
+                    <DateField
                       id="wp-end"
-                      type="date"
                       value={form.planned_end ?? ''}
-                      onChange={(e) => set('planned_end', str(e.target.value))}
-                    />
+                      onChange={(v) => set('planned_end', str(v))} />
                   </div>
                 </div>
 

@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog'
 import { useScheduleInspection, useWorkPackages, usePermissions, type InspectionInput } from '@/lib/query-hooks'
 import type { InspectionEvent } from '@/lib/types'
+import { DateField } from '@/components/ui/date-field'
 
 const ROLES: { value: InspectionEvent['inspector_role']; label: string }[] = [
   { value: 'CLASS_SURVEYOR', label: 'Class surveyor' },
@@ -176,12 +177,10 @@ export default function ScheduleInspectionForm({
 
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="insp-date">Scheduled date</Label>
-                  <Input
+                  <DateField
                     id="insp-date"
-                    type="date"
                     value={form.scheduled_date ?? ''}
-                    onChange={(e) => set('scheduled_date', str(e.target.value))}
-                  />
+                    onChange={(v) => set('scheduled_date', str(v))} />
                 </div>
 
                 <label className="flex items-center gap-2 text-sm">

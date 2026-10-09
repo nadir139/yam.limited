@@ -90,8 +90,8 @@ Deno.test("a drop stores the plan that puts the bar where it was dropped", async
   eq(plan("L", "move", 7), ["2026-10-15", "2026-10-19"], "late start moves from where it is drawn");
   eq(plan("L", "move", -20), ["2026-10-08", "2026-10-12"], "not before today");
   // M is drawn 6 Oct–10 Dec; dragging its end back 10 days ends it on 30 Nov.
-  eq(plan("M", "end", -10), ["2026-11-13", "2026-11-30"], "under way: end moves");
-  eq(plan("M", "move", -10), ["2026-11-13", "2026-11-30"], "under way: a move moves the end only");
+  eq(plan("M", "end", -10), ["2026-10-06", "2026-11-30"], "under way: end moves, start set to the actual start");
+  eq(plan("M", "move", -10), ["2026-10-06", "2026-11-30"], "under way: a move moves the end only");
   eq(planForDrop(r.byId.M, "start", 3, t), null, "under way: start is fixed");
   eq(plan("M", "end", -70), ["2026-10-06", "2026-10-06"], "end not before the actual start");
   // C is drawn 20–27 Oct (5 planned + 3 CO days); its stored plan excludes them.
