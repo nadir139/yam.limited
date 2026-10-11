@@ -7,6 +7,7 @@ import { useCreateProject, useOpenLogbook } from '@/lib/query-hooks'
 import { useTranslation } from '@/lib/i18n'
 import type { Project } from '@/lib/types'
 import { DateField } from '@/components/ui/date-field'
+import { kindForProjectType } from '@/lib/asset'
 
 // Starting a project.
 //
@@ -23,6 +24,8 @@ const TYPES: Project['project_type'][] = [
   'ANNUAL_SURVEY',
   'DAMAGE_REPAIR',
   'PROPERTY',
+  'AIRCRAFT_CHECK',
+  'AIRCRAFT_REFURB',
 ]
 
 const CLASS_SOCIETIES = ['RINA', 'LR', 'DNV', 'ABS', 'BV']
@@ -122,8 +125,9 @@ function ProjectForm({ onDone }: { onDone: () => void }) {
   const [classSociety, setClassSociety] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  // A building has no class society, and offering one invites a wrong answer.
-  const isProperty = projectType === 'PROPERTY'
+  // Only a boat has a class society; offering one for a building or an
+  // aircraft invites a wrong answer.
+  const isProperty = kindForProjectType(projectType) !== 'VESSEL'
 
   const submit = () => {
     setError(null)

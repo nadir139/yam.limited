@@ -74,6 +74,7 @@ import { useTranslation } from '@/lib/i18n'
 import type { Discipline, Part, PartConnection, Space } from '@/lib/types'
 import { Constants } from '@/lib/database.types'
 import { DateField } from '@/components/ui/date-field'
+import { ASSET_NOUN, assetKindOf } from '@/lib/asset'
 
 // The asset, as a tree of the things work is done to.
 //
@@ -1031,13 +1032,15 @@ export default function PartsPage() {
       )
   }, [query, tree])
 
-  const isProperty = project?.project_type === 'PROPERTY'
+  const assetKind = assetKindOf(project)
+  const isProperty = assetKind === 'BUILDING'
+  const noun = ASSET_NOUN[assetKind]
   const needsVessel = project !== undefined && !isProperty && !project.vessel_id
   const assetName = isProperty ? project?.vessel?.name ?? project?.name : project?.vessel?.name
   const selected = selectedId ? byId.get(selectedId) ?? null : null
 
   const seedStarter = async () => {
-    const starter = STARTER_SYSTEMS[isProperty ? 'property' : 'boat']
+    const starter = STARTER_SYSTEMS[assetKind === 'BUILDING' ? 'property' : assetKind === 'AIRCRAFT' ? 'aircraft' : 'boat']
     try {
       for (const s of starter) await create.mutateAsync({ name: s.name, category: s.category })
       toast.success(`Recorded ${starter.length} systems. Add what sits inside each one.`)
@@ -1063,9 +1066,9 @@ export default function PartsPage() {
             Parts{assetName ? ` of ${assetName}` : ''}
           </h1>
           <p className="mt-1 max-w-3xl text-sm" style={muted}>
-            The {isProperty ? 'building' : 'boat'} as the record knows it: its systems and the
+            The {noun} as the record knows it: its systems and the
             components inside them, and everything ever done to each one.
-            {project?.vessel_id ? ` Parts belong to the ${isProperty ? 'building' : 'vessel'}, so they carry over to every project on ${isProperty ? 'it' : 'her'}.` : isProperty ? ' Record the building on the Project page and its parts will outlive this project.' : ''}
+            {project?.vessel_id ? ` Parts belong to the ${isProperty ? 'building' : assetKind === 'AIRCRAFT' ? 'aircraft' : 'vessel'}, so they carry over to every project on ${assetKind === 'VESSEL' ? 'her' : 'it'}.` : isProperty ? ' Record the building on the Project page and its parts will outlive this project.' : ''}
           </p>
         </div>
         <div className="flex gap-2">
@@ -1120,7 +1123,7 @@ export default function PartsPage() {
             </p>
             {can('action_create_part') && (
               <Button size="sm" variant="outline" onClick={seedStarter} disabled={create.isPending}>
-                Start with the standard {isProperty ? 'building' : 'boat'} systems
+                Start with the standard {noun} systems
               </Button>
             )}
           </CardContent>

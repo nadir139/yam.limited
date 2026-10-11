@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import type { Json } from './database.types'
+import type { Database, Json } from './database.types'
 import type {
   Vessel,
   WorkPackageDependency,
@@ -2317,4 +2317,79 @@ export async function setProjectAsset(
     p_details: input.details as unknown as Json,
   })
   return unwrap(data, error, 'Record the asset') as unknown as { asset: Vessel; moved: Record<string, number> | null }
+}
+
+// ─── Aircraft tech log (migration 045) ────────────────────────────────────────
+
+export type AircraftFlight = Database['public']['Tables']['aircraft_flights']['Row']
+
+export interface AircraftTotals {
+  hours_at_entry: number
+  landings_at_entry: number
+  flights: number
+  flight_hours: number
+  landings: number
+  total_hours: number
+  total_landings: number
+}
+
+/** Every flight of the aircraft, newest first; voided ones included, with their reason. */
+export async function fetchFlights(vesselId: string): Promise<AircraftFlight[]> {
+  const { data, error } = await supabase
+    .from('aircraft_flights')
+    .select('*')
+    .eq('vessel_id', vesselId)
+    .order('block_off', { ascending: false })
+    .limit(500)
+  if (error) throw error
+  return data ?? []
+}
+
+export async function fetchAircraftTotals(projectId: string): Promise<AircraftTotals> {
+  const { data, error } = await supabase.rpc('aircraft_totals', { p_project_id: projectId })
+  if (error) throw error
+  return data as unknown as AircraftTotals
+}
+
+export interface FlightInput {
+  flightDate: string
+  departure: string
+  arrival: string
+  blockOff: string
+  blockOn: string
+  takeoffAt?: string | null
+  landingAt?: string | null
+  landings: number
+  picName?: string
+  notes?: string
+  clientId: string
+}
+
+export async function recordFlight(projectId: string, input: FlightInput) {
+  const { data, error } = await supabase.rpc('action_record_flight', {
+    p_project_id: projectId,
+    p_flight_date: input.flightDate,
+    p_departure: input.departure,
+    p_arrival: input.arrival,
+    p_block_off: input.blockOff,
+    p_block_on: input.blockOn,
+    p_takeoff_at: input.takeoffAt ?? undefined,
+    p_landing_at: input.landingAt ?? undefined,
+    p_landings: input.landings,
+    p_pic_name: input.picName || undefined,
+    p_notes: input.notes || undefined,
+    p_client_id: input.clientId,
+  })
+  return unwrap(data, error, 'Record flight') as unknown as { flight: AircraftFlight; duplicate: boolean; totals: AircraftTotals }
+}
+
+export async function voidFlight(projectId: string, flightId: string, reason: string) {
+  const { data, error } = await supabase.rpc('action_void_flight', { p_project_id: projectId, p_flight_id: flightId, p_reason: reason })
+  return unwrap(data, error, 'Void flight')
+}
+
+/** Opens an aircraft's tech log (an OPERATIONS project on the aircraft) from one of its projects. */
+export async function openTechLog(fromProjectId: string): Promise<Project> {
+  const { data, error } = await supabase.rpc('action_open_tech_log', { p_from_project_id: fromProjectId })
+  return (unwrap(data, error, 'Open the tech log') as unknown as { project: Project }).project
 }

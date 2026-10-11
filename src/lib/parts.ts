@@ -108,7 +108,7 @@ export function workPackageSystems(
 }
 
 /** A starting tree for an empty asset, so nobody has to invent the top level. */
-export const STARTER_SYSTEMS: Record<'boat' | 'property', { name: string; category: string }[]> = {
+export const STARTER_SYSTEMS: Record<'boat' | 'property' | 'aircraft', { name: string; category: string }[]> = {
   boat: [
     { name: 'Hull & structure', category: 'HULL' },
     { name: 'Deck & fittings', category: 'STRUCTURAL' },
@@ -128,5 +128,18 @@ export const STARTER_SYSTEMS: Record<'boat' | 'property', { name: string; catego
     { name: 'Heating & cooling', category: 'ENERGY' },
     { name: 'Interior', category: 'INTERIOR' },
     { name: 'Garden & grounds', category: 'LANDSCAPE' },
+  ],
+  // The Airframe is also where the tech log keeps total time (migration 045).
+  aircraft: [
+    { name: 'Airframe', category: 'AIRFRAME' },
+    { name: 'Powerplant', category: 'POWERPLANT' },
+    { name: 'Propellers', category: 'POWERPLANT' },
+    { name: 'Landing gear', category: 'AIRFRAME' },
+    { name: 'Flight controls', category: 'AIRFRAME' },
+    { name: 'Fuel system', category: 'MECHANICAL' },
+    { name: 'Electrical', category: 'ELECTRICAL' },
+    { name: 'Avionics', category: 'AVIONICS' },
+    { name: 'Cabin', category: 'INTERIOR' },
+    { name: 'Emergency equipment', category: 'SAFETY' },
   ],
 }

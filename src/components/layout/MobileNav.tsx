@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { BookOpen, Box, Boxes, CalendarRange, Gauge, LayoutDashboard, LogOut, Menu, Sparkles, UsersRound, Wallet } from 'lucide-react'
+import { BookOpen, Box, Boxes, CalendarRange, Gauge, LayoutDashboard, LogOut, Menu, Plane, Sparkles, UsersRound, Wallet } from 'lucide-react'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { useAuth } from '@/contexts/AuthContext'
 import { useApprovals, useDefects, useMyOpenItemCount, useMyRole } from '@/lib/query-hooks'
@@ -39,6 +39,14 @@ const IN_USE_BAR = [
   { icon: Wallet, labelKey: 'nav.finance', path: '/app/finance' },
 ] as const
 
+// On an aircraft's tech log: its flights and its maintenance.
+const TECH_LOG_BAR = [
+  { icon: Plane, labelKey: 'nav.techLog', path: '/app/tech-log' },
+  { icon: Gauge, labelKey: 'nav.maintenance', path: '/app/maintenance' },
+  { icon: Sparkles, labelKey: 'nav.agent', path: '/app/agent', primary: true },
+  { icon: Boxes, labelKey: 'nav.parts', path: '/app/parts' },
+] as const
+
 export const MOBILE_NAV_HEIGHT = 62
 
 const isActive = (pathname: string, path: string) => pathname === path || pathname.startsWith(path + '/')
@@ -53,7 +61,7 @@ export default function MobileNav() {
   const { activeProject } = useActiveProject()
   const type = activeProject?.project_type
   const kind = activeProject?.vessel?.asset_kind
-  const bar = type === 'OPERATIONS' ? (kind === 'BUILDING' ? IN_USE_BAR : LOGBOOK_BAR) : BAR
+  const bar = type === 'OPERATIONS' ? (kind === 'BUILDING' ? IN_USE_BAR : kind === 'AIRCRAFT' ? TECH_LOG_BAR : LOGBOOK_BAR) : BAR
   const items = navItemsFor(type, role, kind)
 
   const { data: defects = [] } = useDefects()
