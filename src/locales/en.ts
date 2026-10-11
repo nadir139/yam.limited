@@ -48,6 +48,7 @@ export const en: Record<string, string> = {
   'nav.maintenance': 'Maintenance',
   'nav.oilRecord': 'Oil Record Book',
   'nav.finance': 'Finance',
+  'nav.payments': 'Payments',
   'nav.signOut': 'Sign out',
   'nav.noRole': 'No project role',
 

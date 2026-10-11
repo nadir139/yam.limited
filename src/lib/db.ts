@@ -2142,3 +2142,151 @@ export async function removeAllocation(projectId: string, allocationId: string, 
   const { data, error } = await supabase.rpc('action_remove_allocation', { p_project_id: projectId, p_allocation_id: allocationId, p_reason: reason })
   return (unwrap(data, error, 'Remove allocation') as unknown as { allocation: FinanceAllocation }).allocation
 }
+
+// ─── Payment stages (migration 042) ───────────────────────────────────────────
+//
+// Read through payment_status, which checks each stage's conditions against
+// the model now. Seen by the owner side, the captain and the yard's PM.
+
+export interface PaymentCondition {
+  type: 'WORK_PACKAGE_COMPLETE' | 'INSPECTION_PASSED' | 'NO_OPEN_NCR' | 'CHANGE_ORDER_APPROVED' | 'DATE' | 'MANUAL'
+  id?: string
+  on?: string
+  text?: string
+}
+
+export interface CheckedCondition {
+  type: PaymentCondition['type']
+  id?: string
+  on?: string
+  label: string
+  /** null for MANUAL: the approver judges it. */
+  met: boolean | null
+  detail: string | null
+}
+
+export interface PaymentApproval {
+  role: string
+  name: string
+  at: string
+  note: string | null
+  override: string | null
+}
+
+export interface PaymentMilestoneView {
+  milestone: {
+    id: string
+    agreement_id: string
+    seq: number
+    title: string
+    amount: number
+    due_date: string | null
+    status: 'PENDING' | 'RELEASE_REQUESTED' | 'APPROVED' | 'PAID' | 'CANCELLED'
+    requested_at: string | null
+    requested_by_name: string | null
+    request_note: string | null
+    approvals: PaymentApproval[]
+    approved_at: string | null
+    rejected_at: string | null
+    rejected_by_name: string | null
+    rejected_reason: string | null
+    paid_at: string | null
+    paid_recorded_by_name: string | null
+    cancelled_reason: string | null
+  }
+  paid: boolean
+  conditions: CheckedCondition[]
+  all_met: boolean
+}
+
+export interface PaymentAgreementView {
+  agreement: {
+    id: string
+    title: string
+    payee: string
+    currency: string
+    holder: 'OWNER_ACCOUNT' | 'PARTNER_ESCROW'
+    approval_rule: 'ONE' | 'BOTH'
+    status: 'DRAFT' | 'ACTIVE' | 'CLOSED' | 'CANCELLED'
+    created_by_name: string | null
+    activated_at: string | null
+    activated_by_name: string | null
+  }
+  milestones: PaymentMilestoneView[]
+  total: number
+  paid: number
+}
+
+export async function fetchPaymentStatus(projectId: string): Promise<PaymentAgreementView[]> {
+  const { data, error } = await supabase.rpc('payment_status', { p_project_id: projectId })
+  if (error) throw error
+  return (data ?? []) as unknown as PaymentAgreementView[]
+}
+
+export async function createPaymentAgreement(
+  projectId: string,
+  input: { title: string; payee: string; currency: string; approvalRule: 'ONE' | 'BOTH' },
+) {
+  const { data, error } = await supabase.rpc('action_create_payment_agreement', {
+    p_project_id: projectId,
+    p_title: input.title,
+    p_payee: input.payee,
+    p_currency: input.currency,
+    p_approval_rule: input.approvalRule,
+  })
+  return unwrap(data, error, 'Create payment agreement')
+}
+
+export async function addPaymentMilestone(
+  projectId: string,
+  input: { agreementId: string; title: string; amount: number; conditions: PaymentCondition[]; dueDate?: string | null },
+) {
+  const { data, error } = await supabase.rpc('action_add_payment_milestone', {
+    p_project_id: projectId,
+    p_agreement_id: input.agreementId,
+    p_title: input.title,
+    p_amount: input.amount,
+    p_conditions: input.conditions as unknown as Json,
+    p_due_date: input.dueDate || undefined,
+  })
+  return unwrap(data, error, 'Add payment stage')
+}
+
+export async function activatePaymentAgreement(projectId: string, agreementId: string) {
+  const { data, error } = await supabase.rpc('action_activate_payment_agreement', { p_project_id: projectId, p_agreement_id: agreementId })
+  return unwrap(data, error, 'Agree payment plan')
+}
+
+export async function requestRelease(projectId: string, milestoneId: string, note: string) {
+  const { data, error } = await supabase.rpc('action_request_release', { p_project_id: projectId, p_milestone_id: milestoneId, p_note: note || undefined })
+  return unwrap(data, error, 'Request release')
+}
+
+export async function approveRelease(projectId: string, milestoneId: string, note: string, overrideReason: string) {
+  const { data, error } = await supabase.rpc('action_approve_release', {
+    p_project_id: projectId,
+    p_milestone_id: milestoneId,
+    p_note: note || undefined,
+    p_override_reason: overrideReason || undefined,
+  })
+  return unwrap(data, error, 'Approve release') as unknown as { approved: boolean }
+}
+
+export async function rejectRelease(projectId: string, milestoneId: string, reason: string) {
+  const { data, error } = await supabase.rpc('action_reject_release', { p_project_id: projectId, p_milestone_id: milestoneId, p_reason: reason })
+  return unwrap(data, error, 'Reject release')
+}
+
+export async function recordMilestonePayment(projectId: string, milestoneId: string, transactionId: string) {
+  const { data, error } = await supabase.rpc('action_record_milestone_payment', {
+    p_project_id: projectId,
+    p_milestone_id: milestoneId,
+    p_transaction_id: transactionId,
+  })
+  return unwrap(data, error, 'Record payment')
+}
+
+export async function cancelPaymentMilestone(projectId: string, milestoneId: string, reason: string) {
+  const { data, error } = await supabase.rpc('action_cancel_payment_milestone', { p_project_id: projectId, p_milestone_id: milestoneId, p_reason: reason })
+  return unwrap(data, error, 'Cancel payment stage')
+}

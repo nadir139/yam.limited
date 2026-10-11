@@ -20,6 +20,7 @@ import {
   Gauge,
   Droplets,
   Wallet,
+  HandCoins,
   type LucideIcon,
 } from 'lucide-react'
 import type { Project, UserRole } from '@/lib/types'
@@ -48,6 +49,7 @@ export const NAV_ITEMS: NavItem[] = [
   { icon: GitBranch, labelKey: 'nav.changeOrders', path: '/app/change-orders' },
   { icon: CheckCircle2, labelKey: 'nav.approvals', path: '/app/approvals', badge: 'approvals' },
   { icon: Wallet, labelKey: 'nav.finance', path: '/app/finance', roles: ['OWNER', 'OWNERS_REP', 'CAPTAIN'] },
+  { icon: HandCoins, labelKey: 'nav.payments', path: '/app/payments', roles: ['OWNER', 'OWNERS_REP', 'CAPTAIN', 'YARD_PM'] },
   { icon: FileText, labelKey: 'nav.documents', path: '/app/documents' },
   { icon: ListChecks, labelKey: 'nav.actionItems', path: '/app/action-items', badge: 'actionItems' },
   { icon: MessagesSquare, labelKey: 'nav.messages', path: '/app/messages' },
