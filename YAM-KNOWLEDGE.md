@@ -2470,3 +2470,43 @@ a part recorded before the building moved onto it; merge and removal of
 details; new parts land on the building; the boat project unchanged; a
 building cannot open a boat's logbook. Browser test of the card and form
 (create with details and year, then clear a field and add another).
+
+## 48. A building in use (migration 044)
+
+Step A2. A building gets what a boat's logbook project gives a boat: a
+record between renovations. `action_open_in_use(from_project | building
+name)` opens an OPERATIONS project "<name> · In use" on a BUILDING asset
+(owner or owner's rep only; one per building; refused on a boat or a
+project with no building). Its parts, intervals, services, money and NCRs
+hang on the building (vessel_id), so the property project and the next
+renovation see them. OWNER may now record services and readings (a
+building has no captain).
+
+App: navigation is chosen by project type *and* asset kind
+(`navItemsFor(type, role, kind)`, `homeFor`, `pathFits`): a building in
+use shows Agent, Maintenance (home), Project, Parts, NCRs, Finance,
+Documents, My Items, Messages, Team — no log, crew, rest or Oil Record
+Book; the phone bar is Maintenance, Parts, Agent, Finance. The boat-only
+pages are wrapped in `BoatOnly` and send a building to its home. The
+property's Project page has "The building in use" card (open / go to);
+the switcher says "In use" and shows a house.
+
+Maintenance on an empty building offers the usual checks
+(`src/lib/building-checks.ts`): boiler service (1 y), combustion and
+efficiency (2 y), air conditioning (1 y), chimney/flue (1 y), roof (1 y),
+gutters (6 m), RCD test (6 m), electrical inspection (5 y), water heater
+(1 y), windows and doors (1 y), smoke/CO alarms (6 m), extinguishers
+(6 m). Ticked ones become ordinary intervals on parts created under the
+starter systems (+ Safety). Stated as common practice, not any country's
+rules. A service recorded on a building also lands in its log entries, a
+diary for later.
+
+Verified on the live database (rolled back, real property project):
+refused before the building exists, opened once, refused twice and on a
+boat; a yearly boiler service last done 2025-09-01 shows OVERDUE, recorded
+today it becomes OK until 2027-10-11; the part is seen from the property
+project. Browser test (mocked): open from the property, land on
+Maintenance with the building nav, add 11 checks (15 parts under 6
+systems, both boiler checks on one boiler), /app/logbook redirects home.
+Not yet: meter readings for a building (electricity, water, gas) still
+use the hours form's wording.

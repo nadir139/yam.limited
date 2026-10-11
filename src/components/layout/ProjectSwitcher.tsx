@@ -41,7 +41,9 @@ function projectIcon(type: Project['project_type'], kind?: string | null) {
  * and unrecognisable.
  */
 function describe(p: ProjectWithVessel, t: (k: string) => string) {
-  return [p.vessel?.name, t(`projectType.${p.project_type}`), p.yard_location || p.yard_name]
+  // A building's OPERATIONS project is its record in use, not a logbook.
+  const type = p.project_type === 'OPERATIONS' && p.vessel?.asset_kind === 'BUILDING' ? 'In use' : t(`projectType.${p.project_type}`)
+  return [p.vessel?.name, type, p.yard_location || p.yard_name]
     .filter(Boolean)
     .join(' · ')
 }
