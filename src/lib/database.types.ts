@@ -660,6 +660,7 @@ export type Database = {
           author_name: string | null
           body: string
           created_at: string
+          defect_id: string | null
           id: string
           kind: Database["public"]["Enums"]["log_entry_kind"]
           occurred_at: string
@@ -675,6 +676,7 @@ export type Database = {
           author_name?: string | null
           body: string
           created_at?: string
+          defect_id?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["log_entry_kind"]
           occurred_at: string
@@ -690,6 +692,7 @@ export type Database = {
           author_name?: string | null
           body?: string
           created_at?: string
+          defect_id?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["log_entry_kind"]
           occurred_at?: string
@@ -701,6 +704,13 @@ export type Database = {
           voided_by_name?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "log_entries_defect_id_fkey"
+            columns: ["defect_id"]
+            isOneToOne: false
+            referencedRelation: "defect_records"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "log_entries_part_id_fkey"
             columns: ["part_id"]
@@ -1488,6 +1498,111 @@ export type Database = {
           },
         ]
       }
+      rest_record_versions: {
+        Row: {
+          breaches: Json
+          id: string
+          reason: string | null
+          replaced_at: string
+          replaced_by_name: string | null
+          rest_record_id: string
+          schedule: Json
+        }
+        Insert: {
+          breaches: Json
+          id?: string
+          reason?: string | null
+          replaced_at?: string
+          replaced_by_name?: string | null
+          rest_record_id: string
+          schedule: Json
+        }
+        Update: {
+          breaches?: Json
+          id?: string
+          reason?: string | null
+          replaced_at?: string
+          replaced_by_name?: string | null
+          rest_record_id?: string
+          schedule?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rest_record_versions_rest_record_id_fkey"
+            columns: ["rest_record_id"]
+            isOneToOne: false
+            referencedRelation: "rest_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rest_records: {
+        Row: {
+          breach_days: number
+          breaches: Json
+          created_at: string
+          crew_id: string
+          id: string
+          month: number
+          project_id: string
+          schedule: Json
+          updated_at: string | null
+          updated_by_name: string | null
+          vessel_id: string
+          year: number
+        }
+        Insert: {
+          breach_days?: number
+          breaches?: Json
+          created_at?: string
+          crew_id: string
+          id?: string
+          month: number
+          project_id: string
+          schedule?: Json
+          updated_at?: string | null
+          updated_by_name?: string | null
+          vessel_id: string
+          year: number
+        }
+        Update: {
+          breach_days?: number
+          breaches?: Json
+          created_at?: string
+          crew_id?: string
+          id?: string
+          month?: number
+          project_id?: string
+          schedule?: Json
+          updated_at?: string | null
+          updated_by_name?: string | null
+          vessel_id?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rest_records_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "crew"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rest_records_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rest_records_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       spaces: {
         Row: {
           created_at: string
@@ -2036,6 +2151,15 @@ export type Database = {
         }
         Returns: Json
       }
+      action_raise_ncr_from_entry: {
+        Args: {
+          p_entry_id: string
+          p_project_id: string
+          p_severity?: string
+          p_title?: string
+        }
+        Returns: Json
+      }
       action_record_inspection_result: {
         Args: {
           p_actual_date?: string
@@ -2063,6 +2187,17 @@ export type Database = {
       }
       action_record_project_access: {
         Args: { p_project_id: string }
+        Returns: Json
+      }
+      action_record_rest: {
+        Args: {
+          p_crew_id: string
+          p_month: number
+          p_project_id: string
+          p_reason?: string
+          p_schedule: Json
+          p_year: number
+        }
         Returns: Json
       }
       action_register_document: {
@@ -2271,6 +2406,10 @@ export type Database = {
         Args: { p_project_id: string; p_vessel_id: string }
         Returns: boolean
       }
+      can_read_rest: {
+        Args: { p_crew_id: string; p_project_id: string }
+        Returns: boolean
+      }
       clean_text: { Args: { p: string }; Returns: string }
       current_actor_id: { Args: never; Returns: string }
       current_actor_name: { Args: never; Returns: string }
@@ -2355,6 +2494,14 @@ export type Database = {
         Returns: undefined
       }
       resolve_project: { Args: { p_explicit: string }; Returns: string }
+      rest_breaches: {
+        Args: { p_days: number; p_schedule: Json }
+        Returns: Json
+      }
+      rest_summary: {
+        Args: { p_month: number; p_project_id: string; p_year: number }
+        Returns: Json
+      }
       space_is_on_project: {
         Args: {
           p_project_id: string
@@ -2461,6 +2608,7 @@ export type Database = {
         | "CREW"
         | "LOG_DAY"
         | "LOG_ENTRY"
+        | "REST_RECORD"
       project_phase:
         | "PRE_SURVEY"
         | "HAUL_OUT"
@@ -2743,6 +2891,7 @@ export const Constants = {
         "CREW",
         "LOG_DAY",
         "LOG_ENTRY",
+        "REST_RECORD",
       ],
       project_phase: [
         "PRE_SURVEY",

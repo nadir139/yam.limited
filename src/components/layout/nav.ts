@@ -16,6 +16,7 @@ import {
   ListChecks,
   BookOpen,
   UsersRound,
+  BedDouble,
   type LucideIcon,
 } from 'lucide-react'
 import type { Project } from '@/lib/types'
@@ -54,9 +55,10 @@ export const NAV_ITEMS: NavItem[] = [
 const LOGBOOK_ITEMS: NavItem[] = [
   { icon: BookOpen, labelKey: 'nav.logbook', path: '/app/logbook' },
   { icon: UsersRound, labelKey: 'nav.crew', path: '/app/crew' },
+  { icon: BedDouble, labelKey: 'nav.rest', path: '/app/rest' },
 ]
 const LOGBOOK_KEEPS = new Set([
-  '/app/agent', '/app/project', '/app/model', '/app/parts', '/app/documents', '/app/action-items', '/app/messages', '/app/team',
+  '/app/agent', '/app/project', '/app/model', '/app/parts', '/app/defects', '/app/documents', '/app/action-items', '/app/messages', '/app/team',
 ])
 
 type ProjectType = Project['project_type'] | undefined

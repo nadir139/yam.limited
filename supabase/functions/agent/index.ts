@@ -212,6 +212,19 @@ function buildTools(
         required: ["object_type", "id"],
       },
     },
+    {
+      name: "get_logbook",
+      description:
+        "The boat's logbook for a date range (default: the last 14 days, at most 62): each day's status (SEA_SERVICE, STANDBY, YARD), position, ports, nautical miles, watchkeeping, notes and who was aboard; every timestamped entry (navigation, engine, defect, safety, bunkering, weather, maintenance, note) including struck-out ones with the reason, and the NCR a defect entry was raised as; the crew list; the days in the range nobody logged; and hours-of-rest counts for the month (how many crew recorded, how many in breach -- never anyone's hours). From a refit project it reads the same vessel's logbook when the caller is on it. Call this before answering what the boat did, where it was, who was aboard, what went wrong at sea, or before raising an NCR from a log entry. Dates are YYYY-MM-DD.",
+      input_schema: {
+        type: "object",
+        properties: {
+          from: { type: "string", description: "First day, YYYY-MM-DD" },
+          to: { type: "string", description: "Last day, YYYY-MM-DD (default today)" },
+        },
+        required: [],
+      },
+    },
   ];
 
   const actionTools = actions.map((a) => {
@@ -299,6 +312,9 @@ The schedule is part of the world model. Call get_schedule before answering anyt
 The model is of a physical thing, so the things work is done to are recorded too: a tree of systems and components (Deck > Winches > Port primary winch) that belongs to the vessel and outlives this project. Call get_parts before recording parts, and before answering what has been done to a physical thing -- get_parts with a part_id returns its record across every project. When a work package, NCR or inspection concerns a specific component, link it with action_link_part, recording the part first with action_create_part if it is not in the tree; place it under the right parent rather than at the top level, creating the system above it if needed. action_create_part returns the existing part when one of that name already sits under that parent, so it is safe to call for each item. When someone tells you a make, model or serial number, record it on the part.
 
 Parts also have a place (action_create_space, then action_set_part_details with p_space_id) and connections (action_connect_parts: POWERS, PROTECTS, CONTROLS, SIGNALS, FLOWS_TO). For "what stops if X fails", "what feeds X" or "which breaker is the bilge pump on", call get_parts with that part's id and answer from upstream and downstream; say when the record has no connections rather than guessing from names. Safety-critical parts (seacocks, through-hulls, fuel shut-offs) deserve a mention whenever work touches them. A whole manual or drawing set is imported from the Parts page ("Import from documents"), not through you: suggest it when someone wants to load many parts from documents.
+
+## The logbook
+A boat in service keeps a logbook: a project of type OPERATIONS, one per vessel, recording each day (sea service, standby or yard; position, ports, miles, who was aboard) and timestamped entries. Call get_logbook before answering what the boat did, where it was, who was aboard or what went wrong at sea, and name days nobody logged when they matter -- a gap is the first thing a surveyor or insurer asks about. A DEFECT entry can become an NCR in one step with action_raise_ncr_from_entry; suggest it when a defect entry has none and the fault needs following up. Hours of rest are private to each crew member and the captain: you see only counts, so never guess or report anyone's hours.
 
 ## Act
 When you are asked to record something, record it. A list of jobs is a list of records: one work package per item, all issued together as parallel tool calls in a single turn, not one per turn. Check what already exists once, up front, so you do not file a duplicate. Fill the fields you were given, leave unknown optional fields empty, and state your assumptions in one line afterwards -- a filed record that ${actorName} corrects beats an interrogation.
@@ -910,6 +926,80 @@ Deno.serve(async (req: Request) => {
     // people said afterwards. Reporting an NCR's cost from the row and calling
     // the closure uncommented -- when the comment is sitting on its thread --
     // is exactly the failure this exists to prevent.
+    if (name === "get_logbook") {
+      // A boat's log lives on its OPERATIONS project (migration 032). From a
+      // refit project of the same vessel, read that one -- the projects read
+      // runs on the caller's JWT, so it is found only if they are on it.
+      let logProjectId = projectId;
+      if (project.project_type !== "OPERATIONS") {
+        if (!project.vessel_id) return { error: "This project has no vessel, so there is no logbook." };
+        const { data: ops, error: opsError } = await supabase
+          .from("projects")
+          .select("id")
+          .eq("vessel_id", project.vessel_id)
+          .eq("project_type", "OPERATIONS")
+          .maybeSingle();
+        if (opsError) return { error: opsError.message };
+        if (!ops) return { error: "This boat has no logbook you can read: none has been opened, or you are not on it." };
+        logProjectId = String(ops.id);
+      }
+
+      const isDay = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
+      const dayMs = 86_400_000;
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const to = isDay(input.to) ? input.to : todayStr;
+      let from = isDay(input.from) ? input.from : new Date(Date.parse(to) - 13 * dayMs).toISOString().slice(0, 10);
+      if (Date.parse(from) > Date.parse(to)) return { error: "from is after to" };
+      // Keep the answer readable: two months at most.
+      if ((Date.parse(to) - Date.parse(from)) / dayMs > 61) from = new Date(Date.parse(to) - 61 * dayMs).toISOString().slice(0, 10);
+      const afterTo = new Date(Date.parse(to) + dayMs).toISOString().slice(0, 10);
+      const [year, month] = to.split("-").map(Number);
+
+      const [daysRes, entriesRes, crewRes, restRes] = await Promise.all([
+        supabase
+          .from("log_days")
+          .select("log_date, status, position, port_from, port_to, nautical_miles, watchkeeping, notes, updated_by_name, log_day_crew(crew_id, attendance)")
+          .eq("project_id", logProjectId)
+          .gte("log_date", from)
+          .lte("log_date", to)
+          .order("log_date"),
+        supabase
+          .from("log_entries")
+          .select("id, occurred_at, kind, body, part_id, author_name, voided_at, voided_by_name, void_reason, defect_id")
+          .eq("project_id", logProjectId)
+          .gte("occurred_at", `${from}T00:00:00Z`)
+          .lt("occurred_at", `${afterTo}T00:00:00Z`)
+          .order("occurred_at")
+          .limit(500),
+        // Names and roles only: contact details stay out of the conversation.
+        supabase
+          .from("crew")
+          .select("id, first_name, last_name, position, department, joined_on, left_on")
+          .eq("project_id", logProjectId),
+        supabase.rpc("rest_summary", { p_project_id: logProjectId, p_year: year, p_month: month }),
+      ]);
+      const failed = [daysRes, entriesRes, crewRes].find((r) => r.error);
+      if (failed?.error) return { error: failed.error.message };
+
+      const logged = new Set((daysRes.data ?? []).map((d: { log_date: string }) => d.log_date));
+      const unlogged: string[] = [];
+      // Only days that are over: today is still being written.
+      for (let t = Date.parse(from); t <= Date.parse(to) && t < Date.parse(todayStr); t += dayMs) {
+        const d = new Date(t).toISOString().slice(0, 10);
+        if (!logged.has(d)) unlogged.push(d);
+      }
+      return {
+        logbook_project_id: logProjectId,
+        from,
+        to,
+        days: daysRes.data,
+        entries: entriesRes.data,
+        crew: crewRes.data,
+        unlogged_days: unlogged,
+        hours_of_rest: restRes.error ? null : { year, month, ...(restRes.data as Record<string, unknown>) },
+      };
+    }
+
     if (name === "get_object_story") {
       const objectType = String(input.object_type);
       const table = tableFor.get(objectType);

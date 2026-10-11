@@ -33,7 +33,9 @@ import type {
   LogStatus,
   AttendanceStatus,
   LogEntryKind,
+  RestRecord,
 } from './types'
+import type { RestSchedule } from './rest-hours'
 
 /** A project row carrying just enough of its vessel to name it. */
 export type ProjectWithVessel = Project & { vessel: { name: string } | null }
@@ -1681,4 +1683,64 @@ export async function voidLogEntry(projectId: string, entryId: string, reason: s
     p_reason: reason,
   })
   return (unwrap(data, error, 'Strike out entry') as unknown as { entry: LogEntry }).entry
+}
+
+/** A DEFECT log entry raised as an NCR on the same boat (migration 034). */
+export async function raiseNcrFromEntry(
+  projectId: string,
+  input: { entryId: string; severity: DefectRecord['severity']; title?: string },
+): Promise<DefectRecord> {
+  const { data, error } = await supabase.rpc('action_raise_ncr_from_entry', {
+    p_project_id: projectId,
+    p_entry_id: input.entryId,
+    p_severity: input.severity,
+    p_title: input.title || undefined,
+  })
+  return (unwrap(data, error, 'Raise NCR') as unknown as { defect: DefectRecord }).defect
+}
+
+// ─── Hours of rest (migration 033) ────────────────────────────────────────────
+
+/**
+ * A month's rest records the caller may read: their own, or every crew
+ * member's for the captain. RLS hides the rest, so an empty list can mean
+ * "not recorded" or "not yours"; rest_summary gives everyone the counts.
+ */
+export async function fetchRestRecords(projectId: string, year: number, month: number): Promise<RestRecord[]> {
+  const { data, error } = await supabase
+    .from('rest_records')
+    .select('*')
+    .eq('project_id', projectId)
+    .eq('year', year)
+    .eq('month', month)
+  if (error) throw error
+  return data ?? []
+}
+
+export interface RestSummary {
+  crew_aboard: number
+  crew_recorded: number
+  crew_with_breaches: number
+}
+
+/** Counts only, never names or hours: what the rest of the boat may know. */
+export async function fetchRestSummary(projectId: string, year: number, month: number): Promise<RestSummary> {
+  const { data, error } = await supabase.rpc('rest_summary', { p_project_id: projectId, p_year: year, p_month: month })
+  return unwrap(data, error, 'Hours of rest summary') as unknown as RestSummary
+}
+
+/** Saves a month; the server judges it against the rules and keeps the previous version. */
+export async function recordRest(
+  projectId: string,
+  input: { crewId: string; year: number; month: number; schedule: RestSchedule; reason?: string },
+): Promise<RestRecord> {
+  const { data, error } = await supabase.rpc('action_record_rest', {
+    p_project_id: projectId,
+    p_crew_id: input.crewId,
+    p_year: input.year,
+    p_month: input.month,
+    p_schedule: input.schedule as unknown as Json,
+    p_reason: input.reason || undefined,
+  })
+  return (unwrap(data, error, 'Save hours of rest') as unknown as { rest_record: RestRecord }).rest_record
 }

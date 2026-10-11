@@ -77,6 +77,8 @@ export type Crew = Row<'crew'>
 export type LogDay = Row<'log_days'>
 export type LogDayCrew = Row<'log_day_crew'>
 export type LogEntry = Row<'log_entries'>
+/** Hours of rest (migration 033): one month for one crew member, readable by them and the captain. */
+export type RestRecord = Row<'rest_records'>
 export type PartLink = Row<'part_links'>
 export type Space = Row<'spaces'>
 export type PartConnection = Row<'part_connections'>

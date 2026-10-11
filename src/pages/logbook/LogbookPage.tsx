@@ -11,7 +11,7 @@ import {
   startOfMonth,
   startOfWeek,
 } from 'date-fns'
-import { ChevronLeft, ChevronRight, Printer, Ban, AlertCircle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Printer, Ban, AlertCircle, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -23,17 +23,19 @@ import { Badge } from '@/components/ui/badge'
 import {
   useAddLogEntry,
   useCrew,
+  useDefects,
   useLogDays,
   useLogEntries,
   usePermissions,
   useProject,
   useMyRole,
+  useRaiseNcrFromEntry,
   useRecordLogDay,
   useVoidLogEntry,
 } from '@/lib/query-hooks'
 import { useAuth } from '@/contexts/AuthContext'
 import type { LogDayWithCrew } from '@/lib/db'
-import type { AttendanceStatus, Crew, LogEntry, LogEntryKind, LogStatus } from '@/lib/types'
+import type { AttendanceStatus, Crew, DefectRecord, LogEntry, LogEntryKind, LogStatus } from '@/lib/types'
 
 // The boat's logbook (migration 032).
 //
@@ -80,6 +82,7 @@ export default function LogbookPage() {
   const { data: role = null } = useMyRole()
   const canWrite = can('action_record_log_day')
   const canNote = can('action_add_log_entry')
+  const canRaise = can('action_raise_ncr_from_entry')
 
   const [month, setMonth] = useState(() => startOfMonth(new Date()))
   const [selected, setSelected] = useState(() => ymd(new Date()))
@@ -160,7 +163,7 @@ export default function LogbookPage() {
             crew={crew}
             canWrite={canWrite}
           />
-          <Entries date={selected} canNote={canNote} isCaptain={role === 'CAPTAIN'} />
+          <Entries date={selected} canNote={canNote} canRaise={canRaise} isCaptain={role === 'CAPTAIN'} />
         </div>
       </div>
 
@@ -436,8 +439,19 @@ function DayEditor({ date, day, crew, canWrite }: { date: string; day: LogDayWit
   )
 }
 
-function Entries({ date, canNote, isCaptain }: { date: string; canNote: boolean; isCaptain: boolean }) {
+function Entries({
+  date,
+  canNote,
+  canRaise,
+  isCaptain,
+}: {
+  date: string
+  canNote: boolean
+  canRaise: boolean
+  isCaptain: boolean
+}) {
   const { user } = useAuth()
+  const { data: defects = [] } = useDefects()
   const dayStart = parseISO(date)
   const fromIso = dayStart.toISOString()
   const toIso = addDays(dayStart, 1).toISOString()
@@ -499,6 +513,9 @@ function Entries({ date, canNote, isCaptain }: { date: string; canNote: boolean;
                       Struck out by {e.voided_by_name}: {e.void_reason}
                     </p>
                   )}
+                  {e.kind === 'DEFECT' && !e.voided_at && (
+                    <DefectLink entry={e} defect={defects.find((d) => d.id === e.defect_id) ?? null} canRaise={canRaise} />
+                  )}
                 </li>
               )
             })}
@@ -531,6 +548,67 @@ function Entries({ date, canNote, isCaptain }: { date: string; canNote: boolean;
 }
 
 /** The month as a table, shown only when printing (or saving as PDF). */
+const SEVERITIES: Array<DefectRecord['severity']> = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
+
+/** A defect entry's NCR: a link once raised, otherwise a one-step "Raise NCR" (migration 034). */
+function DefectLink({ entry, defect, canRaise }: { entry: LogEntry; defect: DefectRecord | null; canRaise: boolean }) {
+  const raise = useRaiseNcrFromEntry()
+  const [open, setOpen] = useState(false)
+  const [severity, setSeverity] = useState<DefectRecord['severity']>('MEDIUM')
+
+  if (entry.defect_id) {
+    return (
+      <Link to="/app/defects" className="mt-1 inline-flex items-center gap-1 text-[11px] underline">
+        <AlertTriangle size={11} /> {defect ? `${defect.ncr_number} · ${defect.status.replace(/_/g, ' ').toLowerCase()}` : 'NCR raised'}
+      </Link>
+    )
+  }
+  if (!canRaise) return null
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)} className="mt-1 flex items-center gap-1 text-[11px] hover:underline">
+        <AlertTriangle size={11} /> Raise NCR
+      </button>
+    )
+  }
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+      <select
+        aria-label="Severity"
+        className="h-8 rounded-md border bg-background px-2"
+        value={severity}
+        onChange={(ev) => setSeverity(ev.target.value as DefectRecord['severity'])}
+      >
+        {SEVERITIES.map((s) => (
+          <option key={s} value={s}>{s.charAt(0) + s.slice(1).toLowerCase()}</option>
+        ))}
+      </select>
+      <Button
+        size="sm"
+        className="h-8"
+        disabled={raise.isPending}
+        onClick={() =>
+          raise.mutate(
+            { entryId: entry.id, severity },
+            {
+              onSuccess: (d) => {
+                toast.success(`${d.ncr_number} raised`)
+                setOpen(false)
+              },
+              onError: (err) => toast.error(err.message),
+            },
+          )
+        }
+      >
+        {raise.isPending ? 'Raising…' : 'Raise NCR'}
+      </Button>
+      <Button size="sm" variant="ghost" className="h-8" onClick={() => setOpen(false)}>
+        Cancel
+      </Button>
+    </div>
+  )
+}
+
 function PrintMonth({
   month,
   monthDays,

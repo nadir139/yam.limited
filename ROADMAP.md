@@ -43,9 +43,10 @@ Ordered by impact over effort. Most items are a day or less.
    things; (2) the owner's manual and the estimate as sources the agent reads and cites; (3) a scan
    or point cloud (Potree / 3D Tiles) registered to the same frame by three picked points.
 7b. **The logbook inside YAM** (migration 032 onward, plan in the "Digital Logbook Integration
-   Plan" doc): phase 1 operations project per vessel, crew, daily log, attendance, entries; phase 2
-   hours of rest (crew member and captain only), defect entry → NCR, agent reads the log; phase 3
-   readings → service intervals, yard days → refit, offline. **Direction:** the full life of the
+   Plan" doc): ~~phase 1~~ operations project per vessel, crew, daily log, attendance, entries;
+   ~~phase 2~~ hours of rest (crew member and captain only, migration 033), defect entry → NCR
+   (034), agent reads the log; phase 3 readings → service intervals, yard days → refit, offline,
+   the agent writing log entries. **Direction:** the full life of the
    vessel (newbuild → operations → refits → sale → retirement), and later the boat's electronics
    (PLC, B&G, AIS, comms) streaming into the same record as an online black box.
 8. ~~Schedule you can trust~~ — drops land where they are let go (planForDrop), work under way
