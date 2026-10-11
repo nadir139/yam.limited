@@ -98,12 +98,12 @@ function FlightRow({ f, canVoid, onVoid }: { f: AircraftFlight; canVoid: boolean
   return (
     <tr className={`border-b last:border-0 ${voided ? 'opacity-60' : ''}`}>
       <td className={`px-3 py-2 font-mono text-xs ${voided ? 'line-through' : ''}`}>{format(parseISO(f.flight_date), 'd MMM yy')}</td>
-      <td className={`px-3 py-2 ${voided ? 'line-through' : ''}`}>
-        {f.departure} → {f.arrival}
-        <div className="text-xs" style={muted}>
+      <td className="px-3 py-2">
+        <span className={voided ? 'line-through' : ''}>{f.departure} → {f.arrival}</span>
+        <div className={`text-xs ${voided ? 'line-through' : ''}`} style={muted}>
           {utcHHMM(f.block_off)}–{utcHHMM(f.block_on)} UTC{f.notes ? ` · ${f.notes}` : ''}
         </div>
-        {voided && <div className="text-xs no-underline" style={{ color: 'hsl(var(--destructive))' }}>voided by {f.voided_by_name}: {f.void_reason}</div>}
+        {voided && <div className="text-xs" style={{ color: 'hsl(var(--destructive))' }}>voided by {f.voided_by_name}: {f.void_reason}</div>}
       </td>
       <td className="px-3 py-2 font-mono">{hhmm(f.block_minutes)}</td>
       <td className="px-3 py-2 font-mono">{hhmm(f.air_minutes)}</td>

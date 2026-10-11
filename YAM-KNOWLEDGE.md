@@ -2510,3 +2510,57 @@ Maintenance with the building nav, add 11 checks (15 parts under 6
 systems, both boiler checks on one boiler), /app/logbook redirects home.
 Not yet: meter readings for a building (electricity, water, gas) still
 use the hours form's wording.
+
+## 49. Aircraft and the tech log (migration 045)
+
+Step A3, the third kind of asset.
+
+- Project types AIRCRAFT_CHECK (a maintenance check or inspection; phases
+  INDUCTION → SURVEY → REMEDIATION → FUNCTIONAL_TESTS → RETURN_TO_SERVICE →
+  DELIVERED) and AIRCRAFT_REFURB (INDUCTION → STRUCTURAL → SYSTEMS →
+  INTERIOR → FUNCTIONAL_TESTS → RETURN_TO_SERVICE → DELIVERED); disciplines
+  AIRFRAME, POWERPLANT, AVIONICS (+ the shared ones and PAINT); documents
+  CRS, AIRWORTHINESS_REVIEW (ARC), TECH_LOG; root causes CORROSION,
+  FATIGUE. `project_asset_kind` maps both to AIRCRAFT.
+- The aircraft is recorded with `action_set_project_asset` (registration,
+  manufacturer, model, msn, engines, mtow_kg, ... and `hours_at_entry`,
+  `landings_at_entry`: what the airframe had when its record started here).
+  No class society; the 3D hull view is for boats only.
+- The tech log: `action_open_tech_log(project)` opens "<name> · Tech log"
+  (an OPERATIONS project; owner, owner's rep or captain). `aircraft_flights`
+  holds each flight: date, departure/arrival, block off/on, takeoff/landing
+  (optional), landings, PIC, remarks, client id (a retry records once).
+  Checked: block on after off, at most 20 h, not in the future, takeoff and
+  landing both or neither and inside the block.
+- Total time = hours at entry + each standing flight's airborne time
+  (block time when takeoff/landing are not given); landings likewise
+  (`aircraft_totals`). After every flight the **Airframe** part (created
+  if missing) gets an hours reading equal to the total time at that
+  flight, so hour-based intervals on it ("100-hour inspection") come due
+  through the same `service_due` as a boat's engine. A flight entered out
+  of order, or voided, makes the server re-record the readings after it
+  (`aircraft_rerecord_hours`): the old ones are voided with the reason,
+  new ones recorded. A flight is never edited.
+- App: `/app/tech-log` (times in UTC, a flight past midnight rolls to the
+  next day; From pre-fills with the last arrival), nav Tech log →
+  Maintenance → Project, Parts, NCRs, Finance, Documents...; plane icon
+  and "Tech log" in the switcher; "The aircraft" card and "The tech log"
+  card on the check project; aircraft starter systems (Airframe,
+  Powerplant, Propellers, Landing gear, Flight controls, Fuel, Electrical,
+  Avionics, Cabin, Emergency equipment). The agent records flights
+  (`action_record_flight`) and reads them as FLIGHT objects.
+
+Not yet: intervals in cycles (landings are counted, but `service_due`
+works in hours and days), per-engine times (an engine change), and
+offline flight entry.
+
+Verified on the live database (rolled back): a check project starts at
+INDUCTION with its ladder; the boat action is refused on an aircraft;
+three flights entered out of order give 1,204.5 h / 904 landings with
+readings 1201.5, 1202.5 (late entry), 1204.5 and the stale one voided;
+voiding the late flight leaves 1,203.5 h with readings 1201.5, 1203.5; a
+100-hour inspection last done at 1,150 h on 1 Oct shows 53.5 h used and
+46.5 h left; block on before off and flights on a non-tech-log project
+are refused. Browser test (mocked, browser in Rome time): aircraft
+details, open the tech log, a 23:40–01:20 UTC flight sent as UTC across
+midnight, totals, void with reason.
