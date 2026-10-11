@@ -48,6 +48,7 @@ import type {
   FinanceAllocation,
   FinanceImport,
   FinanceReceipt,
+  FinanceConnection,
   FinanceSummaryRow,
   FinanceByObject,
 } from './types'
@@ -2035,17 +2036,21 @@ export interface FinanceLedger {
   allocations: FinanceAllocation[]
   receipts: FinanceReceipt[]
   imports: FinanceImport[]
+  connections: FinanceConnection[]
 }
 
 export async function fetchFinanceLedger(projectId: string, vesselId: string | null): Promise<FinanceLedger> {
   // Scoped by vessel when there is one, so every project of the boat sees the same ledger.
   const accountsQ = supabase.from('finance_accounts').select('*').order('created_at')
+  const connectionsQ = supabase.from('finance_connections').select('*').order('created_at')
   const txQ = supabase.from('finance_transactions').select('*').order('booked_at', { ascending: false }).limit(2000)
-  const [accounts, transactions] = await Promise.all([
+  const [accounts, transactions, connections] = await Promise.all([
     vesselId ? accountsQ.eq('vessel_id', vesselId) : accountsQ.eq('project_id', projectId),
     vesselId ? txQ.eq('vessel_id', vesselId) : txQ.eq('project_id', projectId),
+    vesselId ? connectionsQ.eq('vessel_id', vesselId) : connectionsQ.eq('project_id', projectId),
   ])
   if (accounts.error) throw accounts.error
+  if (connections.error) throw connections.error
   if (transactions.error) throw transactions.error
   const ids = (accounts.data ?? []).map((a) => a.id)
   const txIds = (transactions.data ?? []).map((t) => t.id)
@@ -2067,6 +2072,7 @@ export async function fetchFinanceLedger(projectId: string, vesselId: string | n
     allocations: allocations.flatMap((r) => r.data ?? []) as FinanceAllocation[],
     receipts: receipts.flatMap((r) => r.data ?? []) as FinanceReceipt[],
     imports: (imports.data ?? []) as FinanceImport[],
+    connections: connections.data ?? [],
   }
 }
 

@@ -579,6 +579,7 @@ export type Database = {
         Row: {
           closed_at: string | null
           closed_reason: string | null
+          connection_id: string | null
           created_at: string
           created_by_name: string | null
           currency: string
@@ -592,6 +593,7 @@ export type Database = {
         Insert: {
           closed_at?: string | null
           closed_reason?: string | null
+          connection_id?: string | null
           created_at?: string
           created_by_name?: string | null
           currency: string
@@ -605,6 +607,7 @@ export type Database = {
         Update: {
           closed_at?: string | null
           closed_reason?: string | null
+          connection_id?: string | null
           created_at?: string
           created_by_name?: string | null
           currency?: string
@@ -684,6 +687,93 @@ export type Database = {
             columns: ["transaction_id"]
             isOneToOne: false
             referencedRelation: "finance_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_connections: {
+        Row: {
+          certificate_pem: string
+          client_id: string | null
+          connected_at: string | null
+          connected_by_name: string | null
+          created_at: string
+          created_by_name: string | null
+          disconnected_at: string | null
+          disconnected_by_name: string | null
+          disconnected_reason: string | null
+          environment: string
+          id: string
+          last_error: string | null
+          last_error_at: string | null
+          last_sync_result: Json | null
+          last_synced_at: string | null
+          project_id: string
+          provider: string
+          redirect_uri: string
+          status: string
+          vessel_id: string | null
+          webhook_id: string | null
+        }
+        Insert: {
+          certificate_pem: string
+          client_id?: string | null
+          connected_at?: string | null
+          connected_by_name?: string | null
+          created_at?: string
+          created_by_name?: string | null
+          disconnected_at?: string | null
+          disconnected_by_name?: string | null
+          disconnected_reason?: string | null
+          environment: string
+          id?: string
+          last_error?: string | null
+          last_error_at?: string | null
+          last_sync_result?: Json | null
+          last_synced_at?: string | null
+          project_id: string
+          provider?: string
+          redirect_uri: string
+          status?: string
+          vessel_id?: string | null
+          webhook_id?: string | null
+        }
+        Update: {
+          certificate_pem?: string
+          client_id?: string | null
+          connected_at?: string | null
+          connected_by_name?: string | null
+          created_at?: string
+          created_by_name?: string | null
+          disconnected_at?: string | null
+          disconnected_by_name?: string | null
+          disconnected_reason?: string | null
+          environment?: string
+          id?: string
+          last_error?: string | null
+          last_error_at?: string | null
+          last_sync_result?: Json | null
+          last_synced_at?: string | null
+          project_id?: string
+          provider?: string
+          redirect_uri?: string
+          status?: string
+          vessel_id?: string | null
+          webhook_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_connections_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_connections_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
             referencedColumns: ["id"]
           },
         ]
@@ -3840,6 +3930,7 @@ export type Database = {
         | "FINANCE_ALLOCATION"
         | "FINANCE_IMPORT"
         | "FINANCE_RECEIPT"
+        | "FINANCE_CONNECTION"
       project_phase:
         | "PRE_SURVEY"
         | "HAUL_OUT"
@@ -4133,6 +4224,7 @@ export const Constants = {
         "FINANCE_ALLOCATION",
         "FINANCE_IMPORT",
         "FINANCE_RECEIPT",
+        "FINANCE_CONNECTION",
       ],
       project_phase: [
         "PRE_SURVEY",

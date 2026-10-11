@@ -2311,3 +2311,73 @@ removed with its reason, summary and cost by object, re-import adds
 nothing, crew get the private message and no finance calls).
 **Not yet verified with a real Revolut export:** column names follow
 Revolut's documented exports; check the first real file and adjust.
+
+## 45. Revolut Business connected straight to the ledger (migration 041)
+
+F2 of the finance plan (§44). The owner connects the Revolut Business
+account once; accounts and transactions then arrive by themselves, through
+the same import as a statement upload (`finance_import_rows`, shared by
+`action_import_transactions` and the sync), so a CSV row and the synced
+transaction meet on one row: both carry Revolut's transaction id.
+
+**Read only.** Consent asks for scope READ. The connection can see
+accounts and transactions; it cannot make a payment.
+
+How Revolut's Business API is connected (no "sign in with Revolut"):
+1. `create` — the `revolut` Edge Function makes an RSA 2048 key pair and a
+   self-signed X.509 certificate (`supabase/functions/revolut/revolut.ts`,
+   a minimal DER writer; OpenSSL verifies it in the unit test). The private
+   key goes to Supabase Vault; the certificate is downloaded by the owner.
+2. In Revolut Business (Settings → APIs → Business API) the owner uploads
+   the certificate with the redirect URI `https://yam.limited/app/finance/revolut`
+   and gets a client ID, pasted back (`client_id`).
+3. The owner approves read access on Revolut's page; Revolut returns to
+   `/app/finance/revolut?code=`, which hands the code to `exchange`. The
+   server signs a client assertion (RS256 JWT: iss = redirect host, sub =
+   client id, aud = https://revolut.com), trades the code for tokens, keeps
+   the refresh token in the vault, registers a webhook
+   (TransactionCreated, TransactionStateChanged) and keeps its signing
+   secret in the vault, then syncs a year back.
+
+Sync: refresh → access token; `/accounts` (each active account maps to a
+ledger account: already linked, else the one unlinked Revolut account of
+that currency on the asset — so a statement imported by hand dedupes — else
+a new one); `/transactions` from the last sync minus 3 days, paged 1,000 at a
+time; one row per leg (fee in the amount, as the CSV's "Total amount"; the
+whole transaction kept as `raw`). Imports run one per account at a time
+(advisory lock), so webhooks arriving together cannot race.
+
+Webhook: `revolut?webhook=<connection id>`, verify_jwt off. Accepted only
+with a valid `Revolut-Signature` (HMAC-SHA256 of `v1.{timestamp}.{body}`)
+and a timestamp within 5 minutes; the payload is not trusted, it only
+triggers a sync that reads from Revolut. People are authenticated inside
+the function (auth.getUser), then checked with their own session:
+`finance_connect_check` / `finance_connection_check` (owner and owner's rep
+connect, approve and disconnect — `action_connect_bank`; the captain sees
+the state and can Sync now).
+
+Storage: `finance_connections` (state, client id, certificate, last sync,
+last error; finance readers only, written only by the service role through
+`finance_connection_update`, which allows only state fields and logs every
+change to `finance_events` with before/after). `finance_connection_secrets`
+maps PRIVATE_KEY / REFRESH_TOKEN / WEBHOOK_SECRET to vault ids; no grants
+to the browser at all. Disconnecting deletes the webhook at Revolut and
+overwrites each secret with nothing (`finance_secrets_revoke`); the
+connection row, its history and every transaction stay. Machine actors are
+named in the record ("Revolut sync", "Revolut (webhook)") through the
+`yam.actor_name` setting read by `finance_actor_name()`.
+
+Verified: unit tests (certificate read and self-verified by OpenSSL and
+matching the key; JWT claims and signature checked against the
+certificate; webhook signature accept/refuse incl. replay; leg mapping);
+the database side in a rolled-back transaction on the live project
+(stranger refused, service functions and secrets closed to the browser,
+certificate immutable, re-sync dedupes and records a bank-side change,
+statement path intact, revoke empties the secrets, nothing in the shared
+log); browser test of the whole flow against a mocked function (certificate
+download, client id, Revolut's page simulated, return with a code, first
+sync, Sync now, disconnect with reason, captain can sync but not manage).
+**Not yet verified against Revolut itself:** endpoints, field names and the
+webhook signature format follow Revolut's documentation; connect the
+sandbox first (choose "Revolut sandbox" when connecting) before the live
+account.
