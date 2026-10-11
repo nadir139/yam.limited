@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ProjectProvider } from "@/contexts/ProjectContext";
+import { QueryPersistence } from "@/lib/query-persist";
 import { LanguageProvider } from "@/lib/i18n";
 import Index from "./pages/Index";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -73,6 +74,9 @@ const App = () => (
           {/* Project selection depends on who is signed in, so it nests inside
               auth. Language does not depend on either, and wraps both so the
               public pages can translate too. */}
+          {/* The last-read data, restored from this device before the pages
+              render, so the logbook opens without signal. */}
+          <QueryPersistence>
           <ProjectProvider>
           <BrowserRouter>
             {/* Last resort for anything outside the app shell (public pages,
@@ -116,6 +120,7 @@ const App = () => (
             </ErrorBoundary>
           </BrowserRouter>
           </ProjectProvider>
+          </QueryPersistence>
         </AuthProvider>
       </TooltipProvider>
       </LanguageProvider>

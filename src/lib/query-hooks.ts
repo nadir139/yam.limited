@@ -1,9 +1,10 @@
 import { useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import * as db from './db'
+import { sendOrQueue } from './sync'
 import { useActiveProject, useProjectId } from '@/contexts/ProjectContext'
 import { useAuth } from '@/contexts/AuthContext'
-import type { DefectRecord, InspectionEvent, ObjectType, WorkPackage } from './types'
+import type { DefectRecord, InspectionEvent, LogDay, LogEntry, ObjectType, PartReading, RestRecord, ServiceRecord, WorkPackage } from './types'
 
 /** Re-exported so a page needs one import to reach the active project. */
 export { useActiveProject, useProjectId }
@@ -1163,17 +1164,45 @@ export function useSetCrew() {
 export function useRecordLogDay() {
   const invalidate = useLogbookInvalidation()
   const projectId = useProjectId()
+  const { user } = useAuth()
   return useMutation({
-    mutationFn: (input: db.LogDayInput) => db.recordLogDay(projectId, input),
+    networkMode: 'always',
+    mutationFn: (input: db.LogDayInput) =>
+      sendOrQueue<LogDay>({
+        kind: 'log_day',
+        projectId,
+        userEmail: user?.email ?? '',
+        clientId: db.newClientId(),
+        payload: input as unknown as Record<string, unknown>,
+        summary: `day ${input.date}: ${input.status.replace('_', ' ').toLowerCase()}`,
+        replaceKey: `log_day:${projectId}:${input.date}`,
+      }),
     onSuccess: invalidate,
   })
 }
 
+// Logbook writes go through sendOrQueue: sent at once with signal, kept on
+// the device and sent later without (offline mode, migration 038). They run
+// whether or not the browser thinks it is online (networkMode 'always'), so
+// a write is never parked in memory where closing the app would lose it.
+
 export function useAddLogEntry() {
   const invalidate = useLogbookInvalidation()
   const projectId = useProjectId()
+  const { user } = useAuth()
   return useMutation({
-    mutationFn: (input: Parameters<typeof db.addLogEntry>[1]) => db.addLogEntry(projectId, input),
+    networkMode: 'always',
+    mutationFn: (input: Parameters<typeof db.addLogEntry>[1]) => {
+      const clientId = input.clientId ?? db.newClientId()
+      return sendOrQueue<LogEntry>({
+        kind: 'log_entry',
+        projectId,
+        userEmail: user?.email ?? '',
+        clientId,
+        payload: { ...input, clientId },
+        summary: `${input.kind.toLowerCase()}: ${input.body.slice(0, 80)}`,
+      })
+    },
     onSuccess: invalidate,
   })
 }
@@ -1224,8 +1253,19 @@ export const useRestSummary = (year: number, month: number) => {
 export function useRecordRest() {
   const qc = useQueryClient()
   const projectId = useProjectId()
+  const { user } = useAuth()
   return useMutation({
-    mutationFn: (input: Parameters<typeof db.recordRest>[1]) => db.recordRest(projectId, input),
+    networkMode: 'always',
+    mutationFn: (input: Parameters<typeof db.recordRest>[1]) =>
+      sendOrQueue<RestRecord>({
+        kind: 'rest',
+        projectId,
+        userEmail: user?.email ?? '',
+        clientId: db.newClientId(),
+        payload: input as unknown as Record<string, unknown>,
+        summary: `hours of rest ${input.year}-${String(input.month).padStart(2, '0')}`,
+        replaceKey: `rest:${projectId}:${input.crewId}:${input.year}-${input.month}`,
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.rest(projectId) })
       qc.invalidateQueries({ queryKey: QUERY_KEYS.events(projectId) })
@@ -1278,7 +1318,22 @@ function useMaintenanceInvalidation() {
 export function useRecordReading() {
   const invalidate = useMaintenanceInvalidation()
   const projectId = useProjectId()
-  return useMutation({ mutationFn: (input: db.ReadingInput) => db.recordReading(projectId, input), onSuccess: invalidate })
+  const { user } = useAuth()
+  return useMutation({
+    networkMode: 'always',
+    mutationFn: (input: db.ReadingInput) => {
+      const clientId = input.clientId ?? db.newClientId()
+      return sendOrQueue<PartReading>({
+        kind: 'reading',
+        projectId,
+        userEmail: user?.email ?? '',
+        clientId,
+        payload: { ...input, clientId } as unknown as Record<string, unknown>,
+        summary: `reading: ${input.value} ${input.unit ?? (input.kind === 'FUEL_LEVEL' ? 'L' : 'h')}`,
+      })
+    },
+    onSuccess: invalidate,
+  })
 }
 
 export function useVoidReading() {
@@ -1308,7 +1363,22 @@ export function useRetireServiceInterval() {
 export function useRecordService() {
   const invalidate = useMaintenanceInvalidation()
   const projectId = useProjectId()
-  return useMutation({ mutationFn: (input: db.ServiceInput) => db.recordService(projectId, input), onSuccess: invalidate })
+  const { user } = useAuth()
+  return useMutation({
+    networkMode: 'always',
+    mutationFn: (input: db.ServiceInput) => {
+      const clientId = input.clientId ?? db.newClientId()
+      return sendOrQueue<ServiceRecord>({
+        kind: 'service',
+        projectId,
+        userEmail: user?.email ?? '',
+        clientId,
+        payload: { ...input, clientId } as unknown as Record<string, unknown>,
+        summary: `maintenance done ${input.doneOn ?? 'today'}${input.note ? `: ${input.note.slice(0, 60)}` : ''}`,
+      })
+    },
+    onSuccess: invalidate,
+  })
 }
 
 export function useVoidServiceRecord() {

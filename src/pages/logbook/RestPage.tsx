@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { KEPT_MESSAGE, isQueued } from '@/lib/outbox'
 import { Link } from 'react-router-dom'
 import { addMonths, endOfMonth, format, getDaysInMonth, isSameMonth, startOfMonth } from 'date-fns'
 import { ChevronLeft, ChevronRight, Printer, ShieldCheck, ShieldAlert, Lock } from 'lucide-react'
@@ -255,9 +256,9 @@ function MonthSheet({
 
   const onSave = async () => {
     try {
-      await save.mutateAsync({ crewId: crew.id, year, month: mon, schedule: draft, reason })
+      const res = await save.mutateAsync({ crewId: crew.id, year, month: mon, schedule: draft, reason })
       setDirty(false)
-      toast.success('Hours of rest saved')
+      toast.success(isQueued(res) ? KEPT_MESSAGE : 'Hours of rest saved')
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not save')
     }
