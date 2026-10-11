@@ -41,6 +41,7 @@ export const QUERY_KEYS = {
   crew: (p: string) => ['crew', p],
   logDays: (p: string) => ['log-days', p],
   logEntries: (p: string) => ['log-entries', p],
+  rest: (p: string) => ['rest', p],
 }
 
 export const useProject = () => {
@@ -1178,5 +1179,51 @@ export function useVoidLogEntry() {
   return useMutation({
     mutationFn: (v: { id: string; reason: string }) => db.voidLogEntry(projectId, v.id, v.reason),
     onSuccess: invalidate,
+  })
+}
+
+export function useRaiseNcrFromEntry() {
+  const invalidate = useLogbookInvalidation()
+  const qc = useQueryClient()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (input: Parameters<typeof db.raiseNcrFromEntry>[1]) => db.raiseNcrFromEntry(projectId, input),
+    onSuccess: () => {
+      invalidate()
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.defects(projectId) })
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.partLinks(projectId) })
+    },
+  })
+}
+
+/** The month's rest records the caller may read (own, or all for the captain). */
+export const useRestRecords = (year: number, month: number) => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: [...QUERY_KEYS.rest(projectId), 'records', year, month],
+    queryFn: () => db.fetchRestRecords(projectId, year, month),
+    enabled: !!projectId,
+  })
+}
+
+/** Counts of crew aboard, recorded and in breach for a month. */
+export const useRestSummary = (year: number, month: number) => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: [...QUERY_KEYS.rest(projectId), 'summary', year, month],
+    queryFn: () => db.fetchRestSummary(projectId, year, month),
+    enabled: !!projectId,
+  })
+}
+
+export function useRecordRest() {
+  const qc = useQueryClient()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (input: Parameters<typeof db.recordRest>[1]) => db.recordRest(projectId, input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.rest(projectId) })
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.events(projectId) })
+    },
   })
 }

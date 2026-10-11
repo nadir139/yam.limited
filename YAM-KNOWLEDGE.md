@@ -1945,7 +1945,7 @@ shows "15 Nov 2026", picks from a Monday-first calendar, and passes the same
 'YYYY-MM-DD' value as before. Displays already used 'd MMM yyyy'.
 
 
-## 39. The vessel's whole life, and the logbook (migration 032)
+## 39. The vessel's whole life, and the logbook (migrations 032–034)
 
 **The standing direction, from the owner (11 Oct 2026).** YAM is the full
 ontology of a vessel, from the newbuild project that creates her, through
@@ -1993,8 +1993,48 @@ CAPTAIN only, so running a boat's crew gives no power over a refit.
   edited or deleted: it is voided with a reason (by its author or the
   captain) and a new one written, and the voided text stays visible.
 
-Hours of rest (phase 2) are readable only by the crew member and the captain:
-managers see whether the boat complies, never a person's hours.
+**Hours of rest (migration 033, `/app/rest`).** One `rest_records` row per
+crew member per month: `schedule` is `{day: [48 half-hours, true = working]}`,
+so watches that change on the half hour are recorded as worked. The rules
+(STCW A-VIII/1, MLC A2.3) live twice, identically: `src/lib/rest-hours.ts`
+(checked as you edit, unit-tested with vitest) and `rest_breaches()` in SQL,
+which judges what is saved so a browser cannot store a clean verdict on a
+breaching month. They are: at least 10 h rest in every rolling 24 h (checked
+from each half-hour), at least 77 h in every 7 days, rest in at most two
+periods with one of 6 h or more (a period is at least 1 h unbroken, counted
+on the day it starts, so a night's sleep over midnight and a lunch break are
+not extra periods), and no stretch of work over 14 h. A day left blank is
+unknown, not rest: no window touching it is judged.
+- **Private by construction.** RLS lets a record be read only through
+  `can_read_rest`: the crew member it belongs to (crew.member_id → their
+  membership by JWT email) or the boat's captain. `action_record_rest`
+  applies the same rule to writes. Everyone else on the boat calls
+  `rest_summary` and gets three counts (aboard, recorded, with breaches).
+  The `REST_RECORDED` event carries only year and month, because the event
+  log is readable by the whole boat.
+- Saving a month again copies the previous schedule into
+  `rest_record_versions` (same privacy rule) with an optional reason.
+  Months that have not begun are refused.
+- Verified in a rolled-back transaction on the live database: captain saves
+  for crew, crew saves own, crew refused for another, another crew member
+  and the owner's rep read nothing, the rep gets counts, direct writes
+  denied; and `rest_breaches` returns the same breaches as the TypeScript
+  engine on nine fixture months.
+
+**A defect at sea becomes an NCR (migration 034).** A `DEFECT` entry has a
+"Raise NCR" link: `action_raise_ncr_from_entry` calls `action_raise_defect`
+on the boat's operations project (title from the entry's first line, body
+plus when and who as the description, root cause OTHER and disposition
+PENDING until someone investigates), links the entry's part to the NCR and
+sets `log_entries.defect_id`, so the entry shows the NCR number and cannot
+be raised twice. Captain and crew may do it. The defects page is therefore
+part of a logbook project's navigation.
+
+**The agent reads the log.** `get_logbook` (Edge Function `agent`) returns
+days, entries (struck-out ones with their reason, and the NCR each defect
+became), crew names and positions (no contact details), the days in the
+range nobody logged, and the month's rest counts. From a refit project it
+reads the same vessel's logbook if the caller is on it.
 
 The logbook's own app (`nadir139/d-logbook`) is retired, not migrated: its
 data was declared expendable on 11 Oct 2026.
