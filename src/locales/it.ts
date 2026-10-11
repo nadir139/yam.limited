@@ -43,6 +43,7 @@ export const it: Record<string, string> = {
   'nav.maintenance': 'Manutenzione',
   'nav.oilRecord': 'Registro degli oli',
   'nav.finance': 'Finanze',
+  'nav.payments': 'Pagamenti',
   'nav.signOut': 'Esci',
   'nav.noRole': 'Nessun ruolo nel progetto',
 

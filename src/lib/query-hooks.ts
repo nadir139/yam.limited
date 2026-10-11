@@ -1567,3 +1567,24 @@ export function useRemoveAllocation() {
     onSuccess: invalidate,
   })
 }
+
+// ─── Payment stages (migration 042) ───────────────────────────────────────────
+
+export const usePaymentStatus = (enabled = true) => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: [...QUERY_KEYS.finance(projectId), 'payments'],
+    queryFn: () => db.fetchPaymentStatus(projectId),
+    enabled: !!projectId && enabled,
+  })
+}
+
+/** Every payment action, one hook: they all refresh the same finance data. */
+export function usePaymentAction() {
+  const invalidate = useFinanceInvalidation()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (run: (projectId: string) => Promise<unknown>) => run(projectId),
+    onSuccess: invalidate,
+  })
+}

@@ -34,6 +34,7 @@ const MaintenancePage = lazy(() => import("./pages/logbook/MaintenancePage"));
 const OilRecordPage = lazy(() => import("./pages/logbook/OilRecordPage"));
 const FinancePage = lazy(() => import("./pages/finance/FinancePage"));
 const RevolutCallbackPage = lazy(() => import("./pages/finance/RevolutCallbackPage"));
+const PaymentsPage = lazy(() => import("./pages/payments/PaymentsPage"));
 const PartsImportPage = lazy(() => import("./pages/parts/PartsImportPage"));
 const InspectionList = lazy(() => import("./pages/inspections/InspectionList"));
 const DefectList = lazy(() => import("./pages/defects/DefectList"));
@@ -105,6 +106,7 @@ const App = () => (
                 <Route path="/app/oil-record" element={<ProtectedRoute><OilRecordPage /></ProtectedRoute>} />
                 <Route path="/app/finance" element={<ProtectedRoute><FinancePage /></ProtectedRoute>} />
                 <Route path="/app/finance/revolut" element={<ProtectedRoute><RevolutCallbackPage /></ProtectedRoute>} />
+                <Route path="/app/payments" element={<ProtectedRoute><PaymentsPage /></ProtectedRoute>} />
                 <Route path="/app/parts" element={<ProtectedRoute><PartsPage /></ProtectedRoute>} />
                 <Route path="/app/parts/import" element={<ProtectedRoute><PartsImportPage /></ProtectedRoute>} />
                 <Route path="/app/parts/import/:importId" element={<ProtectedRoute><PartsImportPage /></ProtectedRoute>} />
