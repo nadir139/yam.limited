@@ -76,7 +76,7 @@ export function RevolutConnection({ connections, canManage }: { connections: Fin
       <CardContent className="flex flex-col gap-3 p-4 text-sm">
         <div className="flex items-center justify-between gap-2">
           <h2 className="flex items-center gap-2 text-base font-semibold">
-            <Link2 size={16} /> Revolut Business, connected
+            <Link2 size={16} /> Revolut Business connection
           </h2>
           {canManage && live.length === 0 && !starting && (
             <Button size="sm" variant="outline" onClick={() => setStarting(true)}>Connect</Button>
