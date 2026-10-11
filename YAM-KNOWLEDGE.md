@@ -2381,3 +2381,50 @@ sync, Sync now, disconnect with reason, captain can sync but not manage).
 webhook signature format follow Revolut's documentation; connect the
 sandbox first (choose "Revolut sandbox" when connecting) before the live
 account.
+
+## 46. Refit payments released against the model (migration 042)
+
+F3 of the finance plan (§44). A refit is paid in stages; each stage
+carries conditions the model checks (`payment_condition`):
+WORK_PACKAGE_COMPLETE, INSPECTION_PASSED (a conditional pass counts and
+says so), NO_OPEN_NCR on a work package, CHANGE_ORDER_APPROVED, DATE, and
+MANUAL (a sentence the approver confirms). A stage goes PENDING →
+RELEASE_REQUESTED (the yard's PM, or the owner's rep) → APPROVED (owner
+side: every checkable condition met, or an override with a reason; the
+conditions as they stood are stored with the approval; rule BOTH needs one
+OWNER and one OWNERS_REP, two people) → PAID (the owner's payment, picked
+from the ledger, is matched to the stage and its amount allocated REFIT to
+the stage's work package, through `action_allocate_transaction`). "Not yet"
+sends it back with a reason; a stage is cancelled with a reason, never
+deleted. A plan is DRAFT until agreed; once ACTIVE its stages, amounts and
+conditions are fixed. It closes when every stage is paid or cancelled.
+
+**Who holds the money.** `holder = OWNER_ACCOUNT`: the money stays in the
+owner's own account until they pay it; YAM records the agreement, the
+checks, the approvals and the payment. `PARTNER_ESCROW` exists in the
+schema and is refused with an explanation: YAM is not licensed to hold
+client money, and real escrow (funds released by these approvals) needs a
+contracted, licensed escrow or safeguarding partner. This is the piece to
+build next commercially, not technically: the approvals and conditions
+here are what such a partner would act on.
+
+Visibility: `payment_can_read` — finance readers (owner, owner's rep,
+captain) and the project's YARD_PM. The yard sees its plan, stages,
+conditions and the names/times on each stage, never the owner's ledger.
+Every change is in `finance_events` (before/after), not in the shared log.
+Page `/app/payments` (nav: the four roles, refit projects). The agent
+reads stages through the registry and may ask for a release
+(`action_request_release`); approving and recording payment are people's.
+
+Verified on the live database in a rolled-back transaction (Lucky Bird
+refit, temporary members): escrow refused; crew sees nothing; the yard
+sees the plan and can ask but not approve; an unmet condition blocks
+approval without a reason; the same person cannot approve twice; under
+BOTH the rep's approval waits for the owner's; an incoming transaction is
+refused as payment; the payment allocates 10,000 REFIT to the work package
+and closes the plan; 8 private events, none shared. Real data showed the
+NCR condition working: WP-MECH-001 has an open NCR. Browser test against a
+mocked backend: plan, stage with a work-package and a manual condition,
+agree, yard asks, rep approves with override and confirms the manual
+condition, payment picked (the yard's transfer offered first, the marina
+charge not offered), plan shown as all paid; crew locked out.
