@@ -24,6 +24,7 @@ import {
 } from '@/lib/query-hooks'
 import { useTranslation } from '@/lib/i18n'
 import type { WorldModelEvent } from '@/lib/types'
+import { homeFor } from '@/components/layout/nav'
 
 // The phase ladder is per project type and comes from ontology_vocabulary.
 // It used to be this hardcoded marine sequence, which is why a farmhouse was
@@ -78,7 +79,7 @@ export default function Dashboard() {
   const PHASES = useVocabulary('PHASE')
 
   // A boat's logbook has no dashboard of work and money: its home is the log.
-  if (projectQ.data?.project_type === 'OPERATIONS') return <Navigate to="/app/logbook" replace />
+  if (projectQ.data?.project_type === 'OPERATIONS') return <Navigate to={homeFor('OPERATIONS', projectQ.data.vessel?.asset_kind)} replace />
 
   const isLoading =
     projectQ.isLoading ||

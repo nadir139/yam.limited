@@ -26,9 +26,9 @@ import type { Project } from '@/lib/types'
 // kind of thing it is, because "yard" means something different for a ketch at
 // Pendennis than for a farmhouse outside Olbia.
 
-function projectIcon(type: Project['project_type']) {
+function projectIcon(type: Project['project_type'], kind?: string | null) {
   if (type === 'PROPERTY') return Home
-  if (type === 'OPERATIONS') return BookOpen
+  if (type === 'OPERATIONS') return kind === 'BUILDING' ? Home : BookOpen
   if (type === 'FIVE_YEAR_SURVEY' || type === 'ANNUAL_SURVEY') return ClipboardCheck
   return Ship
 }
@@ -61,9 +61,11 @@ export default function ProjectSwitcher() {
     setActiveProjectId(id)
     // A boat's logbook has no work packages and a refit has no logbook: a page
     // the new project does not have goes to that project's home instead.
-    const type = projects.find((p) => p.id === id)?.project_type
-    if (!pathFits(type, location.pathname)) {
-      navigate(homeFor(type))
+    const next = projects.find((p) => p.id === id)
+    const type = next?.project_type
+    const kind = next?.vessel?.asset_kind
+    if (!pathFits(type, location.pathname, kind)) {
+      navigate(homeFor(type, kind))
       return
     }
     const detail = /^(\/app\/[^/]+)\/[^/]+$/.exec(location.pathname)
@@ -78,7 +80,7 @@ export default function ProjectSwitcher() {
     )
   }
 
-  const Icon = activeProject ? projectIcon(activeProject.project_type) : Ship
+  const Icon = activeProject ? projectIcon(activeProject.project_type, activeProject.vessel?.asset_kind) : Ship
   const subtitle = activeProject ? describe(activeProject, t) : ''
 
   return (

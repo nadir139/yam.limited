@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { BookOpen, Box, CalendarRange, LayoutDashboard, LogOut, Menu, Sparkles, UsersRound } from 'lucide-react'
+import { BookOpen, Box, Boxes, CalendarRange, Gauge, LayoutDashboard, LogOut, Menu, Sparkles, UsersRound, Wallet } from 'lucide-react'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { useAuth } from '@/contexts/AuthContext'
 import { useApprovals, useDefects, useMyOpenItemCount, useMyRole } from '@/lib/query-hooks'
@@ -31,6 +31,14 @@ const LOGBOOK_BAR = [
   { icon: Box, labelKey: 'nav.model', path: '/app/model' },
 ] as const
 
+// On a building in use: its maintenance and parts.
+const IN_USE_BAR = [
+  { icon: Gauge, labelKey: 'nav.maintenance', path: '/app/maintenance' },
+  { icon: Boxes, labelKey: 'nav.parts', path: '/app/parts' },
+  { icon: Sparkles, labelKey: 'nav.agent', path: '/app/agent', primary: true },
+  { icon: Wallet, labelKey: 'nav.finance', path: '/app/finance' },
+] as const
+
 export const MOBILE_NAV_HEIGHT = 62
 
 const isActive = (pathname: string, path: string) => pathname === path || pathname.startsWith(path + '/')
@@ -44,8 +52,9 @@ export default function MobileNav() {
   const [moreOpen, setMoreOpen] = useState(false)
   const { activeProject } = useActiveProject()
   const type = activeProject?.project_type
-  const bar = type === 'OPERATIONS' ? LOGBOOK_BAR : BAR
-  const items = navItemsFor(type, role)
+  const kind = activeProject?.vessel?.asset_kind
+  const bar = type === 'OPERATIONS' ? (kind === 'BUILDING' ? IN_USE_BAR : LOGBOOK_BAR) : BAR
+  const items = navItemsFor(type, role, kind)
 
   const { data: defects = [] } = useDefects()
   const { data: approvals = [] } = useApprovals()

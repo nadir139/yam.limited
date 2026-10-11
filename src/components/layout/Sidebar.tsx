@@ -23,7 +23,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
   // be wrong the moment there were two projects.
   const { data: role = null } = useMyRole()
   const { activeProject } = useActiveProject()
-  const items = navItemsFor(activeProject?.project_type, role)
+  const items = navItemsFor(activeProject?.project_type, role, activeProject?.vessel?.asset_kind)
   const [hoveredPath, setHoveredPath] = useState<string | null>(null)
 
   const { data: defects = [] } = useDefects()
