@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Check, ChevronsUpDown, Plus, Ship, Home, ClipboardCheck } from 'lucide-react'
+import { Check, ChevronsUpDown, Plus, Ship, Home, ClipboardCheck, BookOpen } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { useActiveProject } from '@/contexts/ProjectContext'
 import { useTranslation } from '@/lib/i18n'
 import CreateProjectForm from '@/components/actions/CreateProjectForm'
+import { homeFor, pathFits } from './nav'
 import type { ProjectWithVessel } from '@/lib/db'
 import type { Project } from '@/lib/types'
 
@@ -27,6 +28,7 @@ import type { Project } from '@/lib/types'
 
 function projectIcon(type: Project['project_type']) {
   if (type === 'PROPERTY') return Home
+  if (type === 'OPERATIONS') return BookOpen
   if (type === 'FIVE_YEAR_SURVEY' || type === 'ANNUAL_SURVEY') return ClipboardCheck
   return Ship
 }
@@ -57,6 +59,13 @@ export default function ProjectSwitcher() {
   const switchTo = (id: string) => {
     if (id === activeProject?.id) return
     setActiveProjectId(id)
+    // A boat's logbook has no work packages and a refit has no logbook: a page
+    // the new project does not have goes to that project's home instead.
+    const type = projects.find((p) => p.id === id)?.project_type
+    if (!pathFits(type, location.pathname)) {
+      navigate(homeFor(type))
+      return
+    }
     const detail = /^(\/app\/[^/]+)\/[^/]+$/.exec(location.pathname)
     if (detail) navigate(detail[1])
   }

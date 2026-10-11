@@ -226,6 +226,97 @@ export type Database = {
         }
         Relationships: []
       }
+      crew: {
+        Row: {
+          created_at: string
+          created_by_name: string | null
+          department: string | null
+          email: string | null
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          first_name: string
+          flights_allocated: number | null
+          holidays_allocated: number | null
+          id: string
+          joined_on: string | null
+          last_name: string
+          left_on: string | null
+          member_id: string | null
+          notes: string | null
+          phone: string | null
+          position: string
+          project_id: string
+          updated_at: string | null
+          vessel_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by_name?: string | null
+          department?: string | null
+          email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          first_name: string
+          flights_allocated?: number | null
+          holidays_allocated?: number | null
+          id?: string
+          joined_on?: string | null
+          last_name?: string
+          left_on?: string | null
+          member_id?: string | null
+          notes?: string | null
+          phone?: string | null
+          position: string
+          project_id: string
+          updated_at?: string | null
+          vessel_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by_name?: string | null
+          department?: string | null
+          email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          first_name?: string
+          flights_allocated?: number | null
+          holidays_allocated?: number | null
+          id?: string
+          joined_on?: string | null
+          last_name?: string
+          left_on?: string | null
+          member_id?: string | null
+          notes?: string | null
+          phone?: string | null
+          position?: string
+          project_id?: string
+          updated_at?: string | null
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "project_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       defect_records: {
         Row: {
           change_order_id: string | null
@@ -457,6 +548,178 @@ export type Database = {
             columns: ["work_package_id"]
             isOneToOne: false
             referencedRelation: "work_packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      log_day_crew: {
+        Row: {
+          attendance: Database["public"]["Enums"]["attendance_status"]
+          crew_id: string
+          log_day_id: string
+        }
+        Insert: {
+          attendance: Database["public"]["Enums"]["attendance_status"]
+          crew_id: string
+          log_day_id: string
+        }
+        Update: {
+          attendance?: Database["public"]["Enums"]["attendance_status"]
+          crew_id?: string
+          log_day_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "log_day_crew_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "crew"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "log_day_crew_log_day_id_fkey"
+            columns: ["log_day_id"]
+            isOneToOne: false
+            referencedRelation: "log_days"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      log_days: {
+        Row: {
+          created_at: string
+          created_by_name: string | null
+          id: string
+          log_date: string
+          nautical_miles: number
+          notes: string | null
+          port_from: string | null
+          port_to: string | null
+          position: string | null
+          project_id: string
+          status: Database["public"]["Enums"]["log_status"]
+          updated_at: string | null
+          updated_by_name: string | null
+          vessel_id: string
+          watchkeeping: boolean
+        }
+        Insert: {
+          created_at?: string
+          created_by_name?: string | null
+          id?: string
+          log_date: string
+          nautical_miles?: number
+          notes?: string | null
+          port_from?: string | null
+          port_to?: string | null
+          position?: string | null
+          project_id: string
+          status: Database["public"]["Enums"]["log_status"]
+          updated_at?: string | null
+          updated_by_name?: string | null
+          vessel_id: string
+          watchkeeping?: boolean
+        }
+        Update: {
+          created_at?: string
+          created_by_name?: string | null
+          id?: string
+          log_date?: string
+          nautical_miles?: number
+          notes?: string | null
+          port_from?: string | null
+          port_to?: string | null
+          position?: string | null
+          project_id?: string
+          status?: Database["public"]["Enums"]["log_status"]
+          updated_at?: string | null
+          updated_by_name?: string | null
+          vessel_id?: string
+          watchkeeping?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "log_days_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "log_days_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      log_entries: {
+        Row: {
+          author_id: string | null
+          author_name: string | null
+          body: string
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["log_entry_kind"]
+          occurred_at: string
+          part_id: string | null
+          project_id: string
+          vessel_id: string
+          void_reason: string | null
+          voided_at: string | null
+          voided_by_name: string | null
+        }
+        Insert: {
+          author_id?: string | null
+          author_name?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["log_entry_kind"]
+          occurred_at: string
+          part_id?: string | null
+          project_id: string
+          vessel_id: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by_name?: string | null
+        }
+        Update: {
+          author_id?: string | null
+          author_name?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["log_entry_kind"]
+          occurred_at?: string
+          part_id?: string | null
+          project_id?: string
+          vessel_id?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "log_entries_part_id_fkey"
+            columns: ["part_id"]
+            isOneToOne: false
+            referencedRelation: "parts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "log_entries_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "log_entries_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
             referencedColumns: ["id"]
           },
         ]
@@ -1568,6 +1831,16 @@ export type Database = {
         Args: { p_item_id: string; p_project_id: string; p_response: string }
         Returns: Json
       }
+      action_add_log_entry: {
+        Args: {
+          p_body: string
+          p_kind?: string
+          p_occurred_at?: string
+          p_part_id?: string
+          p_project_id: string
+        }
+        Returns: Json
+      }
       action_advance_project_phase: {
         Args: { p_project_id?: string }
         Returns: Json
@@ -1710,6 +1983,10 @@ export type Database = {
         }
         Returns: Json
       }
+      action_open_logbook: {
+        Args: { p_from_project_id?: string; p_vessel_name?: string }
+        Returns: Json
+      }
       action_place_part: {
         Args: {
           p_clear?: boolean
@@ -1768,6 +2045,22 @@ export type Database = {
         }
         Returns: Json
       }
+      action_record_log_day: {
+        Args: {
+          p_attendance?: Json
+          p_log_date: string
+          p_nautical_miles?: number
+          p_notes?: string
+          p_port_from?: string
+          p_port_to?: string
+          p_position?: string
+          p_project_id: string
+          p_reason?: string
+          p_status: string
+          p_watchkeeping?: boolean
+        }
+        Returns: Json
+      }
       action_record_project_access: {
         Args: { p_project_id: string }
         Returns: Json
@@ -1822,6 +2115,28 @@ export type Database = {
           p_scheduled_date?: string
           p_title: string
           p_work_package_id?: string
+        }
+        Returns: Json
+      }
+      action_set_crew: {
+        Args: {
+          p_crew_id?: string
+          p_department?: string
+          p_email?: string
+          p_emergency_contact_name?: string
+          p_emergency_contact_phone?: string
+          p_first_name?: string
+          p_flights_allocated?: number
+          p_holidays_allocated?: number
+          p_invite?: boolean
+          p_joined_on?: string
+          p_last_name?: string
+          p_left_on?: string
+          p_member_role?: string
+          p_notes?: string
+          p_phone?: string
+          p_position?: string
+          p_project_id: string
         }
         Returns: Json
       }
@@ -1936,6 +2251,10 @@ export type Database = {
         }
         Returns: Json
       }
+      action_void_log_entry: {
+        Args: { p_entry_id: string; p_project_id: string; p_reason: string }
+        Returns: Json
+      }
       approval_days_for_tier: {
         Args: { p_tier: Database["public"]["Enums"]["approval_tier"] }
         Returns: number
@@ -1972,6 +2291,34 @@ export type Database = {
         Returns: Record<string, unknown>
       }
       model_vector_ok: { Args: { p: Json; p_keys: string[] }; Returns: boolean }
+      operations_project: {
+        Args: { p_project_id: string }
+        Returns: {
+          actual_delivery: string | null
+          actual_start: string | null
+          budget_contingency: number | null
+          budget_locked: number | null
+          budget_spent: number | null
+          class_society: Database["public"]["Enums"]["class_society"] | null
+          created_at: string | null
+          id: string
+          name: string
+          phase: Database["public"]["Enums"]["project_phase"]
+          planned_delivery: string | null
+          planned_start: string | null
+          project_type: Database["public"]["Enums"]["project_type"]
+          survey_due_date: string | null
+          vessel_id: string | null
+          yard_location: string | null
+          yard_name: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "projects"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       parse_discipline: {
         Args: { p: string }
         Returns: Database["public"]["Enums"]["discipline"]
@@ -2020,6 +2367,7 @@ export type Database = {
       action_item_status: "OPEN" | "ACKNOWLEDGED" | "DONE" | "DECLINED"
       approval_status: "PENDING" | "APPROVED" | "REJECTED" | "ESCALATED"
       approval_tier: "TIER_1" | "TIER_2" | "TIER_3"
+      attendance_status: "PRESENT" | "HOLIDAY" | "ABSENT"
       change_order_status:
         | "DRAFT"
         | "PENDING_APPROVAL"
@@ -2077,6 +2425,16 @@ export type Database = {
         | "LANDSCAPE_CLEARANCE"
       document_status: "DRAFT" | "UNDER_REVIEW" | "APPROVED" | "SUPERSEDED"
       inspection_result: "PASS" | "CONDITIONAL_PASS" | "FAIL" | "PENDING"
+      log_entry_kind:
+        | "NOTE"
+        | "NAVIGATION"
+        | "ENGINE"
+        | "DEFECT"
+        | "SAFETY"
+        | "BUNKERING"
+        | "WEATHER"
+        | "MAINTENANCE"
+      log_status: "SEA_SERVICE" | "STANDBY" | "YARD"
       membership_status: "INVITED" | "ACTIVE" | "LEFT"
       message_kind:
         | "NOTE"
@@ -2100,6 +2458,9 @@ export type Database = {
         | "ACTION_ITEM"
         | "PART"
         | "SPACE"
+        | "CREW"
+        | "LOG_DAY"
+        | "LOG_ENTRY"
       project_phase:
         | "PRE_SURVEY"
         | "HAUL_OUT"
@@ -2113,6 +2474,7 @@ export type Database = {
         | "COMPLIANCE_REVIEW"
         | "REMEDIATION"
         | "CERTIFICATION"
+        | "IN_SERVICE"
       project_type:
         | "FIVE_YEAR_SURVEY"
         | "REFIT"
@@ -2120,6 +2482,7 @@ export type Database = {
         | "ANNUAL_SURVEY"
         | "DAMAGE_REPAIR"
         | "PROPERTY"
+        | "OPERATIONS"
       root_cause:
         | "WEAR"
         | "CORROSION"
@@ -2279,6 +2642,7 @@ export const Constants = {
       action_item_status: ["OPEN", "ACKNOWLEDGED", "DONE", "DECLINED"],
       approval_status: ["PENDING", "APPROVED", "REJECTED", "ESCALATED"],
       approval_tier: ["TIER_1", "TIER_2", "TIER_3"],
+      attendance_status: ["PRESENT", "HOLIDAY", "ABSENT"],
       change_order_status: [
         "DRAFT",
         "PENDING_APPROVAL",
@@ -2341,6 +2705,17 @@ export const Constants = {
       ],
       document_status: ["DRAFT", "UNDER_REVIEW", "APPROVED", "SUPERSEDED"],
       inspection_result: ["PASS", "CONDITIONAL_PASS", "FAIL", "PENDING"],
+      log_entry_kind: [
+        "NOTE",
+        "NAVIGATION",
+        "ENGINE",
+        "DEFECT",
+        "SAFETY",
+        "BUNKERING",
+        "WEATHER",
+        "MAINTENANCE",
+      ],
+      log_status: ["SEA_SERVICE", "STANDBY", "YARD"],
       membership_status: ["INVITED", "ACTIVE", "LEFT"],
       message_kind: [
         "NOTE",
@@ -2365,6 +2740,9 @@ export const Constants = {
         "ACTION_ITEM",
         "PART",
         "SPACE",
+        "CREW",
+        "LOG_DAY",
+        "LOG_ENTRY",
       ],
       project_phase: [
         "PRE_SURVEY",
@@ -2379,6 +2757,7 @@ export const Constants = {
         "COMPLIANCE_REVIEW",
         "REMEDIATION",
         "CERTIFICATION",
+        "IN_SERVICE",
       ],
       project_type: [
         "FIVE_YEAR_SURVEY",
@@ -2387,6 +2766,7 @@ export const Constants = {
         "ANNUAL_SURVEY",
         "DAMAGE_REPAIR",
         "PROPERTY",
+        "OPERATIONS",
       ],
       root_cause: [
         "WEAR",

@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Box, CalendarRange, LayoutDashboard, LogOut, Menu, Sparkles } from 'lucide-react'
+import { BookOpen, Box, CalendarRange, LayoutDashboard, LogOut, Menu, Sparkles, UsersRound } from 'lucide-react'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { useAuth } from '@/contexts/AuthContext'
 import { useApprovals, useDefects, useMyOpenItemCount, useMyRole } from '@/lib/query-hooks'
 import { useTranslation } from '@/lib/i18n'
-import { NAV_ITEMS } from './Sidebar'
+import { navItemsFor } from './nav'
+import { useActiveProject } from '@/contexts/ProjectContext'
 
 // Phones only: on md and up the sidebar is always there.
 //
@@ -22,6 +23,14 @@ const BAR = [
   { icon: Box, labelKey: 'nav.model', path: '/app/model' },
 ] as const
 
+// On a boat's logbook the thumb reaches the log and the crew instead.
+const LOGBOOK_BAR = [
+  { icon: BookOpen, labelKey: 'nav.logbook', path: '/app/logbook' },
+  { icon: UsersRound, labelKey: 'nav.crew', path: '/app/crew' },
+  { icon: Sparkles, labelKey: 'nav.agent', path: '/app/agent', primary: true },
+  { icon: Box, labelKey: 'nav.model', path: '/app/model' },
+] as const
+
 export const MOBILE_NAV_HEIGHT = 62
 
 const isActive = (pathname: string, path: string) => pathname === path || pathname.startsWith(path + '/')
@@ -33,6 +42,10 @@ export default function MobileNav() {
   const { user, logout } = useAuth()
   const { data: role = null } = useMyRole()
   const [moreOpen, setMoreOpen] = useState(false)
+  const { activeProject } = useActiveProject()
+  const type = activeProject?.project_type
+  const bar = type === 'OPERATIONS' ? LOGBOOK_BAR : BAR
+  const items = navItemsFor(type)
 
   const { data: defects = [] } = useDefects()
   const { data: approvals = [] } = useApprovals()
@@ -43,8 +56,8 @@ export default function MobileNav() {
     actionItems: myItems,
   }
   const waiting = badges.defects + badges.approvals + badges.actionItems
-  const inBar = new Set<string>(BAR.map((b) => b.path))
-  const moreActive = !BAR.some((b) => isActive(pathname, b.path))
+  const inBar = new Set<string>(bar.map((b) => b.path))
+  const moreActive = !bar.some((b) => isActive(pathname, b.path))
 
   const go = (path: string) => {
     setMoreOpen(false)
@@ -65,7 +78,7 @@ export default function MobileNav() {
         style={{ height: `calc(${MOBILE_NAV_HEIGHT}px + env(safe-area-inset-bottom))`, paddingBottom: 'env(safe-area-inset-bottom)' }}
         aria-label="Main"
       >
-        {BAR.map(({ icon: Icon, labelKey, path, ...rest }) => {
+        {bar.map(({ icon: Icon, labelKey, path, ...rest }) => {
           const active = isActive(pathname, path)
           const primary = 'primary' in rest
           return (
@@ -126,7 +139,7 @@ export default function MobileNav() {
           <SheetTitle className="sr-only">All sections</SheetTitle>
           <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-muted" aria-hidden />
           <div className="grid grid-cols-3 gap-2">
-            {NAV_ITEMS.filter((item) => !inBar.has(item.path)).map((item) => {
+            {items.filter((item) => !inBar.has(item.path)).map((item) => {
               const active = isActive(pathname, item.path)
               const n = 'badge' in item && item.badge ? badges[item.badge] ?? 0 : 0
               return (

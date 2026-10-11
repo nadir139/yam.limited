@@ -3,7 +3,7 @@ import { AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useCreateProject } from '@/lib/query-hooks'
+import { useCreateProject, useOpenLogbook } from '@/lib/query-hooks'
 import { useTranslation } from '@/lib/i18n'
 import type { Project } from '@/lib/types'
 import { DateField } from '@/components/ui/date-field'
@@ -34,7 +34,81 @@ const selectStyle = {
   color: 'hsl(var(--foreground))',
 }
 
+/**
+ * A boat's logbook, started from nothing but her name. The caller becomes her
+ * captain; anyone else joins by the captain's invitation (migration 032).
+ */
+function OpenLogbookForm({ onDone }: { onDone: () => void }) {
+  const { t } = useTranslation()
+  const open = useOpenLogbook()
+  const [name, setName] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="lb-name">Boat's name ({t('common.required')})</Label>
+        <Input
+          id="lb-name"
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value)
+            setError(null)
+          }}
+          placeholder="Lucky Bird"
+          autoFocus
+        />
+        <span className="text-[11px]" style={{ color: 'hsl(var(--muted-foreground))' }}>
+          You become her captain in the logbook and can invite the crew. If the boat already has a
+          refit project here, open the logbook from that project instead, so both share one record.
+        </span>
+      </div>
+      {error && (
+        <p className="flex items-start gap-1.5 text-xs" style={{ color: 'hsl(var(--destructive))' }}>
+          <AlertCircle size={13} className="mt-px flex-shrink-0" />
+          {error}
+        </p>
+      )}
+      <div className="mt-1 flex justify-end gap-2">
+        <Button variant="outline" onClick={onDone}>
+          {t('common.cancel')}
+        </Button>
+        <Button
+          disabled={name.trim().length === 0 || open.isPending}
+          onClick={() =>
+            open.mutate({ vesselName: name.trim() }, { onSuccess: onDone, onError: (e) => setError(e.message) })
+          }
+        >
+          {open.isPending ? t('common.creating') : 'Open the logbook'}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export default function CreateProjectForm({ onDone }: { onDone: () => void }) {
+  const [kind, setKind] = useState<'project' | 'logbook'>('project')
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-2 gap-1 rounded-lg border p-1" role="tablist">
+        {(['project', 'logbook'] as const).map((k) => (
+          <button
+            key={k}
+            type="button"
+            role="tab"
+            aria-selected={kind === k}
+            onClick={() => setKind(k)}
+            className={`rounded-md px-2 py-1.5 text-sm font-medium ${kind === k ? 'bg-muted' : ''}`}
+          >
+            {k === 'project' ? 'A project' : "A boat's logbook"}
+          </button>
+        ))}
+      </div>
+      {kind === 'project' ? <ProjectForm onDone={onDone} /> : <OpenLogbookForm onDone={onDone} />}
+    </div>
+  )
+}
+
+function ProjectForm({ onDone }: { onDone: () => void }) {
   const { t } = useTranslation()
   const create = useCreateProject()
 

@@ -57,6 +57,10 @@ export type MembershipStatus = Enums['membership_status']
  * back, DECLINED means they said no and why, DONE means it happened.
  */
 export type ActionItemStatus = Enums['action_item_status']
+/** A logbook day: at sea, standing by, or in the yard. */
+export type LogStatus = Enums['log_status']
+export type AttendanceStatus = Enums['attendance_status']
+export type LogEntryKind = Enums['log_entry_kind']
 
 // ─── Core objects ─────────────────────────────────────────────────────────────
 //
@@ -68,6 +72,11 @@ export type Vessel = Row<'vessels'>
 export type WorkPackage = Row<'work_packages'>
 export type WorkPackageDependency = Row<'work_package_dependencies'>
 export type Part = Row<'parts'>
+/** The operations logbook (migration 032): the boat's people, days and entries. */
+export type Crew = Row<'crew'>
+export type LogDay = Row<'log_days'>
+export type LogDayCrew = Row<'log_day_crew'>
+export type LogEntry = Row<'log_entries'>
 export type PartLink = Row<'part_links'>
 export type Space = Row<'spaces'>
 export type PartConnection = Row<'part_connections'>

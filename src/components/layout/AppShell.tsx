@@ -43,9 +43,13 @@ export default function AppShell({ children }: AppShellProps) {
   return (
     // 100dvh, not 100vh: on a phone 100vh includes the strip under the browser's
     // toolbar, which hid the bottom of every page.
-    <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
+    <div className="app-shell" style={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
       {/* Desktop sidebar — always visible on md+ */}
-      {!isMobile && <Sidebar />}
+      {!isMobile && (
+        <div className="contents print:hidden">
+          <Sidebar />
+        </div>
+      )}
 
       {/* Mobile sidebar overlay */}
       {isMobile && sidebarOpen && (
@@ -60,8 +64,10 @@ export default function AppShell({ children }: AppShellProps) {
         </div>
       )}
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
-        <Topbar onMenuClick={() => setSidebarOpen(true)} />
+      <div className="app-shell-column" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+        <div className="contents print:hidden">
+          <Topbar onMenuClick={() => setSidebarOpen(true)} />
+        </div>
         <main
           className={fullHeight ? undefined : 'p-4 md:p-6'}
           style={{
@@ -88,7 +94,11 @@ export default function AppShell({ children }: AppShellProps) {
           </ErrorBoundary>
         </main>
       </div>
-      {isMobile && <MobileNav />}
+      {isMobile && (
+        <div className="contents print:hidden">
+          <MobileNav />
+        </div>
+      )}
     </div>
   )
 }

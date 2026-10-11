@@ -1,53 +1,17 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import {
-  LayoutDashboard,
-  Anchor,
-  Wrench,
-  CalendarRange,
-  Boxes,
-  Box,
-  ClipboardCheck,
-  AlertTriangle,
-  GitBranch,
-  CheckCircle2,
-  FileText,
-  Users,
-  Sparkles,
-  MessagesSquare,
-  ListChecks,
-  LogOut,
-  X,
-} from 'lucide-react'
+import { LogOut, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import Logo from '@/assets/logo.svg'
 import { useAuth } from '@/contexts/AuthContext'
 import { useDefects, useApprovals, useMyRole, useMyOpenItemCount } from '@/lib/query-hooks'
 import { useTranslation } from '@/lib/i18n'
+import { useActiveProject } from '@/contexts/ProjectContext'
+import { navItemsFor } from './nav'
 
 interface SidebarProps {
   onClose?: () => void
 }
-
-// Labels are translation keys rather than English strings, so the navigation
-// follows the language menu instead of staying English around translated pages.
-export const NAV_ITEMS = [
-  { icon: Sparkles, labelKey: 'nav.agent', path: '/app/agent' },
-  { icon: LayoutDashboard, labelKey: 'nav.dashboard', path: '/app/dashboard' },
-  { icon: Anchor, labelKey: 'nav.project', path: '/app/project' },
-  { icon: Box, labelKey: 'nav.model', path: '/app/model' },
-  { icon: Boxes, labelKey: 'nav.parts', path: '/app/parts' },
-  { icon: Wrench, labelKey: 'nav.workPackages', path: '/app/work-packages' },
-  { icon: CalendarRange, labelKey: 'nav.schedule', path: '/app/schedule' },
-  { icon: ClipboardCheck, labelKey: 'nav.inspections', path: '/app/inspections' },
-  { icon: AlertTriangle, labelKey: 'nav.defects', path: '/app/defects', badge: 'defects' },
-  { icon: GitBranch, labelKey: 'nav.changeOrders', path: '/app/change-orders' },
-  { icon: CheckCircle2, labelKey: 'nav.approvals', path: '/app/approvals', badge: 'approvals' },
-  { icon: FileText, labelKey: 'nav.documents', path: '/app/documents' },
-  { icon: ListChecks, labelKey: 'nav.actionItems', path: '/app/action-items', badge: 'actionItems' },
-  { icon: MessagesSquare, labelKey: 'nav.messages', path: '/app/messages' },
-  { icon: Users, labelKey: 'nav.team', path: '/app/team' },
-]
 
 export default function Sidebar({ onClose }: SidebarProps) {
   const navigate = useNavigate()
@@ -58,6 +22,8 @@ export default function Sidebar({ onClose }: SidebarProps) {
   // be owner's rep on one and nothing on another, so a single stored role would
   // be wrong the moment there were two projects.
   const { data: role = null } = useMyRole()
+  const { activeProject } = useActiveProject()
+  const items = navItemsFor(activeProject?.project_type)
   const [hoveredPath, setHoveredPath] = useState<string | null>(null)
 
   const { data: defects = [] } = useDefects()
@@ -139,7 +105,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
 
       {/* Nav */}
       <nav style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
-        {NAV_ITEMS.map((item) => {
+        {items.map((item) => {
           const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/')
           const isHovered = hoveredPath === item.path
           const badgeCount =

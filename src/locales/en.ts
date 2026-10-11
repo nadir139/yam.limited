@@ -42,6 +42,8 @@ export const en: Record<string, string> = {
   'nav.actionItems': 'My Items',
   'nav.messages': 'Messages',
   'nav.agent': 'Agent',
+  'nav.logbook': 'Logbook',
+  'nav.crew': 'Crew',
   'nav.signOut': 'Sign out',
   'nav.noRole': 'No project role',
 
@@ -72,9 +74,11 @@ export const en: Record<string, string> = {
   'projectType.ANNUAL_SURVEY': 'Annual survey',
   'projectType.DAMAGE_REPAIR': 'Damage repair',
   'projectType.PROPERTY': 'Property',
+  'projectType.OPERATIONS': 'Logbook',
 
   // ─── Phases ────────────────────────────────────────────────────────────────
   'phase.PRE_SURVEY': 'Pre-survey',
+  'phase.IN_SERVICE': 'In service',
   'phase.HAUL_OUT': 'Haul out',
   'phase.STRUCTURAL': 'Structural',
   'phase.SYSTEMS': 'Systems',

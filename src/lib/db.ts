@@ -26,6 +26,13 @@ import type {
   MessageSource,
   ObjectType,
   ActionItem,
+  Crew,
+  LogDay,
+  LogDayCrew,
+  LogEntry,
+  LogStatus,
+  AttendanceStatus,
+  LogEntryKind,
 } from './types'
 
 /** A project row carrying just enough of its vessel to name it. */
@@ -1522,4 +1529,156 @@ export async function fetchVocabulary(): Promise<VocabularyEntry[]> {
     .order('display_order')
   if (error) throw error
   return (data ?? []) as VocabularyEntry[]
+}
+
+// ─── The operations logbook (migration 032) ──────────────────────────────────
+//
+// Each boat's logbook is its own OPERATIONS project, so every read is scoped
+// to that project like everything else, and a person on two boats reads two
+// separate logbooks. Writes go through Actions that log every change; entries
+// are struck out with a reason, never edited.
+
+/** Opens a boat's logbook from a project with a vessel, or for a new boat by name. */
+export async function openLogbook(input: { fromProjectId?: string; vesselName?: string }): Promise<Project> {
+  const { data, error } = await supabase.rpc('action_open_logbook', {
+    p_from_project_id: input.fromProjectId ?? undefined,
+    p_vessel_name: input.vesselName ?? undefined,
+  })
+  return (unwrap(data, error, 'Open logbook') as unknown as { project: Project }).project
+}
+
+export async function fetchCrew(projectId: string): Promise<Crew[]> {
+  const { data, error } = await supabase
+    .from('crew')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('left_on', { ascending: true, nullsFirst: true })
+    .order('first_name')
+  if (error) throw error
+  return data ?? []
+}
+
+export type LogDayWithCrew = LogDay & { log_day_crew: LogDayCrew[] }
+
+/** Days between two dates inclusive ('YYYY-MM-DD'), with who was aboard. */
+export async function fetchLogDays(projectId: string, from: string, to: string): Promise<LogDayWithCrew[]> {
+  const { data, error } = await supabase
+    .from('log_days')
+    .select('*, log_day_crew(*)')
+    .eq('project_id', projectId)
+    .gte('log_date', from)
+    .lte('log_date', to)
+    .order('log_date')
+  if (error) throw error
+  return (data ?? []) as LogDayWithCrew[]
+}
+
+/** Entries whose time falls in [from, to), newest first. */
+export async function fetchLogEntries(projectId: string, fromIso: string, toIso: string): Promise<LogEntry[]> {
+  const { data, error } = await supabase
+    .from('log_entries')
+    .select('*')
+    .eq('project_id', projectId)
+    .gte('occurred_at', fromIso)
+    .lt('occurred_at', toIso)
+    .order('occurred_at', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+export interface CrewInput {
+  crewId?: string | null
+  firstName?: string
+  lastName?: string
+  position?: string
+  department?: string
+  email?: string
+  phone?: string
+  joinedOn?: string | null
+  leftOn?: string | null
+  emergencyContactName?: string
+  emergencyContactPhone?: string
+  holidaysAllocated?: number | null
+  flightsAllocated?: number | null
+  notes?: string
+  invite?: boolean
+  memberRole?: 'CREW' | 'CAPTAIN'
+}
+
+/** Adds or updates a crew member; omitted fields keep, empty strings clear. */
+export async function setCrew(projectId: string, input: CrewInput): Promise<Crew> {
+  const { data, error } = await supabase.rpc('action_set_crew', {
+    p_project_id: projectId,
+    p_crew_id: input.crewId ?? undefined,
+    p_first_name: input.firstName,
+    p_last_name: input.lastName,
+    p_position: input.position,
+    p_department: input.department,
+    p_email: input.email,
+    p_phone: input.phone,
+    p_joined_on: input.joinedOn ?? undefined,
+    p_left_on: input.leftOn ?? undefined,
+    p_emergency_contact_name: input.emergencyContactName,
+    p_emergency_contact_phone: input.emergencyContactPhone,
+    p_holidays_allocated: input.holidaysAllocated ?? undefined,
+    p_flights_allocated: input.flightsAllocated ?? undefined,
+    p_notes: input.notes,
+    p_invite: input.invite ?? false,
+    p_member_role: input.memberRole ?? 'CREW',
+  })
+  return (unwrap(data, error, 'Save crew member') as unknown as { crew: Crew }).crew
+}
+
+export interface LogDayInput {
+  date: string
+  status: LogStatus
+  position: string
+  portFrom: string
+  portTo: string
+  nauticalMiles: number
+  watchkeeping: boolean
+  notes: string
+  attendance: Array<{ crew_id: string; attendance: AttendanceStatus }>
+  /** Needed when changing a day that has already passed. */
+  reason?: string
+}
+
+export async function recordLogDay(projectId: string, input: LogDayInput): Promise<LogDay> {
+  const { data, error } = await supabase.rpc('action_record_log_day', {
+    p_project_id: projectId,
+    p_log_date: input.date,
+    p_status: input.status,
+    p_position: input.position,
+    p_port_from: input.portFrom,
+    p_port_to: input.portTo,
+    p_nautical_miles: input.nauticalMiles,
+    p_watchkeeping: input.watchkeeping,
+    p_notes: input.notes,
+    p_attendance: input.attendance as unknown as Json,
+    p_reason: input.reason || undefined,
+  })
+  return (unwrap(data, error, 'Record log day') as unknown as { log_day: LogDay }).log_day
+}
+
+export async function addLogEntry(
+  projectId: string,
+  input: { body: string; kind: LogEntryKind; occurredAt?: string | null; partId?: string | null },
+): Promise<LogEntry> {
+  const { data, error } = await supabase.rpc('action_add_log_entry', {
+    p_project_id: projectId,
+    p_body: input.body,
+    p_kind: input.kind,
+    p_occurred_at: input.occurredAt ?? undefined,
+    p_part_id: input.partId ?? undefined,
+  })
+  return (unwrap(data, error, 'Write log entry') as unknown as { entry: LogEntry }).entry
+}
+
+export async function voidLogEntry(projectId: string, entryId: string, reason: string): Promise<LogEntry> {
+  const { data, error } = await supabase.rpc('action_void_log_entry', {
+    p_project_id: projectId,
+    p_entry_id: entryId,
+    p_reason: reason,
+  })
+  return (unwrap(data, error, 'Strike out entry') as unknown as { entry: LogEntry }).entry
 }

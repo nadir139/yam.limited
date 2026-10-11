@@ -1,7 +1,7 @@
 import { day, eur, NONE } from '@/lib/format'
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Pencil, Plus } from 'lucide-react'
+import { BookOpen, Pencil, Plus } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -17,7 +17,10 @@ import {
   useDocuments,
   useTeam,
   usePermissions,
+  useMyRole,
+  useOpenLogbook,
 } from '@/lib/query-hooks'
+import { useActiveProject } from '@/contexts/ProjectContext'
 
 /** A measurement with its unit, or a dash when nobody has recorded it. */
 const measure = (n: number | null | undefined, unit: string) => (n == null ? NONE : `${n}${unit}`)
@@ -45,6 +48,10 @@ export default function ProjectOverview() {
   const { data: approvals = [], isLoading: approvalsLoading } = useApprovals()
   const { data: documents = [], isLoading: docsLoading } = useDocuments()
   const { data: team = [], isLoading: teamLoading } = useTeam()
+  const { data: role = null } = useMyRole()
+  const { projects, setActiveProjectId } = useActiveProject()
+  const openLogbook = useOpenLogbook()
+  const [logbookError, setLogbookError] = useState<string | null>(null)
 
   // Only the record itself gates the page.
   //
@@ -65,7 +72,20 @@ export default function ProjectOverview() {
 
   const vessel = project.vessel
 
-  const QUICK_LINKS = [
+  // A boat's logbook (migration 032) is the boat in service: no yard, budget
+  // or phases of work, so its overview is the vessel and the way into the log.
+  const isOps = project.project_type === 'OPERATIONS'
+  const logbookProject = project.vessel_id
+    ? projects.find((p) => p.project_type === 'OPERATIONS' && p.vessel_id === project.vessel_id)
+    : undefined
+  const mayOpenLogbook = role === 'OWNER' || role === 'OWNERS_REP' || role === 'CAPTAIN'
+
+  const QUICK_LINKS = isOps ? [
+    { label: 'Logbook', count: null, path: '/app/logbook', color: 'hsl(var(--primary))' },
+    { label: 'Crew', count: null, path: '/app/crew', color: 'hsl(var(--accent))' },
+    { label: 'Documents', count: documents.length, path: '/app/documents', color: 'hsl(var(--success))' },
+    { label: 'Team Members', count: team.length, path: '/app/team', color: 'hsl(215 50% 50%)' },
+  ] : [
     { label: 'Work Packages', count: workPackages.length, path: '/app/work-packages', color: 'hsl(var(--primary))' },
     { label: 'Inspections', count: inspections.length, path: '/app/inspections', color: 'hsl(var(--accent))' },
     { label: 'Defects / NCRs', count: defects.length, path: '/app/defects', color: 'hsl(var(--destructive))' },
@@ -153,7 +173,53 @@ export default function ProjectOverview() {
           </DialogContent>
         </Dialog>
 
+        {/* The boat's logbook: one per vessel, shared by every project on her. */}
+        {!isOps && vessel && (logbookProject || mayOpenLogbook) && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <BookOpen size={16} /> The boat's logbook
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3 px-4 pb-4 pt-0 text-sm">
+              <p style={{ color: 'hsl(var(--muted-foreground))' }}>
+                {vessel.name}'s days at sea, crew and log entries, kept by her captain and crew. It
+                stays with the boat across every refit and owner.
+              </p>
+              {logbookProject ? (
+                <Button
+                  size="sm"
+                  className="self-start"
+                  onClick={() => {
+                    setActiveProjectId(logbookProject.id)
+                    navigate('/app/logbook')
+                  }}
+                >
+                  Go to the logbook
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  className="self-start"
+                  disabled={openLogbook.isPending}
+                  onClick={() => {
+                    setLogbookError(null)
+                    openLogbook.mutate(
+                      { fromProjectId: project.id },
+                      { onSuccess: () => navigate('/app/logbook'), onError: (e) => setLogbookError(e.message) },
+                    )
+                  }}
+                >
+                  {openLogbook.isPending ? 'Opening…' : 'Open the logbook'}
+                </Button>
+              )}
+              {logbookError && <p className="text-xs" style={{ color: 'hsl(var(--destructive))' }}>{logbookError}</p>}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Project details */}
+        {!isOps && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Project Details</CardTitle>
@@ -187,6 +253,7 @@ export default function ProjectOverview() {
             )}
           </CardContent>
         </Card>
+        )}
       </div>
 
       {/* Quick links grid */}
@@ -207,7 +274,7 @@ export default function ProjectOverview() {
                 className="text-3xl font-bold mb-1"
                 style={{ color: link.color }}
               >
-                {link.count}
+                {link.count ?? "→"}
               </div>
               <div className="text-sm font-medium">{link.label}</div>
             </button>

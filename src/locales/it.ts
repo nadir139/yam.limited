@@ -37,6 +37,8 @@ export const it: Record<string, string> = {
   'nav.actionItems': 'Le mie voci',
   'nav.messages': 'Messaggi',
   'nav.agent': 'Agente',
+  'nav.logbook': 'Giornale di bordo',
+  'nav.crew': 'Equipaggio',
   'nav.signOut': 'Esci',
   'nav.noRole': 'Nessun ruolo nel progetto',
 
@@ -65,6 +67,7 @@ export const it: Record<string, string> = {
   'projectType.ANNUAL_SURVEY': 'Visita annuale',
   'projectType.DAMAGE_REPAIR': 'Riparazione danni',
   'projectType.PROPERTY': 'Immobile',
+  'projectType.OPERATIONS': 'Giornale di bordo',
 
   'phase.PRE_SURVEY': 'Pre-visita',
   'phase.HAUL_OUT': 'Alaggio',
