@@ -49,8 +49,14 @@ export function useRealtimeSync() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'world_model_events' },
-        () => {
+        (payload) => {
           qc.invalidateQueries({ queryKey: ['events'] })
+          // Hours of rest are private, so most people never receive the
+          // rest_records row itself; the event (month only) tells them the
+          // boat's counts have changed.
+          if ((payload.new as { event_type?: string } | null)?.event_type === 'REST_RECORDED') {
+            qc.invalidateQueries({ queryKey: ['rest'] })
+          }
         },
       )
       .on(
@@ -166,6 +172,11 @@ export function useRealtimeSync() {
       )
       .on('postgres_changes', { event: '*', schema: 'public', table: 'crew' }, () =>
         qc.invalidateQueries({ queryKey: ['crew'] }),
+      )
+      // Hours of rest: RLS decides who receives these, so only the crew member
+      // and the captain see the record change live.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rest_records' }, () =>
+        qc.invalidateQueries({ queryKey: ['rest'] }),
       )
       .subscribe()
 

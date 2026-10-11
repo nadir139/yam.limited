@@ -2012,6 +2012,10 @@ unknown, not rest: no window touching it is judged.
   `rest_summary` and gets three counts (aboard, recorded, with breaches).
   The `REST_RECORDED` event carries only year and month, because the event
   log is readable by the whole boat.
+- **Live (migration 035).** `rest_records` is in the realtime publication;
+  realtime applies RLS per subscriber, so only the crew member and the
+  captain receive the row. Everyone else refreshes the counts when the
+  `REST_RECORDED` event arrives.
 - Saving a month again copies the previous schedule into
   `rest_record_versions` (same privacy rule) with an optional reason.
   Months that have not begun are refused.
@@ -2027,7 +2031,7 @@ on the boat's operations project (title from the entry's first line, body
 plus when and who as the description, root cause OTHER and disposition
 PENDING until someone investigates), links the entry's part to the NCR and
 sets `log_entries.defect_id`, so the entry shows the NCR number and cannot
-be raised twice. Captain and crew may do it. The defects page is therefore
+be raised twice. Captain, crew and the owner's rep may do it (migration 035). The defects page is therefore
 part of a logbook project's navigation.
 
 **The agent reads the log.** `get_logbook` (Edge Function `agent`) returns
