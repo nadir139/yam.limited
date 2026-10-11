@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
+import { KEPT_MESSAGE, isQueued } from '@/lib/outbox'
 import { format, parseISO } from 'date-fns'
 import { ChevronDown, ChevronRight, Ban } from 'lucide-react'
 import { toast } from 'sonner'
@@ -107,8 +108,8 @@ export function ReadingForm({ parts, partId: fixedPart, onDone }: { parts: Part[
     record.mutate(
       { ...content, clientId: sub.id(content) },
       {
-        onSuccess: () => {
-          toast.success('Reading recorded')
+        onSuccess: (res) => {
+          toast.success(isQueued(res) ? KEPT_MESSAGE : 'Reading recorded')
           sub.next()
           setValue('')
           setNote('')
@@ -318,8 +319,8 @@ export function ServiceForm({
     record.mutate(
       { ...content, clientId: sub.id(content) },
       {
-        onSuccess: () => {
-          toast.success('Maintenance recorded')
+        onSuccess: (res) => {
+          toast.success(isQueued(res) ? KEPT_MESSAGE : 'Maintenance recorded')
           sub.next()
           onDone?.()
         },

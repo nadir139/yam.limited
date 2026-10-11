@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import type { AuthUser } from '@/lib/types'
+import { forgetPersistedQueries } from '@/lib/query-cache-store'
 
 interface AuthContextType {
   user: AuthUser | null
@@ -118,10 +119,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const logout = async () => {
+    const leaving = user?.id
     try {
       await supabase.auth.signOut()
     } finally {
       setUser(null)
+      // What was kept on this device for reading offline goes too. Writes
+      // still waiting in the outbox stay: they are this person's record and
+      // are sent when they sign in here again.
+      if (leaving) forgetPersistedQueries(leaving).catch(() => undefined)
       // Everything cached was read as the person leaving. In a shared browser
       // the next person to sign in would otherwise see it until it refetched.
       queryClient.clear()

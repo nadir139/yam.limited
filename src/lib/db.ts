@@ -1672,7 +1672,7 @@ export async function recordLogDay(projectId: string, input: LogDayInput): Promi
 
 export async function addLogEntry(
   projectId: string,
-  input: { body: string; kind: LogEntryKind; occurredAt?: string | null; partId?: string | null },
+  input: { body: string; kind: LogEntryKind; occurredAt?: string | null; partId?: string | null; clientId?: string },
 ): Promise<LogEntry> {
   const { data, error } = await supabase.rpc('action_add_log_entry', {
     p_project_id: projectId,
@@ -1680,6 +1680,8 @@ export async function addLogEntry(
     p_kind: input.kind,
     p_occurred_at: input.occurredAt ?? undefined,
     p_part_id: input.partId ?? undefined,
+    // The same id sent twice records one entry (migration 038).
+    p_client_id: input.clientId ?? newClientId(),
   })
   return (unwrap(data, error, 'Write log entry') as unknown as { entry: LogEntry }).entry
 }

@@ -761,6 +761,7 @@ export type Database = {
           author_id: string | null
           author_name: string | null
           body: string
+          client_id: string | null
           created_at: string
           defect_id: string | null
           id: string
@@ -777,6 +778,7 @@ export type Database = {
           author_id?: string | null
           author_name?: string | null
           body: string
+          client_id?: string | null
           created_at?: string
           defect_id?: string | null
           id?: string
@@ -793,6 +795,7 @@ export type Database = {
           author_id?: string | null
           author_name?: string | null
           body?: string
+          client_id?: string | null
           created_at?: string
           defect_id?: string | null
           id?: string
@@ -2326,6 +2329,17 @@ export type Database = {
         Returns: Json
       }
       action_add_log_entry: {
+        Args: {
+          p_body: string
+          p_client_id?: string
+          p_kind?: string
+          p_occurred_at?: string
+          p_part_id?: string
+          p_project_id: string
+        }
+        Returns: Json
+      }
+      action_add_log_entry_superseded_038: {
         Args: {
           p_body: string
           p_kind?: string

@@ -6,6 +6,7 @@ import Topbar from './Topbar'
 import MobileNav, { MOBILE_NAV_HEIGHT } from './MobileNav'
 import { NoProjects } from './ProjectSwitcher'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
+import { useOutboxSync } from '@/hooks/useOutbox'
 import { useProjectPresence } from '@/lib/query-hooks'
 import { useActiveProject } from '@/contexts/ProjectContext'
 
@@ -29,6 +30,8 @@ export default function AppShell({ children }: AppShellProps) {
   // under it, so the page around it must not scroll as well.
   const fullHeight = pathname === '/app/agent'
   useRealtimeSync()
+  // Writes kept on this device while offline go out when the signal is back.
+  useOutboxSync()
   // Stamps first_seen_at on the first visit and keeps last_seen_at fresh, which
   // is what "here now" on the team page is derived from.
   useProjectPresence()

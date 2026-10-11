@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { KEPT_MESSAGE, isQueued } from '@/lib/outbox'
 import { Link } from 'react-router-dom'
 import {
   addDays,
@@ -34,6 +35,8 @@ import {
   useVoidLogEntry,
 } from '@/lib/query-hooks'
 import { useAuth } from '@/contexts/AuthContext'
+import { useOutbox } from '@/hooks/useOutbox'
+import { useProjectId } from '@/contexts/ProjectContext'
 import type { LogDayWithCrew } from '@/lib/db'
 import type { AttendanceStatus, Crew, DefectRecord, LogEntry, LogEntryKind, LogStatus } from '@/lib/types'
 
@@ -302,7 +305,7 @@ function DayEditor({ date, day, crew, canWrite }: { date: string; day: LogDayWit
         reason: needsReason ? reason.trim() : undefined,
       },
       {
-        onSuccess: () => toast.success(`${format(d, 'd MMM')} saved`),
+        onSuccess: (res) => toast.success(isQueued(res) ? KEPT_MESSAGE : `${format(d, 'd MMM')} saved`),
         onError: (e) => setError(e.message),
       },
     )
@@ -463,6 +466,14 @@ function Entries({
   const fromIso = dayStart.toISOString()
   const toIso = addDays(dayStart, 1).toISOString()
   const { data: entries = [] } = useLogEntries(fromIso, toIso)
+  const projectId = useProjectId()
+  // Entries written without signal, kept on this device until sent.
+  const { items: outbox } = useOutbox()
+  const kept = outbox.filter((i) => {
+    if (i.kind !== 'log_entry' || i.projectId !== projectId) return false
+    const at = String(i.payload.occurredAt ?? i.createdAt)
+    return at >= fromIso && at < toIso
+  })
   const add = useAddLogEntry()
   const strike = useVoidLogEntry()
   const isToday = date === ymd(new Date())
@@ -477,7 +488,8 @@ function Entries({
     add.mutate(
       { body: body.trim(), kind, occurredAt: at.toISOString() },
       {
-        onSuccess: () => {
+        onSuccess: (res) => {
+          if (isQueued(res)) toast.success(KEPT_MESSAGE)
           setBody('')
           if (isToday) setTime(format(new Date(), 'HH:mm'))
         },
@@ -496,7 +508,23 @@ function Entries({
     <Card>
       <CardContent className="flex flex-col gap-3 p-4">
         <h3 className="text-sm font-semibold">Entries</h3>
-        {entries.length === 0 ? (
+        {kept.length > 0 && (
+          <ul className="flex flex-col gap-2">
+            {kept.map((i) => (
+              <li key={i.id} className="rounded-md border border-dashed p-2 text-sm">
+                <div className="flex items-center gap-2 text-[11px]" style={muted}>
+                  <span className="font-mono">{format(parseISO(String(i.payload.occurredAt ?? i.createdAt)), 'HH:mm')}</span>
+                  <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">{kindLabel(i.payload.kind as LogEntryKind)}</Badge>
+                  <span style={{ color: i.status === 'failed' ? 'hsl(var(--destructive))' : 'hsl(35 80% 35%)' }}>
+                    {i.status === 'failed' ? `refused: ${i.lastError}` : 'kept on this device, not sent yet'}
+                  </span>
+                </div>
+                <p className="mt-1 whitespace-pre-wrap">{String(i.payload.body ?? '')}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+        {entries.length === 0 && kept.length === 0 ? (
           <p className="text-xs" style={muted}>Nothing written for this day.</p>
         ) : (
           <ul className="flex flex-col gap-2">

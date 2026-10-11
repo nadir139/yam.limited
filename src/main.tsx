@@ -16,3 +16,12 @@ window.addEventListener('load', () => {
     }
   }, 10_000)
 })
+
+// Offline mode (migration 038): the service worker keeps the app itself so it
+// opens without signal; data and pending writes are kept by the app. Only in
+// a production build, where asset names are content hashes.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => console.error('Service worker not registered', err))
+  })
+}

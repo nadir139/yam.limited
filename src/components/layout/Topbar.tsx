@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import LanguagePicker from '@/components/LanguagePicker'
 import ProjectSwitcher from './ProjectSwitcher'
+import OutboxIndicator from './OutboxIndicator'
 import { useActiveProject } from '@/contexts/ProjectContext'
 import { useTranslation } from '@/lib/i18n'
 
@@ -66,6 +67,7 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
             {phaseLabel.toUpperCase()}
           </Badge>
         )}
+        <OutboxIndicator />
         <LanguagePicker />
         <ThemeToggle />
       </div>

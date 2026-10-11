@@ -2134,3 +2134,65 @@ a sea day never links; a crew member records their own certificate and is
 refused for another's; retiring needs a reason and keeps the row; sea time
 adds up (3 days aboard: 1 at sea with watch and 80 nm, 1 yard, 1 standby);
 an outsider gets nothing from either function.
+## 42. Offline mode: nothing written at sea is lost (migration 038)
+
+Phase 3 of the logbook merge, last part. A phone at sea loses signal for
+hours; what the crew write then must reach the record, once, and the app
+must open and show the log without a connection.
+
+**Writes: the outbox** (`src/lib/outbox.ts`, `src/lib/sync.ts`). Log
+entries, days, readings, services and months of rest go through
+`sendOrQueue`: with signal they are sent at once as before; when the
+browser is offline, or a request gets no answer (failed fetch, timeout,
+expired session), the write is kept in IndexedDB (`yam-outbox`), which
+survives closing the app and restarting the phone, and the page says
+"kept on this device". Kept entries show in the day's log with a dashed
+border. `useOutboxSync` (in the app shell) sends them oldest first on
+start, when the browser comes back online, when the app returns to the
+foreground and every 30 s; it stops at the first that gets no answer.
+- **Once, never twice.** Every kept write carries the client id it was
+  first sent with. Entries (`log_entries.client_id`, this migration),
+  readings and services (036) return the first row when the same id comes
+  again, so a request that did reach the server before the signal dropped
+  is not recorded twice. A day or a month of rest is one record; saving it
+  again before the first was sent replaces the unsent one (`replaceKey`),
+  because the later save is what the person meant and sending both would
+  make the second a change needing a reason.
+- **Never silently dropped.** A write the server refuses (a rule, a
+  permission) stays in the outbox marked with the server's reason. The
+  outbox button in the top bar ("Offline · 2 kept", "1 refused") lists
+  everything kept; a refused past day can be given its reason there and
+  resent. Discarding, with a confirmation, is the only way anything leaves
+  the outbox without reaching the server.
+- **Whose.** Each kept write is tagged with the signed-in email and only
+  sent while that person is signed in, so a shared phone never sends one
+  person's writes as another's. Sign-out keeps the outbox.
+- Mutations for these writes run with `networkMode: 'always'`, so React
+  Query never parks them in memory where closing the app would lose them.
+- `action_add_log_entry` gained `p_client_id`; its old signature was
+  renamed `action_add_log_entry_superseded_038` and its execute right
+  revoked (this project's SQL tooling does not run DROP). The event of an
+  entry sent more than an hour after it happened carries `sent_late`.
+
+**Reads: the last-read data on the device** (`src/lib/query-persist.tsx`,
+`query-cache-store.ts`). The query cache is saved to IndexedDB
+(`yam-cache`) per user two seconds after it changes and restored before the
+pages render, so the log, crew, maintenance and hours of rest show as last
+seen when the server cannot be reached; fresher server data always wins.
+Kept for 14 days; deleted on sign-out.
+
+**The app itself: a service worker** (`public/sw.js`, registered in
+production only). Pages are network first with the last `index.html` as
+fallback, so a deploy is picked up as soon as there is signal; `/assets/*`
+(content-hashed) are cache first. It never touches Supabase or any data.
+`vercel.json` serves `sw.js` with `no-cache`.
+
+Verified: unit tests (`src/lib/sync.test.ts`: sent with signal, kept with
+its id without, refused not kept, replace, oldest first, stop when the
+signal goes, refused kept with the reason, never another person's); a
+browser run (write an entry and a day offline, both in IndexedDB; close the
+app; reopen with signal: the entry sent once with its id, the day refused
+for want of a reason, resent from the outbox with one; with the server
+unreachable the last-read log still shows); a production build opened with
+the network off loads from the service worker; on the live database the
+same client id twice records one entry and the old signature is refused.
