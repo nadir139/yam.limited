@@ -123,6 +123,96 @@ export type Database = {
         }
         Relationships: []
       }
+      aircraft_flights: {
+        Row: {
+          air_minutes: number | null
+          arrival: string
+          block_minutes: number
+          block_off: string
+          block_on: string
+          client_id: string | null
+          created_at: string
+          departure: string
+          flight_date: string
+          id: string
+          landing_at: string | null
+          landings: number
+          notes: string | null
+          pic_name: string | null
+          project_id: string
+          recorded_by: string | null
+          recorded_by_name: string | null
+          takeoff_at: string | null
+          vessel_id: string
+          void_reason: string | null
+          voided_at: string | null
+          voided_by_name: string | null
+        }
+        Insert: {
+          air_minutes?: number | null
+          arrival: string
+          block_minutes: number
+          block_off: string
+          block_on: string
+          client_id?: string | null
+          created_at?: string
+          departure: string
+          flight_date: string
+          id?: string
+          landing_at?: string | null
+          landings?: number
+          notes?: string | null
+          pic_name?: string | null
+          project_id: string
+          recorded_by?: string | null
+          recorded_by_name?: string | null
+          takeoff_at?: string | null
+          vessel_id: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by_name?: string | null
+        }
+        Update: {
+          air_minutes?: number | null
+          arrival?: string
+          block_minutes?: number
+          block_off?: string
+          block_on?: string
+          client_id?: string | null
+          created_at?: string
+          departure?: string
+          flight_date?: string
+          id?: string
+          landing_at?: string | null
+          landings?: number
+          notes?: string | null
+          pic_name?: string | null
+          project_id?: string
+          recorded_by?: string | null
+          recorded_by_name?: string | null
+          takeoff_at?: string | null
+          vessel_id?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aircraft_flights_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aircraft_flights_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       change_orders: {
         Row: {
           approval_id: string | null
@@ -1908,6 +1998,7 @@ export type Database = {
         Row: {
           client_id: string | null
           created_at: string
+          flight_id: string | null
           id: string
           kind: string
           log_entry_id: string | null
@@ -1928,6 +2019,7 @@ export type Database = {
         Insert: {
           client_id?: string | null
           created_at?: string
+          flight_id?: string | null
           id?: string
           kind?: string
           log_entry_id?: string | null
@@ -1948,6 +2040,7 @@ export type Database = {
         Update: {
           client_id?: string | null
           created_at?: string
+          flight_id?: string | null
           id?: string
           kind?: string
           log_entry_id?: string | null
@@ -1966,6 +2059,13 @@ export type Database = {
           voided_by_name?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "part_readings_flight_id_fkey"
+            columns: ["flight_id"]
+            isOneToOne: false
+            referencedRelation: "aircraft_flights"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "part_readings_log_entry_id_fkey"
             columns: ["log_entry_id"]
@@ -3401,6 +3501,10 @@ export type Database = {
         Args: { p_from_project_id?: string; p_vessel_name?: string }
         Returns: Json
       }
+      action_open_tech_log: {
+        Args: { p_from_project_id: string }
+        Returns: Json
+      }
       action_place_part: {
         Args: {
           p_clear?: boolean
@@ -3456,6 +3560,23 @@ export type Database = {
           p_project_id: string
           p_severity?: string
           p_title?: string
+        }
+        Returns: Json
+      }
+      action_record_flight: {
+        Args: {
+          p_arrival: string
+          p_block_off: string
+          p_block_on: string
+          p_client_id?: string
+          p_departure: string
+          p_flight_date: string
+          p_landing_at?: string
+          p_landings?: number
+          p_notes?: string
+          p_pic_name?: string
+          p_project_id: string
+          p_takeoff_at?: string
         }
         Returns: Json
       }
@@ -3791,6 +3912,10 @@ export type Database = {
         }
         Returns: Json
       }
+      action_void_flight: {
+        Args: { p_flight_id: string; p_project_id: string; p_reason: string }
+        Returns: Json
+      }
       action_void_log_entry: {
         Args: { p_entry_id: string; p_project_id: string; p_reason: string }
         Returns: Json
@@ -3803,6 +3928,17 @@ export type Database = {
         Args: { p_project_id: string; p_reason: string; p_record_id: string }
         Returns: Json
       }
+      aircraft_rerecord_hours: {
+        Args: {
+          p_from: string
+          p_project_id: string
+          p_reason: string
+          p_vessel_id: string
+        }
+        Returns: number
+      }
+      aircraft_totals: { Args: { p_project_id: string }; Returns: Json }
+      aircraft_totals_for: { Args: { p_vessel_id: string }; Returns: Json }
       approval_days_for_tier: {
         Args: { p_tier: Database["public"]["Enums"]["approval_tier"] }
         Returns: number
@@ -4053,6 +4189,10 @@ export type Database = {
           currency: string
           month: string
         }[]
+      }
+      flight_hours: {
+        Args: { f: Database["public"]["Tables"]["aircraft_flights"]["Row"] }
+        Returns: number
       }
       is_project_member: { Args: { p_project_id: string }; Returns: boolean }
       log_alongside: {
@@ -4368,6 +4508,9 @@ export type Database = {
         | "CADASTRAL"
         | "ENERGY"
         | "LANDSCAPE"
+        | "AIRFRAME"
+        | "POWERPLANT"
+        | "AVIONICS"
       disposition: "REPAIR" | "REPLACE" | "MONITOR" | "ACCEPT_AS_IS" | "PENDING"
       doc_type:
         | "SURVEY_REPORT"
@@ -4389,6 +4532,9 @@ export type Database = {
         | "DEED"
         | "COMPLIANCE_DECLARATION"
         | "LANDSCAPE_CLEARANCE"
+        | "CRS"
+        | "AIRWORTHINESS_REVIEW"
+        | "TECH_LOG"
       document_status: "DRAFT" | "UNDER_REVIEW" | "APPROVED" | "SUPERSEDED"
       inspection_result: "PASS" | "CONDITIONAL_PASS" | "FAIL" | "PENDING"
       log_entry_kind:
@@ -4441,6 +4587,7 @@ export type Database = {
         | "FINANCE_CONNECTION"
         | "PAYMENT_AGREEMENT"
         | "PAYMENT_MILESTONE"
+        | "FLIGHT"
       project_phase:
         | "PRE_SURVEY"
         | "HAUL_OUT"
@@ -4455,6 +4602,9 @@ export type Database = {
         | "REMEDIATION"
         | "CERTIFICATION"
         | "IN_SERVICE"
+        | "INDUCTION"
+        | "FUNCTIONAL_TESTS"
+        | "RETURN_TO_SERVICE"
       project_type:
         | "FIVE_YEAR_SURVEY"
         | "REFIT"
@@ -4463,6 +4613,8 @@ export type Database = {
         | "DAMAGE_REPAIR"
         | "PROPERTY"
         | "OPERATIONS"
+        | "AIRCRAFT_CHECK"
+        | "AIRCRAFT_REFURB"
       root_cause:
         | "WEAR"
         | "CORROSION"
@@ -4660,6 +4812,9 @@ export const Constants = {
         "CADASTRAL",
         "ENERGY",
         "LANDSCAPE",
+        "AIRFRAME",
+        "POWERPLANT",
+        "AVIONICS",
       ],
       disposition: ["REPAIR", "REPLACE", "MONITOR", "ACCEPT_AS_IS", "PENDING"],
       doc_type: [
@@ -4682,6 +4837,9 @@ export const Constants = {
         "DEED",
         "COMPLIANCE_DECLARATION",
         "LANDSCAPE_CLEARANCE",
+        "CRS",
+        "AIRWORTHINESS_REVIEW",
+        "TECH_LOG",
       ],
       document_status: ["DRAFT", "UNDER_REVIEW", "APPROVED", "SUPERSEDED"],
       inspection_result: ["PASS", "CONDITIONAL_PASS", "FAIL", "PENDING"],
@@ -4737,6 +4895,7 @@ export const Constants = {
         "FINANCE_CONNECTION",
         "PAYMENT_AGREEMENT",
         "PAYMENT_MILESTONE",
+        "FLIGHT",
       ],
       project_phase: [
         "PRE_SURVEY",
@@ -4752,6 +4911,9 @@ export const Constants = {
         "REMEDIATION",
         "CERTIFICATION",
         "IN_SERVICE",
+        "INDUCTION",
+        "FUNCTIONAL_TESTS",
+        "RETURN_TO_SERVICE",
       ],
       project_type: [
         "FIVE_YEAR_SURVEY",
@@ -4761,6 +4923,8 @@ export const Constants = {
         "DAMAGE_REPAIR",
         "PROPERTY",
         "OPERATIONS",
+        "AIRCRAFT_CHECK",
+        "AIRCRAFT_REFURB",
       ],
       root_cause: [
         "WEAR",

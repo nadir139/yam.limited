@@ -1,7 +1,7 @@
 import { day, eur, NONE } from '@/lib/format'
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Anchor, BookOpen, Gauge, Pencil, Plus } from 'lucide-react'
+import { Anchor, BookOpen, Gauge, Pencil, Plane, Plus } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -20,10 +20,12 @@ import {
   usePermissions,
   useMyRole,
   useOpenInUse,
+  useOpenTechLog,
   useOpenLogbook,
   useYardDays,
 } from '@/lib/query-hooks'
 import { useActiveProject } from '@/contexts/ProjectContext'
+import { assetKindOf } from '@/lib/asset'
 
 /** A measurement with its unit, or a dash when nobody has recorded it. */
 const measure = (n: number | null | undefined, unit: string) => (n == null ? NONE : `${n}${unit}`)
@@ -55,6 +57,7 @@ export default function ProjectOverview() {
   const { projects, setActiveProjectId } = useActiveProject()
   const openLogbook = useOpenLogbook()
   const openInUse = useOpenInUse()
+  const openTechLog = useOpenTechLog()
   const [logbookError, setLogbookError] = useState<string | null>(null)
   // Days the boat's crew logged in the yard for this refit (migration 037).
   const workOnVessel = !!project?.vessel_id && project.project_type !== 'OPERATIONS' && project.project_type !== 'PROPERTY'
@@ -87,8 +90,14 @@ export default function ProjectOverview() {
     : undefined
   const mayOpenLogbook = role === 'OWNER' || role === 'OWNERS_REP' || role === 'CAPTAIN'
 
-  const isBuilding = project.project_type === 'PROPERTY' || vessel?.asset_kind === 'BUILDING'
-  const QUICK_LINKS = isOps && isBuilding ? [
+  const assetKind = assetKindOf(project)
+  const isBuilding = assetKind === 'BUILDING'
+  const QUICK_LINKS = isOps && assetKind === 'AIRCRAFT' ? [
+    { label: 'Tech log', count: null, path: '/app/tech-log', color: 'hsl(var(--primary))' },
+    { label: 'Maintenance', count: null, path: '/app/maintenance', color: 'hsl(var(--accent))' },
+    { label: 'Documents', count: documents.length, path: '/app/documents', color: 'hsl(var(--success))' },
+    { label: 'Team Members', count: team.length, path: '/app/team', color: 'hsl(215 50% 50%)' },
+  ] : isOps && isBuilding ? [
     { label: 'Maintenance', count: null, path: '/app/maintenance', color: 'hsl(var(--primary))' },
     { label: 'Parts', count: null, path: '/app/parts', color: 'hsl(var(--accent))' },
     { label: 'Documents', count: documents.length, path: '/app/documents', color: 'hsl(var(--success))' },
@@ -119,8 +128,8 @@ export default function ProjectOverview() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* The asset: a building on a property project (migration 043), else the boat. */}
-        {isBuilding ? (
-          <AssetCard kind="BUILDING" asset={vessel ?? null} canEdit={can('action_set_project_asset')} />
+        {assetKind !== 'VESSEL' ? (
+          <AssetCard kind={assetKind} asset={vessel ?? null} canEdit={can('action_set_project_asset')} />
         ) : (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -226,6 +235,48 @@ export default function ProjectOverview() {
                   }}
                 >
                   {openLogbook.isPending ? 'Opening…' : 'Open the logbook'}
+                </Button>
+              )}
+              {logbookError && <p className="text-xs" style={{ color: 'hsl(var(--destructive))' }}>{logbookError}</p>}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* An aircraft's tech log (migration 045): its flights, total time and maintenance. */}
+        {!isOps && vessel?.asset_kind === 'AIRCRAFT' && (logbookProject || mayOpenLogbook) && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Plane size={16} /> The tech log
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3 px-4 pb-4 pt-0 text-sm">
+              <p style={{ color: 'hsl(var(--muted-foreground))' }}>
+                {vessel.name}'s flights, total time and landings, and the maintenance they move. It stays with the aircraft across
+                every check and owner.
+              </p>
+              {logbookProject ? (
+                <Button
+                  size="sm"
+                  className="self-start"
+                  onClick={() => {
+                    setActiveProjectId(logbookProject.id)
+                    navigate('/app/tech-log')
+                  }}
+                >
+                  Go to the tech log
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  className="self-start"
+                  disabled={openTechLog.isPending}
+                  onClick={() => {
+                    setLogbookError(null)
+                    openTechLog.mutate(project.id, { onSuccess: () => navigate('/app/tech-log'), onError: (e) => setLogbookError(e.message) })
+                  }}
+                >
+                  {openTechLog.isPending ? 'Opening…' : 'Open the tech log'}
                 </Button>
               )}
               {logbookError && <p className="text-xs" style={{ color: 'hsl(var(--destructive))' }}>{logbookError}</p>}

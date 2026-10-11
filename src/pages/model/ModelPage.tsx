@@ -53,6 +53,7 @@ import {
   type Vec3,
 } from '@/lib/vessel-model'
 import type { Part } from '@/lib/types'
+import { assetKindOf } from '@/lib/asset'
 
 // YAManagement: the project as one model. The object graph says what kinds of
 // thing exist and how they relate; the vessel view puts the physical ones --
@@ -309,7 +310,9 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
     return systemColour.get(partSystem(p.part, byId).id) ?? SYSTEM_PALETTE[0]
   }
 
-  const isProperty = project?.project_type === 'PROPERTY'
+  // The 3D view draws a hull: for a boat only (a building or an aircraft gets the graph).
+  const assetKind = assetKindOf(project)
+  const isProperty = assetKind !== 'VESSEL'
   const selected = selectedPartId ? byId.get(selectedPartId) ?? null : null
   const placed = selected ? model.parts.find((p) => p.part.id === selected.id) : undefined
   const selectedSpace = selectedSpaceId ? model.spaces.find((p) => p.space.id === selectedSpaceId) ?? null : null
@@ -364,7 +367,7 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
     return (
       <Card>
         <CardContent className="p-6 text-sm">
-          The 3D view draws a hull, so it is for boats. This project is a property:{' '}
+          The 3D view draws a hull, so it is for boats. This project's asset is {assetKind === 'AIRCRAFT' ? 'an aircraft' : 'a building'}:{' '}
           <button className="font-medium underline" onClick={onOpenGraph}>
             open the object graph
           </button>{' '}

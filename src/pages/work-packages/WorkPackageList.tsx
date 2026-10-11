@@ -27,6 +27,9 @@ const DISCIPLINE_COLORS: Record<Discipline, { bg: string; text: string }> = {
   CADASTRAL: { bg: 'hsl(280 50% 45% / 0.12)', text: 'hsl(280 50% 42%)' },
   ENERGY: { bg: 'hsl(90 55% 40% / 0.14)', text: 'hsl(90 55% 30%)' },
   LANDSCAPE: { bg: 'hsl(170 50% 38% / 0.14)', text: 'hsl(170 50% 30%)' },
+  AIRFRAME: { bg: 'hsl(200 40% 40% / 0.14)', text: 'hsl(200 45% 32%)' },
+  POWERPLANT: { bg: 'hsl(10 70% 50% / 0.12)', text: 'hsl(10 70% 42%)' },
+  AVIONICS: { bg: 'hsl(240 50% 55% / 0.12)', text: 'hsl(240 50% 45%)' },
 }
 
 /**

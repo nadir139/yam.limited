@@ -1618,3 +1618,57 @@ export function usePaymentAction() {
     onSuccess: invalidate,
   })
 }
+
+// ─── Aircraft tech log (migration 045) ────────────────────────────────────────
+
+export const useFlights = () => {
+  const { data: project } = useProject()
+  const vesselId = project?.vessel_id ?? null
+  return useQuery({
+    queryKey: ['flights', vesselId],
+    queryFn: () => db.fetchFlights(vesselId!),
+    enabled: !!vesselId,
+  })
+}
+
+export const useAircraftTotals = (enabled = true) => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: ['flights', 'totals', projectId],
+    queryFn: () => db.fetchAircraftTotals(projectId),
+    enabled: !!projectId && enabled,
+  })
+}
+
+function useFlightInvalidation() {
+  const qc = useQueryClient()
+  return () => {
+    qc.invalidateQueries({ queryKey: ['flights'] })
+    // Each flight moves the airframe's hours, so what is due moves too.
+    qc.invalidateQueries({ queryKey: ['maintenance'] })
+  }
+}
+
+export function useRecordFlight() {
+  const projectId = useProjectId()
+  const invalidate = useFlightInvalidation()
+  return useMutation({ mutationFn: (input: db.FlightInput) => db.recordFlight(projectId, input), onSuccess: invalidate })
+}
+
+export function useVoidFlight() {
+  const projectId = useProjectId()
+  const invalidate = useFlightInvalidation()
+  return useMutation({ mutationFn: (v: { id: string; reason: string }) => db.voidFlight(projectId, v.id, v.reason), onSuccess: invalidate })
+}
+
+export function useOpenTechLog() {
+  const qc = useQueryClient()
+  const { setActiveProjectId } = useActiveProject()
+  return useMutation({
+    mutationFn: (fromProjectId: string) => db.openTechLog(fromProjectId),
+    onSuccess: (project) => {
+      qc.invalidateQueries({ queryKey: ['my-projects'] })
+      setActiveProjectId(project.id)
+    },
+  })
+}

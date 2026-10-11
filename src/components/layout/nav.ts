@@ -20,6 +20,7 @@ import {
   Gauge,
   Droplets,
   Wallet,
+  Plane,
   HandCoins,
   type LucideIcon,
 } from 'lucide-react'
@@ -75,6 +76,11 @@ const LOGBOOK_KEEPS = new Set([
 // 044) has no log days, crew, rest or Oil Record Book: its home is the
 // maintenance of the building, with its parts, money and NCRs alongside.
 const IN_USE_ITEMS: NavItem[] = [{ icon: Gauge, labelKey: 'nav.maintenance', path: '/app/maintenance' }]
+// An aircraft's tech log (migration 045): its flights, then its maintenance.
+const TECH_LOG_ITEMS: NavItem[] = [
+  { icon: Plane, labelKey: 'nav.techLog', path: '/app/tech-log' },
+  { icon: Gauge, labelKey: 'nav.maintenance', path: '/app/maintenance' },
+]
 const IN_USE_KEEPS = new Set([
   '/app/project', '/app/parts', '/app/defects', '/app/finance', '/app/documents', '/app/action-items', '/app/messages', '/app/team',
 ])
@@ -92,12 +98,13 @@ export function navItemsFor(type: ProjectType, role?: UserRole | null, kind?: As
   if (type !== 'OPERATIONS') return forRole(NAV_ITEMS)
   const agent = NAV_ITEMS.filter((i) => i.path === '/app/agent')
   if (kind === 'BUILDING') return forRole([...agent, ...IN_USE_ITEMS, ...NAV_ITEMS.filter((i) => IN_USE_KEEPS.has(i.path))])
+  if (kind === 'AIRCRAFT') return forRole([...agent, ...TECH_LOG_ITEMS, ...NAV_ITEMS.filter((i) => IN_USE_KEEPS.has(i.path))])
   return forRole([...agent, ...LOGBOOK_ITEMS, ...NAV_ITEMS.filter((i) => LOGBOOK_KEEPS.has(i.path) && i.path !== '/app/agent')])
 }
 
 /** Where a project of this type opens. */
 export const homeFor = (type: ProjectType, kind?: AssetKind) =>
-  type === 'OPERATIONS' ? (kind === 'BUILDING' ? '/app/maintenance' : '/app/logbook') : '/app/dashboard'
+  type === 'OPERATIONS' ? (kind === 'BUILDING' ? '/app/maintenance' : kind === 'AIRCRAFT' ? '/app/tech-log' : '/app/logbook') : '/app/dashboard'
 
 /** Whether a page belongs to a project of this type; switching to one that lacks it goes home. */
 export function pathFits(type: ProjectType, pathname: string, kind?: AssetKind) {

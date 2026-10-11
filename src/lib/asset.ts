@@ -11,7 +11,9 @@ interface ProjectLike {
 
 /** The kind of asset a project of this type is done to (same rule as project_asset_kind()). */
 export function kindForProjectType(type: string | null | undefined): AssetKind {
-  return type === 'PROPERTY' ? 'BUILDING' : 'VESSEL'
+  if (type === 'PROPERTY') return 'BUILDING'
+  if (type === 'AIRCRAFT_CHECK' || type === 'AIRCRAFT_REFURB') return 'AIRCRAFT'
+  return 'VESSEL'
 }
 
 /** The project's asset kind: the recorded asset's, else what its type implies. */
@@ -59,5 +61,7 @@ export const DETAIL_FIELDS: Record<'BUILDING' | 'AIRCRAFT', DetailField[]> = {
     { key: 'base', label: 'Base', type: 'text', placeholder: 'LIML' },
     { key: 'operator', label: 'Operator', type: 'text' },
     { key: 'type_certificate', label: 'Type certificate', type: 'text' },
+    { key: 'hours_at_entry', label: 'Airframe hours when recorded here', type: 'number', unit: 'h' },
+    { key: 'landings_at_entry', label: 'Landings when recorded here', type: 'number' },
   ],
 }

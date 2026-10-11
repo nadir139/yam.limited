@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Check, ChevronsUpDown, Plus, Ship, Home, ClipboardCheck, BookOpen } from 'lucide-react'
+import { BookOpen, Check, ChevronsUpDown, ClipboardCheck, Home, Plane, Plus, Ship } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -28,7 +28,8 @@ import type { Project } from '@/lib/types'
 
 function projectIcon(type: Project['project_type'], kind?: string | null) {
   if (type === 'PROPERTY') return Home
-  if (type === 'OPERATIONS') return kind === 'BUILDING' ? Home : BookOpen
+  if (type === 'AIRCRAFT_CHECK' || type === 'AIRCRAFT_REFURB') return Plane
+  if (type === 'OPERATIONS') return kind === 'BUILDING' ? Home : kind === 'AIRCRAFT' ? Plane : BookOpen
   if (type === 'FIVE_YEAR_SURVEY' || type === 'ANNUAL_SURVEY') return ClipboardCheck
   return Ship
 }
@@ -42,7 +43,10 @@ function projectIcon(type: Project['project_type'], kind?: string | null) {
  */
 function describe(p: ProjectWithVessel, t: (k: string) => string) {
   // A building's OPERATIONS project is its record in use, not a logbook.
-  const type = p.project_type === 'OPERATIONS' && p.vessel?.asset_kind === 'BUILDING' ? 'In use' : t(`projectType.${p.project_type}`)
+  const type =
+    p.project_type === 'OPERATIONS' && p.vessel?.asset_kind === 'BUILDING' ? 'In use'
+      : p.project_type === 'OPERATIONS' && p.vessel?.asset_kind === 'AIRCRAFT' ? 'Tech log'
+        : t(`projectType.${p.project_type}`)
   return [p.vessel?.name, type, p.yard_location || p.yard_name]
     .filter(Boolean)
     .join(' · ')
