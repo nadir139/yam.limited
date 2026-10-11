@@ -31,6 +31,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { parseRevolutCsv, type ParseResult } from '@/lib/revolut-csv'
 import { CATEGORY_LABEL, suggest, type Candidates, type FinanceCategory, type Suggestion } from '@/lib/finance-match'
 import { receiptUrl, uploadReceipt } from '@/lib/finance-files-client'
+import { RevolutConnection } from '@/components/finance/RevolutConnection'
 import type { FinanceAccount, FinanceAllocation, FinanceReceipt, FinanceTransaction } from '@/lib/types'
 
 // The money in the ontology (migration 040).
@@ -127,6 +128,8 @@ export default function FinancePage() {
           )}
         </div>
       </div>
+
+      <RevolutConnection connections={ledger?.connections ?? []} canManage={role === 'OWNER' || role === 'OWNERS_REP'} />
 
       {adding && <AccountForm onDone={() => setAdding(false)} />}
       {importing && <ImportPanel accounts={accounts} onDone={() => setImporting(false)} />}

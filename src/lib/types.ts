@@ -93,6 +93,8 @@ export type FinanceTransaction = Row<'finance_transactions'>
 export type FinanceAllocation = Row<'finance_allocations'>
 export type FinanceImport = Row<'finance_imports'>
 export type FinanceReceipt = Row<'finance_receipts'>
+/** A read-only Revolut Business connection (migration 041); its credentials never leave the server. */
+export type FinanceConnection = Row<'finance_connections'>
 export interface FinanceSummaryRow {
   month: string
   category: string
