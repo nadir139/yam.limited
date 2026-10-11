@@ -45,7 +45,7 @@ export default function MobileNav() {
   const { activeProject } = useActiveProject()
   const type = activeProject?.project_type
   const bar = type === 'OPERATIONS' ? LOGBOOK_BAR : BAR
-  const items = navItemsFor(type)
+  const items = navItemsFor(type, role)
 
   const { data: defects = [] } = useDefects()
   const { data: approvals = [] } = useApprovals()

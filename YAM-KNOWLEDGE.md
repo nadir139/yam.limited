@@ -2239,3 +2239,75 @@ correction before striking is refused; strike then correct works; code G
 appears in the log; the engineer cannot countersign, the master signs all
 four once and a second time finds nothing; direct delete and update are
 denied; the owner's rep cannot write the book.
+
+## 44. The money in the ontology: ledger and Revolut import (migration 040)
+
+Owners of the yachts YAM serves typically run the boat out of a Revolut
+Business account and a pile of receipts, with no accounting system. Yacht
+management firms (Voly and others) hold the operating float and sell the
+owner a cost report. YAM already has what that report lacks: the thing each
+payment was for. So the ledger records every bank transaction against an
+object of the model, and the cost of ownership falls out of it (per work
+package, per system, per bunkering, per day in port).
+
+Plan, in three steps: **F1** (this) the ledger and the CSV import; **F2** a
+direct Revolut Business API connection (accounts and transactions synced,
+no export); **F3** refit milestone payments held and released against the
+model (work package done, inspection passed, NCR closed). F3 moves real
+money only through a licensed partner (escrow / safeguarding); until a
+contract exists the model records agreements, milestones and approvals, and
+the money stays in the owner's bank.
+
+Tables (all RLS by `can_read_finance(vessel, project)`: OWNER, OWNERS_REP or
+CAPTAIN on any project of the vessel, or of a property project):
+- `finance_accounts` — one per account and currency (a Revolut EUR and GBP
+  pocket are two accounts). Kept by vessel, so every project of the boat
+  sees the same ledger.
+- `finance_transactions` — as the bank said it, with the raw row. Never
+  edited by people. A re-import adds nothing (unique account + external
+  id); a row the bank changed (pending → completed, reverted) is updated and
+  the before/after kept.
+- `finance_allocations` — amount + category + optionally an object
+  (WORK_PACKAGE, DEFECT_RECORD, CHANGE_ORDER, INSPECTION_EVENT, PROJECT,
+  PART, SERVICE_RECORD, ORB_ENTRY, LOG_DAY, CREW). Split allowed; the total
+  cannot exceed the transaction; the object must be on the same asset.
+  Removed with a reason, never deleted.
+- `finance_imports` — file, source, counts. `finance_receipts` — file name,
+  sha256, size, path in the private bucket `finance-receipts`.
+- `finance_events` — the before/after of every finance change. Finance
+  writes go **only** here, not to `world_model_events`, which crew read.
+
+Reads: `finance_summary(project, from, to)` (month × category × currency,
+with UNALLOCATED_OUT / UNALLOCATED_IN for money not yet put against
+anything) and `finance_by_object(project)` (spent/received per object, all
+time).
+
+Receipts: the bucket has no storage policies on purpose (crew read the
+project documents bucket; they must not read the owner's). The
+`finance-files` Edge Function checks with the caller's JWT that they can see
+the transaction, hashes and stores the file with the service role, then
+registers it through `action_attach_receipt` as the caller; GET returns a
+5-minute signed URL.
+
+Client: `src/lib/revolut-csv.ts` reads business and personal exports
+(columns looked up by any name they have had; "Payer" in a business export
+is the cardholder, not the merchant, so the counterparty comes from the
+description; personal exports have no id, so a fingerprint of the row
+stands in). `src/lib/finance-match.ts` suggests what a payment was for
+(bunkering in the Oil Record Book within two days, exact change-order
+amount, the work package's contractor, a marina on a day in port); nothing
+is allocated until a person confirms. Page `/app/finance`, in the nav for
+the three finance roles only.
+
+Agent: `get_finance` (refuses for other roles rather than returning an
+empty ledger); `action_allocate_transaction` is agent-usable, the other
+finance actions are not. The agent records payments, never makes them.
+
+Verified: migration steps tested in rolled-back transactions on the live
+database (Lucky Bird refit and logbook); browser test against a mocked
+backend (add account, import a business CSV with a GBP row left out, fuel
+suggestion → ORB entry, a yard payment split into two allocations, one
+removed with its reason, summary and cost by object, re-import adds
+nothing, crew get the private message and no finance calls).
+**Not yet verified with a real Revolut export:** column names follow
+Revolut's documented exports; check the first real file and adjust.

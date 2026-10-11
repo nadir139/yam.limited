@@ -185,6 +185,16 @@ export function useRealtimeSync() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orb_entries' }, () =>
         qc.invalidateQueries({ queryKey: ['orb'] }),
       )
+      // Finance: RLS delivers these only to the owner side and the captain.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'finance_transactions' }, () =>
+        qc.invalidateQueries({ queryKey: ['finance'] }),
+      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'finance_allocations' }, () =>
+        qc.invalidateQueries({ queryKey: ['finance'] }),
+      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'finance_receipts' }, () =>
+        qc.invalidateQueries({ queryKey: ['finance'] }),
+      )
       // Hours of rest: RLS decides who receives these, so only the crew member
       // and the captain see the record change live.
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rest_records' }, () =>

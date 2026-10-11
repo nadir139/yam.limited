@@ -87,6 +87,26 @@ export type ServiceRecord = Row<'service_records'>
 export type CrewCertificate = Row<'crew_certificates'>
 /** The Oil Record Book, Part I (migration 039). */
 export type OrbEntry = Row<'orb_entries'>
+/** Finance (migration 040): the money in the ontology. Owner side and captain only. */
+export type FinanceAccount = Row<'finance_accounts'>
+export type FinanceTransaction = Row<'finance_transactions'>
+export type FinanceAllocation = Row<'finance_allocations'>
+export type FinanceImport = Row<'finance_imports'>
+export type FinanceReceipt = Row<'finance_receipts'>
+export interface FinanceSummaryRow {
+  month: string
+  category: string
+  currency: string
+  amount: number
+}
+export interface FinanceByObject {
+  object_type: string
+  object_id: string
+  currency: string
+  spent: number
+  received: number
+  transactions: number
+}
 export interface SeaTime {
   crew_id: string
   days_aboard: number

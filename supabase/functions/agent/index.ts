@@ -237,6 +237,20 @@ function buildTools(
         required: [],
       },
     },
+    {
+      name: "get_finance",
+      description:
+        "The money of the asset (migration 040), readable only by the owner, the owner's rep and the captain: the accounts; totals by month and category for a date range (default: this year), with UNALLOCATED_OUT / UNALLOCATED_IN for money not yet put against anything; what each object has cost over all time (work packages, change orders, NCRs, parts, Oil Record Book bunkerings, log days, crew); and the transactions in the range with what each was put against (removed allocations included with the reason) and how many receipts it has. Amounts are signed: negative is money out. Call this before answering what something cost, what was spent on what, or which payments still need putting against something, and before action_allocate_transaction (to find the transaction id and what is left of it). Dates are YYYY-MM-DD.",
+      input_schema: {
+        type: "object",
+        properties: {
+          from: { type: "string", description: "First day, YYYY-MM-DD (default 1 January this year)" },
+          to: { type: "string", description: "Last day, YYYY-MM-DD (default today)" },
+          only_unallocated: { type: "boolean", description: "Only transactions with money not yet put against anything" },
+        },
+        required: [],
+      },
+    },
   ];
 
   const actionTools = actions.map((a) => {
@@ -334,6 +348,9 @@ You can write the log: "log: left Palma 08:00, 42 nm to Ibiza" becomes action_ad
 
 ## Maintenance
 Parts carry readings (running hours on a meter) and service intervals ("oil and filter every 250 h or 12 months"). Call get_maintenance before answering what is due or when something was last done, and answer from its status and hours: it counts hours run since the last service across meter replacements. "Main engine 4,312 h" is action_record_reading on that part (it is also written in the log); a figure lower than the last needs p_reset_reason, so ask whether the meter was replaced rather than guessing. "Changed the oil on the port genset" is action_record_service against the matching interval (or with p_note when there is none); give p_hours_at when the hours were said. Set intervals up with action_set_service_interval, including when it was last done if known, or nothing can be counted. Never invent hours or dates.
+
+## Money
+The owner's bank transactions are in the model (imported from Revolut), each put against what it paid for: a work package, a change order, an NCR, a part, a bunkering in the Oil Record Book, a day in port, a crew member. Only the owner, the owner's rep and the captain can read it; for anyone else get_finance says so, and you say so too rather than guessing figures. Call get_finance before answering what something cost or what was spent, and answer from it: name money not yet put against anything (UNALLOCATED) rather than leaving it out of a total. "That Repsol payment was the Palma bunkering" is action_allocate_transaction with the transaction's id, its remaining amount, category FUEL and the ORB_ENTRY; a payment covering two things is two allocations. Never move or promise money: the model records payments, it does not make them.
 
 ## Act
 When you are asked to record something, record it. A list of jobs is a list of records: one work package per item, all issued together as parallel tool calls in a single turn, not one per turn. Check what already exists once, up front, so you do not file a duplicate. Fill the fields you were given, leave unknown optional fields empty, and state your assumptions in one line afterwards -- a filed record that ${actorName} corrects beats an interrogation.
@@ -976,6 +993,83 @@ Deno.serve(async (req: Request) => {
       if (failed?.error) return { error: failed.error.message };
       const due = ((dueRes.data ?? []) as Array<{ part_id: string }>).filter((r) => !partId || r.part_id === partId);
       return { intervals: due, readings: readingsRes.data, services: servicesRes.data };
+    }
+
+    if (name === "get_finance") {
+      // Finance is private to the owner side and the captain (can_read_finance).
+      // RLS would return nothing anyway; saying so stops the model reading an
+      // empty ledger as "nothing was spent".
+      const { data: allowed, error: allowedError } = await supabase.rpc("can_read_finance", {
+        p_vessel_id: project.vessel_id,
+        p_project_id: projectId,
+      });
+      if (allowedError) return { error: allowedError.message };
+      if (!allowed) return { error: `The money of this asset is kept by the owner, the owner's rep and the captain; ${actorName} is not one of them, so say so and do not guess figures.` };
+
+      const isDay = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const to = isDay(input.to) ? input.to : todayStr;
+      const from = isDay(input.from) ? input.from : `${to.slice(0, 4)}-01-01`;
+      if (Date.parse(from) > Date.parse(to)) return { error: "from is after to" };
+      const afterTo = new Date(Date.parse(to) + 86_400_000).toISOString().slice(0, 10);
+
+      const accountsQ = supabase.from("finance_accounts").select("id, name, provider, currency, closed_at");
+      const txQ = supabase
+        .from("finance_transactions")
+        .select("id, account_id, booked_at, amount, currency, fee, original_amount, original_currency, counterparty, description, reference, state")
+        .gte("booked_at", `${from}T00:00:00Z`)
+        .lt("booked_at", `${afterTo}T00:00:00Z`)
+        .order("booked_at", { ascending: false })
+        .limit(300);
+      const [accountsRes, txRes, summaryRes, byObjectRes] = await Promise.all([
+        scopeParts(accountsQ),
+        scopeParts(txQ),
+        supabase.rpc("finance_summary", { p_project_id: projectId, p_from: from, p_to: to }),
+        supabase.rpc("finance_by_object", { p_project_id: projectId }),
+      ]);
+      const failed = [accountsRes, txRes, summaryRes, byObjectRes].find((r) => r.error);
+      if (failed?.error) return { error: failed.error.message };
+
+      type Tx = { id: string; amount: number; state: string };
+      const txs = (txRes.data ?? []) as Tx[];
+      const ids = txs.map((t) => t.id);
+      const allocations: Array<{ transaction_id: string; amount: number; removed_at: string | null }> = [];
+      const receiptCount = new Map<string, number>();
+      // Ids go in the URL: 100 at a time.
+      for (let i = 0; i < ids.length; i += 100) {
+        const chunk = ids.slice(i, i + 100);
+        const [aRes, rRes] = await Promise.all([
+          supabase
+            .from("finance_allocations")
+            .select("transaction_id, amount, category, object_type, object_id, note, created_by_name, removed_at, removed_reason")
+            .in("transaction_id", chunk),
+          supabase.from("finance_receipts").select("transaction_id").in("transaction_id", chunk).is("removed_at", null),
+        ]);
+        if (aRes.error) return { error: aRes.error.message };
+        if (rRes.error) return { error: rRes.error.message };
+        allocations.push(...(aRes.data ?? []));
+        for (const r of rRes.data ?? []) receiptCount.set(r.transaction_id, (receiptCount.get(r.transaction_id) ?? 0) + 1);
+      }
+      const rows = txs.map((t) => {
+        const own = allocations.filter((a) => a.transaction_id === t.id);
+        const taken = own.filter((a) => !a.removed_at).reduce((sum, a) => sum + Number(a.amount), 0);
+        const moved = !["DECLINED", "FAILED", "REVERTED"].includes(t.state);
+        return {
+          ...t,
+          not_yet_allocated: moved ? Math.round((Math.abs(Number(t.amount)) - taken) * 100) / 100 : 0,
+          allocations: own.map(({ transaction_id: _t, ...a }) => a),
+          receipts: receiptCount.get(t.id) ?? 0,
+        };
+      });
+      return {
+        from,
+        to,
+        accounts: accountsRes.data,
+        summary: summaryRes.data,
+        cost_by_object_all_time: byObjectRes.data,
+        transactions: input.only_unallocated === true ? rows.filter((r) => r.not_yet_allocated > 0.004) : rows,
+        truncated: txs.length === 300 ? "only the latest 300 transactions in the range; narrow the dates for older ones" : undefined,
+      };
     }
 
     if (name === "get_logbook") {
