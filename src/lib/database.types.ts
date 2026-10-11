@@ -2849,11 +2849,13 @@ export type Database = {
       }
       vessels: {
         Row: {
+          asset_kind: string
           beam: number | null
           build_yard: string | null
           class_number: string | null
           class_society: Database["public"]["Enums"]["class_society"] | null
           created_at: string | null
+          details: Json
           draft: number | null
           flag_state: string | null
           gross_tonnage: number | null
@@ -2867,11 +2869,13 @@ export type Database = {
           year_built: number | null
         }
         Insert: {
+          asset_kind?: string
           beam?: number | null
           build_yard?: string | null
           class_number?: string | null
           class_society?: Database["public"]["Enums"]["class_society"] | null
           created_at?: string | null
+          details?: Json
           draft?: number | null
           flag_state?: string | null
           gross_tonnage?: number | null
@@ -2885,11 +2889,13 @@ export type Database = {
           year_built?: number | null
         }
         Update: {
+          asset_kind?: string
           beam?: number | null
           build_yard?: string | null
           class_number?: string | null
           class_society?: Database["public"]["Enums"]["class_society"] | null
           created_at?: string | null
+          details?: Json
           draft?: number | null
           flag_state?: string | null
           gross_tonnage?: number | null
@@ -3655,6 +3661,15 @@ export type Database = {
         }
         Returns: Json
       }
+      action_set_project_asset: {
+        Args: {
+          p_details?: Json
+          p_name?: string
+          p_project_id?: string
+          p_year_built?: number
+        }
+        Returns: Json
+      }
       action_set_project_vessel: {
         Args: {
           p_beam?: number
@@ -3792,6 +3807,7 @@ export type Database = {
         Args: { p_cost: number }
         Returns: Database["public"]["Enums"]["approval_tier"]
       }
+      asset_details_spec: { Args: { p_kind: string }; Returns: Json }
       can_keep_crew_record: {
         Args: { p_crew_id: string; p_project_id: string }
         Returns: boolean
@@ -3811,6 +3827,10 @@ export type Database = {
       can_read_rest: {
         Args: { p_crew_id: string; p_project_id: string }
         Returns: boolean
+      }
+      clean_asset_details: {
+        Args: { p_details: Json; p_kind: string }
+        Returns: Json
       }
       clean_text: { Args: { p: string }; Returns: string }
       current_actor_id: { Args: never; Returns: string }
@@ -4094,6 +4114,10 @@ export type Database = {
         Returns: Json
       }
       payment_status: { Args: { p_project_id: string }; Returns: Json }
+      project_asset_kind: {
+        Args: { p_type: Database["public"]["Enums"]["project_type"] }
+        Returns: string
+      }
       project_of_object: {
         Args: { p_object_id: string; p_object_type: string }
         Returns: string
@@ -4176,6 +4200,10 @@ export type Database = {
           p_object_id: string
           p_object_type: string
         }
+        Returns: undefined
+      }
+      require_vessel_kind: {
+        Args: { p_project_id: string }
         Returns: undefined
       }
       resolve_project: { Args: { p_explicit: string }; Returns: string }

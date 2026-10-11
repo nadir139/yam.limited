@@ -32,6 +32,7 @@ import { parseRevolutCsv, type ParseResult } from '@/lib/revolut-csv'
 import { CATEGORY_LABEL, suggest, type Candidates, type FinanceCategory, type Suggestion } from '@/lib/finance-match'
 import { receiptUrl, uploadReceipt } from '@/lib/finance-files-client'
 import { RevolutConnection } from '@/components/finance/RevolutConnection'
+import { ASSET_NOUN, assetKindOf } from '@/lib/asset'
 import type { FinanceAccount, FinanceAllocation, FinanceReceipt, FinanceTransaction } from '@/lib/types'
 
 // The money in the ontology (migration 040).
@@ -72,7 +73,7 @@ export default function FinancePage() {
       <Card>
         <CardContent className="flex items-start gap-3 p-6 text-sm">
           <Lock size={18} className="mt-0.5 shrink-0" style={muted} />
-          The money of this {project?.vessel_id ? 'boat' : 'property'} is kept by the owner, the owner's rep and the captain.
+          The money of this {ASSET_NOUN[assetKindOf(project)]} is kept by the owner, the owner's rep and the captain.
         </CardContent>
       </Card>
     )
@@ -137,7 +138,7 @@ export default function FinancePage() {
       {!isLoading && accounts.length === 0 && !adding && (
         <Card>
           <CardContent className="p-6 text-sm">
-            Add the account the {project?.vessel_id ? 'boat' : 'property'} is run from (your Revolut Business account, for
+            Add the account the {ASSET_NOUN[assetKindOf(project)]} is run from (your Revolut Business account, for
             example), then import its statement. Every transaction can then be put against what it paid for, with the receipt.
           </CardContent>
         </Card>
