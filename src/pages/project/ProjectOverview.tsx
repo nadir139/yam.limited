@@ -181,7 +181,7 @@ export default function ProjectOverview() {
         </Dialog>
 
         {/* The boat's logbook: one per vessel, shared by every project on her. */}
-        {!isOps && vessel && (logbookProject || mayOpenLogbook) && (
+        {!isOps && vessel && (vessel.asset_kind ?? 'VESSEL') === 'VESSEL' && (logbookProject || mayOpenLogbook) && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">

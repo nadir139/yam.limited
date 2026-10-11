@@ -2428,3 +2428,45 @@ mocked backend: plan, stage with a work-package and a manual condition,
 agree, yard asks, rep approves with override and confirms the manual
 condition, payment picked (the yard's transfer offered first, the marina
 charge not offered), plan shown as all paid; crew locked out.
+
+## 47. The asset is a boat, a building or an aircraft (migration 043)
+
+Step A1 of taking the model beyond boats (plan: A1 assets of any kind; A2
+a building in use — maintenance, money, payments — like a boat's logbook
+project; A3 aircraft: registration, maintenance-check projects, a tech log
+of flights with hours and cycles).
+
+`vessels` is now the **asset** record, with `asset_kind` VESSEL | BUILDING |
+AIRCRAFT and kind-specific `details` (jsonb). The table and every
+`vessel_id` keep their names: RLS, functions and indexes all scope by them,
+and renaming would change nothing but risk. In the app, docs and agent it
+is "the asset"; the registry's VESSEL type is labelled Asset.
+
+- Details are checked per kind (`asset_details_spec`, `clean_asset_details`):
+  BUILDING address, city, postcode, country, cadastral_ref, building_use,
+  floor_area_m2, plot_area_m2, floors, units, energy_class, latitude,
+  longitude; AIRCRAFT registration, manufacturer, model, msn, category,
+  engines, engine_model, mtow_kg, seats, base, operator, type_certificate.
+  Unknown keys ("adress") and non-numbers are refused; text is trimmed;
+  "" removes a key. A boat's LOA/beam/draft/hull/flag/class stay columns.
+- `project_asset_kind(type)`: PROPERTY → BUILDING, otherwise VESSEL (A3 adds
+  the aircraft types).
+- `action_set_project_asset(project, name, details, year_built)` records or
+  updates the building (merge). When a building is first recorded,
+  whatever the project held on its own moves onto it: parts, spaces,
+  connections (re-homed, `project_id` → `vessel_id`), and its finance
+  accounts, transactions, bank connections and payment plans are tied to
+  it. Logged as ASSET_CREATED with the counts moved.
+- Boat-only actions refuse other kinds (`require_vessel_kind`):
+  `action_set_project_vessel` and `action_open_logbook`.
+- UI: the Project page shows "The building" card (AssetCard) on a property
+  project, with its form; the boat logbook card is shown for boats only;
+  Finance and Parts word themselves by asset kind (`src/lib/asset.ts`).
+
+Verified on the live database in rolled-back transactions on the real
+property project (H&C Estate): typo and non-number details refused; boat
+action refused on the property; building created with clean details;
+a part recorded before the building moved onto it; merge and removal of
+details; new parts land on the building; the boat project unchanged; a
+building cannot open a boat's logbook. Browser test of the card and form
+(create with details and year, then clear a field and add another).

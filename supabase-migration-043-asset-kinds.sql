@@ -26,7 +26,8 @@
 -- plans are tied to the building, so they outlive the project like a boat's.
 --
 -- Applied to project xgpdfefxarllgykjbppn in steps: assets_1_kind, assets_1b_registry,
--- assets_2_actions, assets_2b_vessel_guard.
+-- assets_2_actions, assets_2b_vessel_guard, assets_3_logbook_guard,
+-- assets_3b_kind_message.
 
 -- 1. Kind and details ----------------------------------------------------------------------
 alter table public.vessels add column if not exists asset_kind text not null default 'VESSEL';
@@ -217,7 +218,8 @@ declare
 begin
   select v.asset_kind into v_kind from projects p join vessels v on v.id = p.vessel_id where p.id = p_project_id;
   if v_kind is not null and v_kind <> 'VESSEL' then
-    raise exception 'This project''s asset is a %: record it with action_set_project_asset', lower(v_kind) using errcode = 'P0001';
+    raise exception 'This project''s asset is a %, not a boat: this is for boats only (record a % with action_set_project_asset)',
+      lower(v_kind), lower(v_kind) using errcode = 'P0001';
   end if;
 end;
 $$;
@@ -350,5 +352,87 @@ begin
   end if;
 
   return json_build_object('vessel', row_to_json(v_after));
+end;
+$fn$;
+
+-- A boat's logbook is for a boat: refused on a building or an aircraft
+-- (assets_3_logbook_guard). Unchanged otherwise.
+create or replace function public.action_open_logbook(p_from_project_id uuid default null, p_vessel_name text default null)
+returns json
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $fn$
+declare
+  v_email text := lower(nullif(auth.jwt() ->> 'email', ''));
+  v_actor_id uuid := current_actor_id();
+  v_actor_name text := current_actor_name();
+  v_name text := nullif(trim(coalesce(p_vessel_name, '')), '');
+  v_from projects;
+  v_vessel vessels;
+  v_role user_role;
+  v_project projects;
+begin
+  if v_email is null then
+    raise exception 'You must be signed in' using errcode = 'P0001';
+  end if;
+  if (p_from_project_id is null) = (v_name is null) then
+    raise exception 'Open a logbook from a project, or name a new boat' using errcode = 'P0001';
+  end if;
+
+  if p_from_project_id is not null then
+    v_role := current_actor_role(p_from_project_id);
+    if v_role is null then
+      raise exception 'You are not a member of that project' using errcode = 'P0001';
+    end if;
+    if v_role not in ('OWNER', 'OWNERS_REP', 'CAPTAIN') then
+      raise exception 'Only the owner, the owner''s representative or the captain can open a boat''s logbook'
+        using errcode = 'P0001';
+    end if;
+    select * into v_from from projects where id = p_from_project_id;
+    if v_from.vessel_id is null then
+      raise exception 'Record the vessel on this project first' using errcode = 'P0001';
+    end if;
+    perform require_vessel_kind(p_from_project_id);
+    if exists (select 1 from projects where vessel_id = v_from.vessel_id and project_type = 'OPERATIONS') then
+      raise exception 'This boat already has a logbook. Ask its captain to invite you.' using errcode = 'P0001';
+    end if;
+    select * into v_vessel from vessels where id = v_from.vessel_id;
+  else
+    if length(v_name) > 200 then
+      raise exception 'A boat''s name is at most 200 characters' using errcode = 'P0001';
+    end if;
+    insert into vessels (name) values (v_name) returning * into v_vessel;
+    v_role := 'CAPTAIN';
+  end if;
+
+  insert into projects (vessel_id, name, project_type, phase)
+  values (v_vessel.id, v_vessel.name || ' · Logbook', 'OPERATIONS', 'IN_SERVICE')
+  returning * into v_project;
+
+  insert into project_members (project_id, user_id, role, name, email, status, first_seen_at, last_seen_at)
+  values (v_project.id, v_actor_id, v_role, coalesce(v_actor_name, v_email), v_email, 'ACTIVE', now(), now());
+
+  if p_from_project_id is null then
+    insert into world_model_events (
+      project_id, event_type, object_type, object_id,
+      before_state, after_state, triggered_by, triggered_by_name
+    ) values (
+      v_project.id, 'VESSEL_CREATED', 'VESSEL', v_vessel.id,
+      null, jsonb_build_object('name', v_vessel.name), v_actor_id, v_actor_name
+    );
+  end if;
+
+  insert into world_model_events (
+    project_id, event_type, object_type, object_id,
+    before_state, after_state, triggered_by, triggered_by_name
+  ) values (
+    v_project.id, 'PROJECT_CREATED', 'PROJECT', v_project.id, null,
+    jsonb_build_object('name', v_project.name, 'project_type', v_project.project_type,
+                       'vessel', v_vessel.name, 'opened_from', p_from_project_id),
+    v_actor_id, v_actor_name
+  );
+
+  return json_build_object('project', row_to_json(v_project));
 end;
 $fn$;
