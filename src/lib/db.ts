@@ -2290,3 +2290,22 @@ export async function cancelPaymentMilestone(projectId: string, milestoneId: str
   const { data, error } = await supabase.rpc('action_cancel_payment_milestone', { p_project_id: projectId, p_milestone_id: milestoneId, p_reason: reason })
   return unwrap(data, error, 'Cancel payment stage')
 }
+
+// ─── The asset of any kind (migration 043) ─────────────────────────────────────
+
+/**
+ * Records or updates a project's asset (a building for a PROPERTY project).
+ * Details are merged on the server; a detail sent as "" is removed.
+ */
+export async function setProjectAsset(
+  projectId: string,
+  input: { name?: string | null; yearBuilt?: number | null; details: Record<string, string | number | null> },
+): Promise<{ asset: Vessel; moved: Record<string, number> | null }> {
+  const { data, error } = await supabase.rpc('action_set_project_asset', {
+    p_project_id: projectId,
+    p_name: input.name ?? undefined,
+    p_year_built: input.yearBuilt ?? undefined,
+    p_details: input.details as unknown as Json,
+  })
+  return unwrap(data, error, 'Record the asset') as unknown as { asset: Vessel; moved: Record<string, number> | null }
+}

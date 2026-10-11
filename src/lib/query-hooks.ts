@@ -667,6 +667,24 @@ export function useSetProjectVessel() {
   })
 }
 
+/** Records a building (or other non-boat asset) on the project (migration 043). */
+export function useSetProjectAsset() {
+  const qc = useQueryClient()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (input: Parameters<typeof db.setProjectAsset>[1]) => db.setProjectAsset(projectId, input),
+    onSuccess: () => {
+      // Parts and finance may have moved onto the new asset.
+      qc.invalidateQueries({ queryKey: ['project'] })
+      qc.invalidateQueries({ queryKey: ['vessel'] })
+      qc.invalidateQueries({ queryKey: ['my-projects'] })
+      qc.invalidateQueries({ queryKey: ['events'] })
+      qc.invalidateQueries({ queryKey: ['parts'] })
+      qc.invalidateQueries({ queryKey: ['finance'] })
+    },
+  })
+}
+
 export function useUploadDocument() {
   const invalidate = useCascadeInvalidation()
   const projectId = useProjectId()

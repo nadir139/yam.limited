@@ -1033,7 +1033,7 @@ export default function PartsPage() {
 
   const isProperty = project?.project_type === 'PROPERTY'
   const needsVessel = project !== undefined && !isProperty && !project.vessel_id
-  const assetName = isProperty ? project?.name : project?.vessel?.name
+  const assetName = isProperty ? project?.vessel?.name ?? project?.name : project?.vessel?.name
   const selected = selectedId ? byId.get(selectedId) ?? null : null
 
   const seedStarter = async () => {
@@ -1065,7 +1065,7 @@ export default function PartsPage() {
           <p className="mt-1 max-w-3xl text-sm" style={muted}>
             The {isProperty ? 'building' : 'boat'} as the record knows it: its systems and the
             components inside them, and everything ever done to each one.
-            {!isProperty && ' Parts belong to the vessel, so they carry over to every project on her.'}
+            {project?.vessel_id ? ` Parts belong to the ${isProperty ? 'building' : 'vessel'}, so they carry over to every project on ${isProperty ? 'it' : 'her'}.` : isProperty ? ' Record the building on the Project page and its parts will outlive this project.' : ''}
           </p>
         </div>
         <div className="flex gap-2">

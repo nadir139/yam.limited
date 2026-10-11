@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import VesselDetailsForm from '@/components/actions/VesselDetailsForm'
+import { AssetCard } from '@/components/assets/AssetCard'
 import {
   useProject,
   useWorkPackages,
@@ -109,62 +110,64 @@ export default function ProjectOverview() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Vessel details */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-base">Vessel Details</CardTitle>
-            {/* The Action refuses on a property and for roles without the
-                permission; the button follows the same rules. */}
-            {project.project_type !== 'PROPERTY' && can('action_set_project_vessel') && (
-              <Button size="sm" variant="outline" onClick={() => setEditingVessel(true)}>
-                {vessel ? <Pencil size={13} className="mr-1.5" /> : <Plus size={13} className="mr-1.5" />}
-                {vessel ? 'Edit' : 'Add vessel'}
-              </Button>
-            )}
-          </CardHeader>
-          <CardContent className="px-4 pb-4 pt-0">
-            {vessel && (
-              <>
-                <div className="mb-4">
-                  <div className="text-2xl font-bold">{vessel.name}</div>
-                  <div className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                    {[vessel.vessel_type, vessel.year_built].filter(Boolean).join(' · ') || NONE}
+        {/* The asset: a building on a property project (migration 043), else the boat. */}
+        {project.project_type === 'PROPERTY' ? (
+          <AssetCard kind="BUILDING" asset={vessel ?? null} canEdit={can('action_set_project_asset')} />
+        ) : (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-base">Vessel Details</CardTitle>
+              {/* The Action refuses on a property and for roles without the
+                  permission; the button follows the same rules. */}
+              {can('action_set_project_vessel') && (
+                <Button size="sm" variant="outline" onClick={() => setEditingVessel(true)}>
+                  {vessel ? <Pencil size={13} className="mr-1.5" /> : <Plus size={13} className="mr-1.5" />}
+                  {vessel ? 'Edit' : 'Add vessel'}
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent className="px-4 pb-4 pt-0">
+              {vessel && (
+                <>
+                  <div className="mb-4">
+                    <div className="text-2xl font-bold">{vessel.name}</div>
+                    <div className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                      {[vessel.vessel_type, vessel.year_built].filter(Boolean).join(' · ') || NONE}
+                    </div>
                   </div>
-                </div>
-                <DetailRow label="Hull ID" value={vessel.hull_id ?? NONE} />
-                <DetailRow label="LOA" value={measure(vessel.loa, 'm')} />
-                <DetailRow label="Beam" value={measure(vessel.beam, 'm')} />
-                <DetailRow label="Draft" value={measure(vessel.draft, 'm')} />
-                <DetailRow label="Gross Tonnage" value={measure(vessel.gross_tonnage, ' GT')} />
-                <DetailRow label="Flag State" value={vessel.flag_state ?? NONE} />
-                <DetailRow
-                  label="Class Society"
-                  value={
-                    vessel.class_society ? (
-                      <span>
-                        {vessel.class_society}{' '}
-                        <span style={{ color: 'hsl(var(--muted-foreground))' }}>
-                          {vessel.class_number}
+                  <DetailRow label="Hull ID" value={vessel.hull_id ?? NONE} />
+                  <DetailRow label="LOA" value={measure(vessel.loa, 'm')} />
+                  <DetailRow label="Beam" value={measure(vessel.beam, 'm')} />
+                  <DetailRow label="Draft" value={measure(vessel.draft, 'm')} />
+                  <DetailRow label="Gross Tonnage" value={measure(vessel.gross_tonnage, ' GT')} />
+                  <DetailRow label="Flag State" value={vessel.flag_state ?? NONE} />
+                  <DetailRow
+                    label="Class Society"
+                    value={
+                      vessel.class_society ? (
+                        <span>
+                          {vessel.class_society}{' '}
+                          <span style={{ color: 'hsl(var(--muted-foreground))' }}>
+                            {vessel.class_number}
+                          </span>
                         </span>
-                      </span>
-                    ) : (
-                      NONE
-                    )
-                  }
-                />
-                <DetailRow label="Year Built" value={vessel.year_built ?? NONE} />
-                <DetailRow label="Build Yard" value={vessel.build_yard ?? NONE} />
-              </>
-            )}
-            {!vessel && (
-              <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
-                {project.project_type === 'PROPERTY'
-                  ? 'A property project has no vessel. It carries the same work packages, findings and approvals without one.'
-                  : 'No vessel recorded yet. Add the boat this project is about — a name is enough to start — or tell the agent.'}
-              </p>
-            )}
-          </CardContent>
-        </Card>
+                      ) : (
+                        NONE
+                      )
+                    }
+                  />
+                  <DetailRow label="Year Built" value={vessel.year_built ?? NONE} />
+                  <DetailRow label="Build Yard" value={vessel.build_yard ?? NONE} />
+                </>
+              )}
+              {!vessel && (
+                <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                  {'No vessel recorded yet. Add the boat this project is about — a name is enough to start — or tell the agent.'}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <Dialog open={editingVessel} onOpenChange={setEditingVessel}>
           <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
