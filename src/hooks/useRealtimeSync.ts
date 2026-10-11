@@ -153,6 +153,20 @@ export function useRealtimeSync() {
           qc.invalidateQueries({ queryKey: ['my-projects'] })
         },
       )
+      // The logbook: a day or an entry written on one phone aboard shows on the
+      // others. Attendance rows change with their day, so one key covers both.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'log_days' }, () =>
+        qc.invalidateQueries({ queryKey: ['log-days'] }),
+      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'log_day_crew' }, () =>
+        qc.invalidateQueries({ queryKey: ['log-days'] }),
+      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'log_entries' }, () =>
+        qc.invalidateQueries({ queryKey: ['log-entries'] }),
+      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'crew' }, () =>
+        qc.invalidateQueries({ queryKey: ['crew'] }),
+      )
       .subscribe()
 
     return () => {

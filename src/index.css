@@ -508,3 +508,16 @@ main .grid > * {
     text-align: center;
   }
 }
+
+/* Printing a page (the logbook's month, as paper or PDF): no app chrome, and
+   the shell's fixed-height, scroll-inside layout opened out so every row
+   reaches the paper instead of the first screenful. */
+@media print {
+  html, body, #root { height: auto !important; overflow: visible !important; }
+  .app-shell, .app-shell-column, .app-shell main {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+}

@@ -38,6 +38,9 @@ export const QUERY_KEYS = {
   partReferences: (id: string) => ['part-references', id],
   partImports: (p: string) => ['part-imports', p],
   partImport: (id: string) => ['part-import', id],
+  crew: (p: string) => ['crew', p],
+  logDays: (p: string) => ['log-days', p],
+  logEntries: (p: string) => ['log-entries', p],
 }
 
 export const useProject = () => {
@@ -1084,4 +1087,96 @@ export function useVocabulary(kind: VocabularyKind): string[] {
       .sort((a, b) => a.display_order - b.display_order)
       .map((v) => v.value)
   }, [all, kind, type])
+}
+
+// ─── The operations logbook (migration 032) ───────────────────────────────────
+
+/** Opens a boat's logbook and switches to it, as creating a project does. */
+export function useOpenLogbook() {
+  const qc = useQueryClient()
+  const { setActiveProjectId } = useActiveProject()
+  return useMutation({
+    mutationFn: (input: { fromProjectId?: string; vesselName?: string }) => db.openLogbook(input),
+    onSuccess: (project) => {
+      qc.invalidateQueries({ queryKey: ['my-projects'] })
+      setActiveProjectId(project.id)
+    },
+  })
+}
+
+export const useCrew = () => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: QUERY_KEYS.crew(projectId),
+    queryFn: () => db.fetchCrew(projectId),
+    enabled: !!projectId,
+  })
+}
+
+/** Days from `from` to `to` inclusive ('YYYY-MM-DD'). */
+export const useLogDays = (from: string, to: string) => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: [...QUERY_KEYS.logDays(projectId), from, to],
+    queryFn: () => db.fetchLogDays(projectId, from, to),
+    enabled: !!projectId,
+  })
+}
+
+/** Entries timed in [fromIso, toIso). */
+export const useLogEntries = (fromIso: string, toIso: string) => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: [...QUERY_KEYS.logEntries(projectId), fromIso, toIso],
+    queryFn: () => db.fetchLogEntries(projectId, fromIso, toIso),
+    enabled: !!projectId,
+  })
+}
+
+function useLogbookInvalidation() {
+  const qc = useQueryClient()
+  const projectId = useProjectId()
+  return () => {
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.crew(projectId) })
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.logDays(projectId) })
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.logEntries(projectId) })
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.team(projectId) })
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.events(projectId) })
+  }
+}
+
+export function useSetCrew() {
+  const invalidate = useLogbookInvalidation()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (input: db.CrewInput) => db.setCrew(projectId, input),
+    onSuccess: invalidate,
+  })
+}
+
+export function useRecordLogDay() {
+  const invalidate = useLogbookInvalidation()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (input: db.LogDayInput) => db.recordLogDay(projectId, input),
+    onSuccess: invalidate,
+  })
+}
+
+export function useAddLogEntry() {
+  const invalidate = useLogbookInvalidation()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (input: Parameters<typeof db.addLogEntry>[1]) => db.addLogEntry(projectId, input),
+    onSuccess: invalidate,
+  })
+}
+
+export function useVoidLogEntry() {
+  const invalidate = useLogbookInvalidation()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (v: { id: string; reason: string }) => db.voidLogEntry(projectId, v.id, v.reason),
+    onSuccess: invalidate,
+  })
 }

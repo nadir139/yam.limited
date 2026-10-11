@@ -1,6 +1,6 @@
 import { at, eur, percent, sinceNow, isOverdue } from '@/lib/format'
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { AlertTriangle, CheckCircle2, ChevronRight, ArrowRight, Lock } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -76,6 +76,9 @@ export default function Dashboard() {
   // pre-survey → documents → survey → compliance → remediation → certification,
   // and is never offered a haul out.
   const PHASES = useVocabulary('PHASE')
+
+  // A boat's logbook has no dashboard of work and money: its home is the log.
+  if (projectQ.data?.project_type === 'OPERATIONS') return <Navigate to="/app/logbook" replace />
 
   const isLoading =
     projectQ.isLoading ||

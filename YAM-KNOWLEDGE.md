@@ -1944,3 +1944,57 @@ a planned start was saved as 15 Oct and then 15 Nov within 35 seconds.
 shows "15 Nov 2026", picks from a Monday-first calendar, and passes the same
 'YYYY-MM-DD' value as before. Displays already used 'd MMM yyyy'.
 
+
+## 39. The vessel's whole life, and the logbook (migration 032)
+
+**The standing direction, from the owner (11 Oct 2026).** YAM is the full
+ontology of a vessel, from the newbuild project that creates her, through
+every season of operation, every refit, every change of owner, to the day she
+is retired. Nothing recorded about her is ever thrown away: the data is the
+asset. Later, the boat's own electronics feed the same record (PLC, B&G
+processor, AIS, communications), so YAM becomes an online black box of what
+the yacht is and what happened to her: valuable for search and rescue, claims,
+surveys, sale and many other cases. Every schema decision should keep that
+open: the **vessel** is the root that outlives projects, people and owners;
+records are corrected with a reason, never deleted; times are stored as
+timestamps with a zone, positions as data rather than prose where possible.
+
+**Many boats, many roles, kept apart.** One person can crew one boat, captain
+another and be owner's rep on a third, at the same time. Access is per project
+membership, so each boat's records are separate by construction: a boat's
+operations live in its own project, and nothing in one boat's project is
+readable from another's.
+
+**The operations project.** A refit is a project with a start and an end;
+operations are not. Each vessel gets at most one standing project of type
+`OPERATIONS` (a partial unique index enforces it) that never closes. Its
+members are the boat's people (`CAPTAIN`, `CREW`, and the owner side), so
+invitations, permissions, the event log, realtime and the agent work for the
+logbook with no new access model. Opened by `action_open_logbook`: from a
+refit project that has a vessel (owner, owner's rep or captain there), or by
+naming a new boat (the caller becomes its captain). Only one can exist per
+vessel; anyone else must be invited from it (by the captain, the owner or the
+owner's rep, who run the crew list), so nobody can join a boat's logbook by
+opening it a second time. Invitations from the crew list are for CREW or
+CAPTAIN only, so running a boat's crew gives no power over a refit.
+
+**What the logbook holds.**
+- `crew`: the boat's people as the boat knows them (position, department,
+  dates, emergency contact, holiday and flight allowances), linked to a
+  member when they have a login. Belongs to the vessel and the operations
+  project. Leaving sets `left_on`; the row stays.
+- `log_days`: one per vessel per date: status (sea service, standby, yard),
+  position, ports, miles, watchkeeping, notes. Recording a day again after
+  it has passed needs a reason; the old values go into the event.
+- `log_day_crew`: who was aboard that day (present, holiday, absent), saved
+  with the day so the day is one fact.
+- `log_entries`: timestamped entries by any member (note, navigation,
+  engine, defect, safety, bunkering, weather, maintenance). An entry is never
+  edited or deleted: it is voided with a reason (by its author or the
+  captain) and a new one written, and the voided text stays visible.
+
+Hours of rest (phase 2) are readable only by the crew member and the captain:
+managers see whether the boat complies, never a person's hours.
+
+The logbook's own app (`nadir139/d-logbook`) is retired, not migrated: its
+data was declared expendable on 11 Oct 2026.
