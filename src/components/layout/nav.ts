@@ -71,23 +71,35 @@ const LOGBOOK_KEEPS = new Set([
   '/app/agent', '/app/project', '/app/model', '/app/parts', '/app/defects', '/app/finance', '/app/documents', '/app/action-items', '/app/messages', '/app/team',
 ])
 
+// A building in use (an OPERATIONS project on a BUILDING asset, migration
+// 044) has no log days, crew, rest or Oil Record Book: its home is the
+// maintenance of the building, with its parts, money and NCRs alongside.
+const IN_USE_ITEMS: NavItem[] = [{ icon: Gauge, labelKey: 'nav.maintenance', path: '/app/maintenance' }]
+const IN_USE_KEEPS = new Set([
+  '/app/project', '/app/parts', '/app/defects', '/app/finance', '/app/documents', '/app/action-items', '/app/messages', '/app/team',
+])
+
 type ProjectType = Project['project_type'] | undefined
+/** The asset kind (vessels.asset_kind); a project with no asset counts as a boat's. */
+type AssetKind = string | null | undefined
 
 /**
  * The sections a project of this type has, in sidebar order. Given a role,
  * sections kept for other roles are left out (the page itself refuses too).
  */
-export function navItemsFor(type: ProjectType, role?: UserRole | null) {
+export function navItemsFor(type: ProjectType, role?: UserRole | null, kind?: AssetKind) {
   const forRole = (items: NavItem[]) => (role === undefined ? items : items.filter((i) => !i.roles || (role !== null && i.roles.includes(role))))
   if (type !== 'OPERATIONS') return forRole(NAV_ITEMS)
   const agent = NAV_ITEMS.filter((i) => i.path === '/app/agent')
+  if (kind === 'BUILDING') return forRole([...agent, ...IN_USE_ITEMS, ...NAV_ITEMS.filter((i) => IN_USE_KEEPS.has(i.path))])
   return forRole([...agent, ...LOGBOOK_ITEMS, ...NAV_ITEMS.filter((i) => LOGBOOK_KEEPS.has(i.path) && i.path !== '/app/agent')])
 }
 
 /** Where a project of this type opens. */
-export const homeFor = (type: ProjectType) => (type === 'OPERATIONS' ? '/app/logbook' : '/app/dashboard')
+export const homeFor = (type: ProjectType, kind?: AssetKind) =>
+  type === 'OPERATIONS' ? (kind === 'BUILDING' ? '/app/maintenance' : '/app/logbook') : '/app/dashboard'
 
 /** Whether a page belongs to a project of this type; switching to one that lacks it goes home. */
-export function pathFits(type: ProjectType, pathname: string) {
-  return navItemsFor(type).some((i) => pathname === i.path || pathname.startsWith(i.path + '/'))
+export function pathFits(type: ProjectType, pathname: string, kind?: AssetKind) {
+  return navItemsFor(type, undefined, kind).some((i) => pathname === i.path || pathname.startsWith(i.path + '/'))
 }

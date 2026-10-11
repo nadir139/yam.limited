@@ -55,7 +55,7 @@ import type {
 import type { RestSchedule } from './rest-hours'
 
 /** A project row carrying just enough of its vessel to name it. */
-export type ProjectWithVessel = Project & { vessel: { name: string } | null }
+export type ProjectWithVessel = Project & { vessel: { name: string; asset_kind: string } | null }
 
 // ─── Reads ────────────────────────────────────────────────────────────────────
 //
@@ -77,7 +77,7 @@ export type ProjectWithVessel = Project & { vessel: { name: string } | null }
 export async function fetchMyProjects(): Promise<ProjectWithVessel[]> {
   const { data, error } = await supabase
     .from('projects')
-    .select('*, vessel:vessels(name)')
+    .select('*, vessel:vessels(name, asset_kind)')
     .order('created_at')
   if (error) throw error
   return (data ?? []) as ProjectWithVessel[]
@@ -1564,6 +1564,15 @@ export async function openLogbook(input: { fromProjectId?: string; vesselName?: 
     p_vessel_name: input.vesselName ?? undefined,
   })
   return (unwrap(data, error, 'Open logbook') as unknown as { project: Project }).project
+}
+
+/** Opens a building's record in use (migration 044): its maintenance, parts and money between renovations. */
+export async function openInUse(input: { fromProjectId?: string; buildingName?: string }): Promise<Project> {
+  const { data, error } = await supabase.rpc('action_open_in_use', {
+    p_from_project_id: input.fromProjectId ?? undefined,
+    p_building_name: input.buildingName ?? undefined,
+  })
+  return (unwrap(data, error, 'Open the building in use') as unknown as { project: Project }).project
 }
 
 export async function fetchCrew(projectId: string): Promise<Crew[]> {

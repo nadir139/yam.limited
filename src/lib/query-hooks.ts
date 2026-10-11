@@ -1130,6 +1130,18 @@ export function useOpenLogbook() {
   })
 }
 
+export function useOpenInUse() {
+  const qc = useQueryClient()
+  const { setActiveProjectId } = useActiveProject()
+  return useMutation({
+    mutationFn: (input: { fromProjectId?: string; buildingName?: string }) => db.openInUse(input),
+    onSuccess: (project) => {
+      qc.invalidateQueries({ queryKey: ['my-projects'] })
+      setActiveProjectId(project.id)
+    },
+  })
+}
+
 export const useCrew = () => {
   const projectId = useProjectId()
   return useQuery({

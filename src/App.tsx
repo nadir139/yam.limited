@@ -11,6 +11,7 @@ import { QueryPersistence } from "@/lib/query-persist";
 import { LanguageProvider } from "@/lib/i18n";
 import Index from "./pages/Index";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import { BoatOnly } from "./components/layout/BoatOnly";
 
 // The public landing page (Index) is the only eagerly-loaded route. Everything
 // behind /app plus the standalone pages are split out, so a visitor to the
@@ -99,11 +100,11 @@ const App = () => (
                 <Route path="/app/work-packages/:id" element={<ProtectedRoute><WorkPackageDetail /></ProtectedRoute>} />
                 <Route path="/app/schedule" element={<ProtectedRoute><SchedulePage /></ProtectedRoute>} />
                 <Route path="/app/model" element={<ProtectedRoute><ModelPage /></ProtectedRoute>} />
-                <Route path="/app/logbook" element={<ProtectedRoute><LogbookPage /></ProtectedRoute>} />
-                <Route path="/app/crew" element={<ProtectedRoute><CrewPage /></ProtectedRoute>} />
-                <Route path="/app/rest" element={<ProtectedRoute><RestPage /></ProtectedRoute>} />
+                <Route path="/app/logbook" element={<ProtectedRoute><BoatOnly><LogbookPage /></BoatOnly></ProtectedRoute>} />
+                <Route path="/app/crew" element={<ProtectedRoute><BoatOnly><CrewPage /></BoatOnly></ProtectedRoute>} />
+                <Route path="/app/rest" element={<ProtectedRoute><BoatOnly><RestPage /></BoatOnly></ProtectedRoute>} />
                 <Route path="/app/maintenance" element={<ProtectedRoute><MaintenancePage /></ProtectedRoute>} />
-                <Route path="/app/oil-record" element={<ProtectedRoute><OilRecordPage /></ProtectedRoute>} />
+                <Route path="/app/oil-record" element={<ProtectedRoute><BoatOnly><OilRecordPage /></BoatOnly></ProtectedRoute>} />
                 <Route path="/app/finance" element={<ProtectedRoute><FinancePage /></ProtectedRoute>} />
                 <Route path="/app/finance/revolut" element={<ProtectedRoute><RevolutCallbackPage /></ProtectedRoute>} />
                 <Route path="/app/payments" element={<ProtectedRoute><PaymentsPage /></ProtectedRoute>} />

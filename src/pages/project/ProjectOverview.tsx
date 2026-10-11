@@ -1,7 +1,7 @@
 import { day, eur, NONE } from '@/lib/format'
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Anchor, BookOpen, Pencil, Plus } from 'lucide-react'
+import { Anchor, BookOpen, Gauge, Pencil, Plus } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -19,6 +19,7 @@ import {
   useTeam,
   usePermissions,
   useMyRole,
+  useOpenInUse,
   useOpenLogbook,
   useYardDays,
 } from '@/lib/query-hooks'
@@ -53,6 +54,7 @@ export default function ProjectOverview() {
   const { data: role = null } = useMyRole()
   const { projects, setActiveProjectId } = useActiveProject()
   const openLogbook = useOpenLogbook()
+  const openInUse = useOpenInUse()
   const [logbookError, setLogbookError] = useState<string | null>(null)
   // Days the boat's crew logged in the yard for this refit (migration 037).
   const workOnVessel = !!project?.vessel_id && project.project_type !== 'OPERATIONS' && project.project_type !== 'PROPERTY'
@@ -85,7 +87,13 @@ export default function ProjectOverview() {
     : undefined
   const mayOpenLogbook = role === 'OWNER' || role === 'OWNERS_REP' || role === 'CAPTAIN'
 
-  const QUICK_LINKS = isOps ? [
+  const isBuilding = project.project_type === 'PROPERTY' || vessel?.asset_kind === 'BUILDING'
+  const QUICK_LINKS = isOps && isBuilding ? [
+    { label: 'Maintenance', count: null, path: '/app/maintenance', color: 'hsl(var(--primary))' },
+    { label: 'Parts', count: null, path: '/app/parts', color: 'hsl(var(--accent))' },
+    { label: 'Documents', count: documents.length, path: '/app/documents', color: 'hsl(var(--success))' },
+    { label: 'Team Members', count: team.length, path: '/app/team', color: 'hsl(215 50% 50%)' },
+  ] : isOps ? [
     { label: 'Logbook', count: null, path: '/app/logbook', color: 'hsl(var(--primary))' },
     { label: 'Crew', count: null, path: '/app/crew', color: 'hsl(var(--accent))' },
     { label: 'Documents', count: documents.length, path: '/app/documents', color: 'hsl(var(--success))' },
@@ -111,7 +119,7 @@ export default function ProjectOverview() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* The asset: a building on a property project (migration 043), else the boat. */}
-        {project.project_type === 'PROPERTY' ? (
+        {isBuilding ? (
           <AssetCard kind="BUILDING" asset={vessel ?? null} canEdit={can('action_set_project_asset')} />
         ) : (
           <Card>
@@ -218,6 +226,51 @@ export default function ProjectOverview() {
                   }}
                 >
                   {openLogbook.isPending ? 'Opening…' : 'Open the logbook'}
+                </Button>
+              )}
+              {logbookError && <p className="text-xs" style={{ color: 'hsl(var(--destructive))' }}>{logbookError}</p>}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* A building in use (migration 044): its maintenance, parts and money between renovations. */}
+        {!isOps && vessel?.asset_kind === 'BUILDING' && (logbookProject || role === 'OWNER' || role === 'OWNERS_REP') && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Gauge size={16} /> The building in use
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3 px-4 pb-4 pt-0 text-sm">
+              <p style={{ color: 'hsl(var(--muted-foreground))' }}>
+                {vessel.name}'s maintenance (boiler, roof, alarms), parts and money between renovations. It stays with the
+                building after this project ends.
+              </p>
+              {logbookProject ? (
+                <Button
+                  size="sm"
+                  className="self-start"
+                  onClick={() => {
+                    setActiveProjectId(logbookProject.id)
+                    navigate('/app/maintenance')
+                  }}
+                >
+                  Go to the building in use
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  className="self-start"
+                  disabled={openInUse.isPending}
+                  onClick={() => {
+                    setLogbookError(null)
+                    openInUse.mutate(
+                      { fromProjectId: project.id },
+                      { onSuccess: () => navigate('/app/maintenance'), onError: (e) => setLogbookError(e.message) },
+                    )
+                  }}
+                >
+                  {openInUse.isPending ? 'Opening…' : 'Open the building in use'}
                 </Button>
               )}
               {logbookError && <p className="text-xs" style={{ color: 'hsl(var(--destructive))' }}>{logbookError}</p>}

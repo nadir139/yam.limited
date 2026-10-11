@@ -3393,6 +3393,10 @@ export type Database = {
         Args: { p_project_id: string; p_through?: string }
         Returns: Json
       }
+      action_open_in_use: {
+        Args: { p_building_name?: string; p_from_project_id?: string }
+        Returns: Json
+      }
       action_open_logbook: {
         Args: { p_from_project_id?: string; p_vessel_name?: string }
         Returns: Json
