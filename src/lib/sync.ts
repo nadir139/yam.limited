@@ -18,6 +18,7 @@ const SENDERS: Record<OutboxKind, Sender> = {
   reading: (p, x) => db.recordReading(p, x as unknown as db.ReadingInput),
   service: (p, x) => db.recordService(p, x as unknown as db.ServiceInput),
   rest: (p, x) => db.recordRest(p, x as unknown as Parameters<typeof db.recordRest>[1]),
+  orb: (p, x) => db.addOrbEntry(p, x as unknown as db.OrbInput),
 }
 
 /** The query keys a sent write changes, so the pages refresh. */
@@ -27,6 +28,7 @@ export const KEYS_FOR: Record<OutboxKind, string[]> = {
   reading: ['maintenance', 'log-entries', 'events'],
   service: ['maintenance', 'log-entries', 'events'],
   rest: ['rest', 'events'],
+  orb: ['orb', 'log-entries', 'events'],
 }
 
 export async function sendOrQueue<T>(args: {

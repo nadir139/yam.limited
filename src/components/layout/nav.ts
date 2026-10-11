@@ -18,6 +18,7 @@ import {
   UsersRound,
   BedDouble,
   Gauge,
+  Droplets,
   type LucideIcon,
 } from 'lucide-react'
 import type { Project } from '@/lib/types'
@@ -58,6 +59,7 @@ const LOGBOOK_ITEMS: NavItem[] = [
   { icon: UsersRound, labelKey: 'nav.crew', path: '/app/crew' },
   { icon: BedDouble, labelKey: 'nav.rest', path: '/app/rest' },
   { icon: Gauge, labelKey: 'nav.maintenance', path: '/app/maintenance' },
+  { icon: Droplets, labelKey: 'nav.oilRecord', path: '/app/oil-record' },
 ]
 const LOGBOOK_KEEPS = new Set([
   '/app/agent', '/app/project', '/app/model', '/app/parts', '/app/defects', '/app/documents', '/app/action-items', '/app/messages', '/app/team',

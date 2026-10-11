@@ -85,6 +85,8 @@ export type ServiceInterval = Row<'service_intervals'>
 export type ServiceRecord = Row<'service_records'>
 /** Crew certificates, sea time and yard days (migration 037). */
 export type CrewCertificate = Row<'crew_certificates'>
+/** The Oil Record Book, Part I (migration 039). */
+export type OrbEntry = Row<'orb_entries'>
 export interface SeaTime {
   crew_id: string
   days_aboard: number

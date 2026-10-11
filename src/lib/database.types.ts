@@ -1018,6 +1018,113 @@ export type Database = {
         }
         Relationships: []
       }
+      orb_entries: {
+        Row: {
+          client_id: string | null
+          code: string
+          corrects_id: string | null
+          created_at: string
+          entry_no: number
+          id: string
+          lines: Json
+          master_signed_at: string | null
+          master_signed_by_name: string | null
+          occurred_at: string
+          part_id: string | null
+          position: string | null
+          project_id: string
+          quantity: number | null
+          recorded_by: string | null
+          recorded_by_name: string
+          recorded_by_role: string | null
+          struck_at: string | null
+          struck_by_name: string | null
+          struck_reason: string | null
+          tank: string | null
+          unit: string | null
+          vessel_id: string
+        }
+        Insert: {
+          client_id?: string | null
+          code: string
+          corrects_id?: string | null
+          created_at?: string
+          entry_no: number
+          id?: string
+          lines: Json
+          master_signed_at?: string | null
+          master_signed_by_name?: string | null
+          occurred_at: string
+          part_id?: string | null
+          position?: string | null
+          project_id: string
+          quantity?: number | null
+          recorded_by?: string | null
+          recorded_by_name: string
+          recorded_by_role?: string | null
+          struck_at?: string | null
+          struck_by_name?: string | null
+          struck_reason?: string | null
+          tank?: string | null
+          unit?: string | null
+          vessel_id: string
+        }
+        Update: {
+          client_id?: string | null
+          code?: string
+          corrects_id?: string | null
+          created_at?: string
+          entry_no?: number
+          id?: string
+          lines?: Json
+          master_signed_at?: string | null
+          master_signed_by_name?: string | null
+          occurred_at?: string
+          part_id?: string | null
+          position?: string | null
+          project_id?: string
+          quantity?: number | null
+          recorded_by?: string | null
+          recorded_by_name?: string
+          recorded_by_role?: string | null
+          struck_at?: string | null
+          struck_by_name?: string | null
+          struck_reason?: string | null
+          tank?: string | null
+          unit?: string | null
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orb_entries_corrects_id_fkey"
+            columns: ["corrects_id"]
+            isOneToOne: false
+            referencedRelation: "orb_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orb_entries_part_id_fkey"
+            columns: ["part_id"]
+            isOneToOne: false
+            referencedRelation: "parts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orb_entries_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orb_entries_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       owner_approvals: {
         Row: {
           approval_number: string
@@ -2349,6 +2456,22 @@ export type Database = {
         }
         Returns: Json
       }
+      action_add_orb_entry: {
+        Args: {
+          p_client_id?: string
+          p_code: string
+          p_corrects_id?: string
+          p_lines: Json
+          p_occurred_at?: string
+          p_part_id?: string
+          p_position?: string
+          p_project_id: string
+          p_quantity?: number
+          p_tank?: string
+          p_unit?: string
+        }
+        Returns: Json
+      }
       action_advance_project_phase: {
         Args: { p_project_id?: string }
         Returns: Json
@@ -2489,6 +2612,10 @@ export type Database = {
           p_predecessor_id: string
           p_successor_id: string
         }
+        Returns: Json
+      }
+      action_master_sign_orb: {
+        Args: { p_project_id: string; p_through?: string }
         Returns: Json
       }
       action_open_logbook: {
@@ -2786,6 +2913,10 @@ export type Database = {
       }
       action_size_part: {
         Args: { p_part_id: string; p_project_id?: string; p_size?: Json }
+        Returns: Json
+      }
+      action_strike_orb_entry: {
+        Args: { p_entry_id: string; p_project_id: string; p_reason: string }
         Returns: Json
       }
       action_unlink_part: {
@@ -3203,6 +3334,7 @@ export type Database = {
         | "SERVICE_INTERVAL"
         | "SERVICE_RECORD"
         | "CREW_CERTIFICATE"
+        | "ORB_ENTRY"
       project_phase:
         | "PRE_SURVEY"
         | "HAUL_OUT"
@@ -3490,6 +3622,7 @@ export const Constants = {
         "SERVICE_INTERVAL",
         "SERVICE_RECORD",
         "CREW_CERTIFICATE",
+        "ORB_ENTRY",
       ],
       project_phase: [
         "PRE_SURVEY",

@@ -42,6 +42,7 @@ import type {
   CrewCertificate,
   SeaTime,
   YardDay,
+  OrbEntry,
 } from './types'
 import type { RestSchedule } from './rest-hours'
 
@@ -1958,4 +1959,59 @@ export async function fetchYardDays(projectId: string): Promise<YardDay[]> {
   const { data, error } = await supabase.rpc('yard_days', { p_project_id: projectId })
   if (error) throw error
   return (data ?? []) as unknown as YardDay[]
+}
+
+// ─── Oil Record Book, Part I (migration 039) ──────────────────────────────────
+
+/** Every entry of the boat's book, in its numbered order. */
+export async function fetchOrbEntries(projectId: string): Promise<OrbEntry[]> {
+  const { data, error } = await supabase
+    .from('orb_entries')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('entry_no')
+  if (error) throw error
+  return data ?? []
+}
+
+export interface OrbInput {
+  code: string
+  lines: Array<{ item: string | null; text: string }>
+  occurredAt?: string | null
+  quantity?: number | null
+  unit?: 'm3' | 't' | null
+  tank?: string
+  partId?: string | null
+  position?: string
+  correctsId?: string | null
+  clientId?: string
+}
+
+/** Makes an entry signed by the caller; the server numbers it. */
+export async function addOrbEntry(projectId: string, input: OrbInput): Promise<OrbEntry> {
+  const { data, error } = await supabase.rpc('action_add_orb_entry', {
+    p_project_id: projectId,
+    p_code: input.code,
+    p_lines: input.lines as unknown as Json,
+    p_occurred_at: input.occurredAt ?? undefined,
+    p_quantity: input.quantity ?? undefined,
+    p_unit: input.unit ?? undefined,
+    p_tank: input.tank || undefined,
+    p_part_id: input.partId ?? undefined,
+    p_position: input.position || undefined,
+    p_corrects_id: input.correctsId ?? undefined,
+    p_client_id: input.clientId ?? newClientId(),
+  })
+  return (unwrap(data, error, 'Make Oil Record Book entry') as unknown as { entry: OrbEntry }).entry
+}
+
+export async function strikeOrbEntry(projectId: string, entryId: string, reason: string): Promise<OrbEntry> {
+  const { data, error } = await supabase.rpc('action_strike_orb_entry', { p_project_id: projectId, p_entry_id: entryId, p_reason: reason })
+  return (unwrap(data, error, 'Strike through entry') as unknown as { entry: OrbEntry }).entry
+}
+
+/** The master countersigns every entry made so far. */
+export async function masterSignOrb(projectId: string): Promise<{ signed: number; entry_nos?: number[] }> {
+  const { data, error } = await supabase.rpc('action_master_sign_orb', { p_project_id: projectId })
+  return unwrap(data, error, 'Countersign the Oil Record Book') as unknown as { signed: number; entry_nos?: number[] }
 }

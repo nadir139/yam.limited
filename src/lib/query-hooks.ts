@@ -4,7 +4,7 @@ import * as db from './db'
 import { sendOrQueue } from './sync'
 import { useActiveProject, useProjectId } from '@/contexts/ProjectContext'
 import { useAuth } from '@/contexts/AuthContext'
-import type { DefectRecord, InspectionEvent, LogDay, LogEntry, ObjectType, PartReading, RestRecord, ServiceRecord, WorkPackage } from './types'
+import type { DefectRecord, InspectionEvent, LogDay, LogEntry, ObjectType, OrbEntry, PartReading, RestRecord, ServiceRecord, WorkPackage } from './types'
 
 /** Re-exported so a page needs one import to reach the active project. */
 export { useActiveProject, useProjectId }
@@ -47,6 +47,7 @@ export const QUERY_KEYS = {
   crewCertificates: (p: string) => ['crew-certificates', p],
   seaTime: (p: string) => ['sea-time', p],
   yardDays: (p: string) => ['yard-days', p],
+  orb: (p: string) => ['orb', p],
 }
 
 export const useProject = () => {
@@ -1441,4 +1442,63 @@ export function useRetireCrewCertificate() {
     mutationFn: (v: { id: string; reason: string }) => db.retireCrewCertificate(projectId, v.id, v.reason),
     onSuccess: invalidate,
   })
+}
+
+// ─── Oil Record Book, Part I (migration 039) ──────────────────────────────────
+
+export const useOrbEntries = () => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: QUERY_KEYS.orb(projectId),
+    queryFn: () => db.fetchOrbEntries(projectId),
+    enabled: !!projectId,
+  })
+}
+
+function useOrbInvalidation() {
+  const qc = useQueryClient()
+  const projectId = useProjectId()
+  return () => {
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.orb(projectId) })
+    // A code G entry is written in the log too.
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.logEntries(projectId) })
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.events(projectId) })
+  }
+}
+
+/** An entry is written in the engine room, often without signal: kept and sent later like the log. */
+export function useAddOrbEntry() {
+  const invalidate = useOrbInvalidation()
+  const projectId = useProjectId()
+  const { user } = useAuth()
+  return useMutation({
+    networkMode: 'always',
+    mutationFn: (input: db.OrbInput) => {
+      const clientId = input.clientId ?? db.newClientId()
+      return sendOrQueue<OrbEntry>({
+        kind: 'orb',
+        projectId,
+        userEmail: user?.email ?? '',
+        clientId,
+        payload: { ...input, clientId } as unknown as Record<string, unknown>,
+        summary: `oil record book ${input.code}: ${input.lines.map((l) => l.text).join('; ').slice(0, 70)}`,
+      })
+    },
+    onSuccess: invalidate,
+  })
+}
+
+export function useStrikeOrbEntry() {
+  const invalidate = useOrbInvalidation()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (v: { id: string; reason: string }) => db.strikeOrbEntry(projectId, v.id, v.reason),
+    onSuccess: invalidate,
+  })
+}
+
+export function useMasterSignOrb() {
+  const invalidate = useOrbInvalidation()
+  const projectId = useProjectId()
+  return useMutation({ mutationFn: () => db.masterSignOrb(projectId), onSuccess: invalidate })
 }
