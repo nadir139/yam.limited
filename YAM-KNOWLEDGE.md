@@ -2196,3 +2196,46 @@ for want of a reason, resent from the outbox with one; with the server
 unreachable the last-read log still shows); a production build opened with
 the network off loads from the service worker; on the live database the
 same client id twice records one entry and the old signature is refused.
+
+## 43. The electronic Oil Record Book, Part I (migration 039)
+
+MARPOL Annex I, regulation 17: ships of 400 GT and above (oil tankers from
+150 GT) keep an Oil Record Book; smaller yachts often keep one voluntarily.
+Part I records machinery space operations under the codes of the IMO
+guidance (MEPC.1/Circ.736/Rev.2): A ballasting/cleaning fuel tanks, B dirty
+ballast discharge, C sludge collection and disposal, D manual bilge water
+discharge or transfer, E automatic bilge discharge, F oil filtering
+equipment condition, G accidental or exceptional discharges, H bunkering,
+I other operations and remarks. `src/lib/oil-record.ts` holds the codes and
+item numbers (11.1, 12.3, 26.2...) with what each asks for; the form shows
+the items of the chosen code and sends only those filled in.
+
+`orb_entries`, kept to the IMO guidelines for electronic record books
+(MEPC.312(74)):
+- **Numbered** in one unbroken sequence per vessel, assigned by the server
+  under a lock, so a missing number would show.
+- **Signed** by the member who made the entry (name, role, time) and
+  **countersigned** by the master (`action_master_sign_orb`: every entry
+  made so far, like signing a page). Only the captain countersigns.
+- **Never deleted or overwritten** (no write grants on the table). A wrong
+  entry is struck through by its maker or the master, with the reason, and
+  stays legible; the correction is a new entry with `corrects_id`, and one
+  cannot be recorded until the wrong entry is struck.
+- Quantities in m3 (tonnes for bunkers); a bunkering entry must state one.
+- A code G entry (oil discharged by accident) is also written in the log as
+  a SAFETY entry: it is an incident as well as a record-book line.
+- Written in the engine room, so it goes through the offline outbox like
+  the log (`client_id`; a repeat returns the first entry).
+- Prints in the book's layout (No., date, code, item, record of operations
+  and signature, master's signature) for port state control.
+- Not agent-writable: it is a signed legal record, entered by the person
+  signing. The agent reads it through the registry (`ORB_ENTRY`).
+
+Verified in a rolled-back transaction on the live database (inside the
+Lucky Bird logbook, left as it was): sequence 1-4; the engineer's signature
+carries name and role; a repeated client id returns the first entry; a
+bunkering entry without quantity, a blank item and litres are refused; a
+correction before striking is refused; strike then correct works; code G
+appears in the log; the engineer cannot countersign, the master signs all
+four once and a second time finds nothing; direct delete and update are
+denied; the owner's rep cannot write the book.

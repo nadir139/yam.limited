@@ -41,6 +41,7 @@ export const it: Record<string, string> = {
   'nav.crew': 'Equipaggio',
   'nav.rest': 'Ore di riposo',
   'nav.maintenance': 'Manutenzione',
+  'nav.oilRecord': 'Registro degli oli',
   'nav.signOut': 'Esci',
   'nav.noRole': 'Nessun ruolo nel progetto',
 

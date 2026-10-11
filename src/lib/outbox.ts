@@ -13,7 +13,7 @@
 // permission gone) stays, marked with the server's reason, until they fix
 // and resend it or discard it.
 
-export type OutboxKind = 'log_entry' | 'log_day' | 'reading' | 'service' | 'rest'
+export type OutboxKind = 'log_entry' | 'log_day' | 'reading' | 'service' | 'rest' | 'orb'
 
 export interface OutboxItem {
   /** The client id the write is sent with; also the item's key. */

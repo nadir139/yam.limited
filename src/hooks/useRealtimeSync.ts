@@ -182,6 +182,9 @@ export function useRealtimeSync() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'crew_certificates' }, () =>
         qc.invalidateQueries({ queryKey: ['crew-certificates'] }),
       )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orb_entries' }, () =>
+        qc.invalidateQueries({ queryKey: ['orb'] }),
+      )
       // Hours of rest: RLS decides who receives these, so only the crew member
       // and the captain see the record change live.
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rest_records' }, () =>
