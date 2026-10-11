@@ -48,6 +48,7 @@ export const QUERY_KEYS = {
   seaTime: (p: string) => ['sea-time', p],
   yardDays: (p: string) => ['yard-days', p],
   orb: (p: string) => ['orb', p],
+  finance: (p: string) => ['finance', p],
 }
 
 export const useProject = () => {
@@ -1501,4 +1502,68 @@ export function useMasterSignOrb() {
   const invalidate = useOrbInvalidation()
   const projectId = useProjectId()
   return useMutation({ mutationFn: () => db.masterSignOrb(projectId), onSuccess: invalidate })
+}
+
+// ─── Finance (migration 040) ──────────────────────────────────────────────────
+
+/** Accounts, transactions, allocations, receipts and imports of the asset. */
+export const useFinanceLedger = (enabled = true) => {
+  const projectId = useProjectId()
+  const { data: project } = useProject()
+  return useQuery({
+    queryKey: [...QUERY_KEYS.finance(projectId), 'ledger', project?.vessel_id ?? null],
+    queryFn: () => db.fetchFinanceLedger(projectId, project?.vessel_id ?? null),
+    enabled: !!projectId && project !== undefined && enabled,
+  })
+}
+
+export const useFinanceSummary = (from: string, to: string, enabled = true) => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: [...QUERY_KEYS.finance(projectId), 'summary', from, to],
+    queryFn: () => db.fetchFinanceSummary(projectId, from, to),
+    enabled: !!projectId && enabled,
+  })
+}
+
+export const useFinanceByObject = (enabled = true) => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: [...QUERY_KEYS.finance(projectId), 'by-object'],
+    queryFn: () => db.fetchFinanceByObject(projectId),
+    enabled: !!projectId && enabled,
+  })
+}
+
+function useFinanceInvalidation() {
+  const qc = useQueryClient()
+  const projectId = useProjectId()
+  return () => qc.invalidateQueries({ queryKey: QUERY_KEYS.finance(projectId) })
+}
+
+export function useCreateFinanceAccount() {
+  const invalidate = useFinanceInvalidation()
+  const projectId = useProjectId()
+  return useMutation({ mutationFn: (input: Parameters<typeof db.createFinanceAccount>[1]) => db.createFinanceAccount(projectId, input), onSuccess: invalidate })
+}
+
+export function useImportTransactions() {
+  const invalidate = useFinanceInvalidation()
+  const projectId = useProjectId()
+  return useMutation({ mutationFn: (input: Parameters<typeof db.importTransactions>[1]) => db.importTransactions(projectId, input), onSuccess: invalidate })
+}
+
+export function useAllocateTransaction() {
+  const invalidate = useFinanceInvalidation()
+  const projectId = useProjectId()
+  return useMutation({ mutationFn: (input: db.AllocationInput) => db.allocateTransaction(projectId, input), onSuccess: invalidate })
+}
+
+export function useRemoveAllocation() {
+  const invalidate = useFinanceInvalidation()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (v: { id: string; reason: string }) => db.removeAllocation(projectId, v.id, v.reason),
+    onSuccess: invalidate,
+  })
 }

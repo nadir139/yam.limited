@@ -19,9 +19,10 @@ import {
   BedDouble,
   Gauge,
   Droplets,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react'
-import type { Project } from '@/lib/types'
+import type { Project, UserRole } from '@/lib/types'
 
 // Labels are translation keys rather than English strings, so the navigation
 // follows the language menu instead of staying English around translated pages.
@@ -30,6 +31,8 @@ export interface NavItem {
   labelKey: string
   path: string
   badge?: 'defects' | 'approvals' | 'actionItems'
+  /** Shown only to these roles (the money is the owner side's and the captain's). */
+  roles?: UserRole[]
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -44,6 +47,7 @@ export const NAV_ITEMS: NavItem[] = [
   { icon: AlertTriangle, labelKey: 'nav.defects', path: '/app/defects', badge: 'defects' },
   { icon: GitBranch, labelKey: 'nav.changeOrders', path: '/app/change-orders' },
   { icon: CheckCircle2, labelKey: 'nav.approvals', path: '/app/approvals', badge: 'approvals' },
+  { icon: Wallet, labelKey: 'nav.finance', path: '/app/finance', roles: ['OWNER', 'OWNERS_REP', 'CAPTAIN'] },
   { icon: FileText, labelKey: 'nav.documents', path: '/app/documents' },
   { icon: ListChecks, labelKey: 'nav.actionItems', path: '/app/action-items', badge: 'actionItems' },
   { icon: MessagesSquare, labelKey: 'nav.messages', path: '/app/messages' },
@@ -62,16 +66,20 @@ const LOGBOOK_ITEMS: NavItem[] = [
   { icon: Droplets, labelKey: 'nav.oilRecord', path: '/app/oil-record' },
 ]
 const LOGBOOK_KEEPS = new Set([
-  '/app/agent', '/app/project', '/app/model', '/app/parts', '/app/defects', '/app/documents', '/app/action-items', '/app/messages', '/app/team',
+  '/app/agent', '/app/project', '/app/model', '/app/parts', '/app/defects', '/app/finance', '/app/documents', '/app/action-items', '/app/messages', '/app/team',
 ])
 
 type ProjectType = Project['project_type'] | undefined
 
-/** The sections a project of this type has, in sidebar order. */
-export function navItemsFor(type: ProjectType) {
-  if (type !== 'OPERATIONS') return NAV_ITEMS
+/**
+ * The sections a project of this type has, in sidebar order. Given a role,
+ * sections kept for other roles are left out (the page itself refuses too).
+ */
+export function navItemsFor(type: ProjectType, role?: UserRole | null) {
+  const forRole = (items: NavItem[]) => (role === undefined ? items : items.filter((i) => !i.roles || (role !== null && i.roles.includes(role))))
+  if (type !== 'OPERATIONS') return forRole(NAV_ITEMS)
   const agent = NAV_ITEMS.filter((i) => i.path === '/app/agent')
-  return [...agent, ...LOGBOOK_ITEMS, ...NAV_ITEMS.filter((i) => LOGBOOK_KEEPS.has(i.path) && i.path !== '/app/agent')]
+  return forRole([...agent, ...LOGBOOK_ITEMS, ...NAV_ITEMS.filter((i) => LOGBOOK_KEEPS.has(i.path) && i.path !== '/app/agent')])
 }
 
 /** Where a project of this type opens. */

@@ -575,6 +575,387 @@ export type Database = {
           },
         ]
       }
+      finance_accounts: {
+        Row: {
+          closed_at: string | null
+          closed_reason: string | null
+          created_at: string
+          created_by_name: string | null
+          currency: string
+          external_id: string | null
+          id: string
+          name: string
+          project_id: string
+          provider: string
+          vessel_id: string | null
+        }
+        Insert: {
+          closed_at?: string | null
+          closed_reason?: string | null
+          created_at?: string
+          created_by_name?: string | null
+          currency: string
+          external_id?: string | null
+          id?: string
+          name: string
+          project_id: string
+          provider: string
+          vessel_id?: string | null
+        }
+        Update: {
+          closed_at?: string | null
+          closed_reason?: string | null
+          created_at?: string
+          created_by_name?: string | null
+          currency?: string
+          external_id?: string | null
+          id?: string
+          name?: string
+          project_id?: string
+          provider?: string
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_accounts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_accounts_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_allocations: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          created_by: string | null
+          created_by_name: string | null
+          id: string
+          note: string | null
+          object_id: string | null
+          object_type: Database["public"]["Enums"]["object_type"] | null
+          removed_at: string | null
+          removed_by_name: string | null
+          removed_reason: string | null
+          transaction_id: string
+        }
+        Insert: {
+          amount: number
+          category: string
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          id?: string
+          note?: string | null
+          object_id?: string | null
+          object_type?: Database["public"]["Enums"]["object_type"] | null
+          removed_at?: string | null
+          removed_by_name?: string | null
+          removed_reason?: string | null
+          transaction_id: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          id?: string
+          note?: string | null
+          object_id?: string | null
+          object_type?: Database["public"]["Enums"]["object_type"] | null
+          removed_at?: string | null
+          removed_by_name?: string | null
+          removed_reason?: string | null
+          transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_allocations_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "finance_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_events: {
+        Row: {
+          after_state: Json | null
+          before_state: Json | null
+          event_type: string
+          id: string
+          object_id: string
+          object_type: Database["public"]["Enums"]["object_type"]
+          project_id: string
+          triggered_at: string
+          triggered_by: string | null
+          triggered_by_name: string | null
+          vessel_id: string | null
+        }
+        Insert: {
+          after_state?: Json | null
+          before_state?: Json | null
+          event_type: string
+          id?: string
+          object_id: string
+          object_type: Database["public"]["Enums"]["object_type"]
+          project_id: string
+          triggered_at?: string
+          triggered_by?: string | null
+          triggered_by_name?: string | null
+          vessel_id?: string | null
+        }
+        Update: {
+          after_state?: Json | null
+          before_state?: Json | null
+          event_type?: string
+          id?: string
+          object_id?: string
+          object_type?: Database["public"]["Enums"]["object_type"]
+          project_id?: string
+          triggered_at?: string
+          triggered_by?: string | null
+          triggered_by_name?: string | null
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_events_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_events_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_imports: {
+        Row: {
+          account_id: string
+          changed_count: number
+          created_at: string
+          file_name: string | null
+          id: string
+          imported_by_name: string | null
+          new_count: number
+          project_id: string
+          row_count: number
+          source: string
+          unchanged_count: number
+        }
+        Insert: {
+          account_id: string
+          changed_count?: number
+          created_at?: string
+          file_name?: string | null
+          id?: string
+          imported_by_name?: string | null
+          new_count?: number
+          project_id: string
+          row_count?: number
+          source: string
+          unchanged_count?: number
+        }
+        Update: {
+          account_id?: string
+          changed_count?: number
+          created_at?: string
+          file_name?: string | null
+          id?: string
+          imported_by_name?: string | null
+          new_count?: number
+          project_id?: string
+          row_count?: number
+          source?: string
+          unchanged_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_imports_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "finance_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_imports_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_receipts: {
+        Row: {
+          created_at: string
+          created_by_name: string | null
+          file_name: string
+          id: string
+          mime_type: string | null
+          removed_at: string | null
+          removed_by_name: string | null
+          removed_reason: string | null
+          sha256: string
+          size_bytes: number | null
+          storage_path: string
+          transaction_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by_name?: string | null
+          file_name: string
+          id?: string
+          mime_type?: string | null
+          removed_at?: string | null
+          removed_by_name?: string | null
+          removed_reason?: string | null
+          sha256: string
+          size_bytes?: number | null
+          storage_path: string
+          transaction_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by_name?: string | null
+          file_name?: string
+          id?: string
+          mime_type?: string | null
+          removed_at?: string | null
+          removed_by_name?: string | null
+          removed_reason?: string | null
+          sha256?: string
+          size_bytes?: number | null
+          storage_path?: string
+          transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_receipts_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "finance_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_transactions: {
+        Row: {
+          account_id: string
+          amount: number
+          bank_category: string | null
+          booked_at: string
+          counterparty: string | null
+          created_at: string
+          currency: string
+          description: string | null
+          external_id: string
+          fee: number | null
+          id: string
+          import_id: string | null
+          original_amount: number | null
+          original_currency: string | null
+          project_id: string
+          raw: Json
+          reference: string | null
+          source: string
+          state: string
+          updated_at: string | null
+          vessel_id: string | null
+        }
+        Insert: {
+          account_id: string
+          amount: number
+          bank_category?: string | null
+          booked_at: string
+          counterparty?: string | null
+          created_at?: string
+          currency: string
+          description?: string | null
+          external_id: string
+          fee?: number | null
+          id?: string
+          import_id?: string | null
+          original_amount?: number | null
+          original_currency?: string | null
+          project_id: string
+          raw: Json
+          reference?: string | null
+          source: string
+          state: string
+          updated_at?: string | null
+          vessel_id?: string | null
+        }
+        Update: {
+          account_id?: string
+          amount?: number
+          bank_category?: string | null
+          booked_at?: string
+          counterparty?: string | null
+          created_at?: string
+          currency?: string
+          description?: string | null
+          external_id?: string
+          fee?: number | null
+          id?: string
+          import_id?: string | null
+          original_amount?: number | null
+          original_currency?: string | null
+          project_id?: string
+          raw?: Json
+          reference?: string | null
+          source?: string
+          state?: string
+          updated_at?: string | null
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_transactions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "finance_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_transactions_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "finance_imports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_transactions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_transactions_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inspection_events: {
         Row: {
           actual_date: string | null
@@ -2476,6 +2857,18 @@ export type Database = {
         Args: { p_project_id?: string }
         Returns: Json
       }
+      action_allocate_transaction: {
+        Args: {
+          p_amount: number
+          p_category: string
+          p_note?: string
+          p_object_id?: string
+          p_object_type?: string
+          p_project_id: string
+          p_transaction_id: string
+        }
+        Returns: Json
+      }
       action_amend_defect_impact: {
         Args: {
           p_cost_impact?: number
@@ -2489,6 +2882,18 @@ export type Database = {
       }
       action_apply_part_import: {
         Args: { p_import_id: string; p_project_id?: string; p_proposal?: Json }
+        Returns: Json
+      }
+      action_attach_receipt: {
+        Args: {
+          p_file_name: string
+          p_mime_type: string
+          p_project_id: string
+          p_sha256: string
+          p_size_bytes: number
+          p_storage_path: string
+          p_transaction_id: string
+        }
         Returns: Json
       }
       action_change_member_role: {
@@ -2511,6 +2916,16 @@ export type Database = {
           p_label?: string
           p_project_id?: string
           p_to_part_id: string
+        }
+        Returns: Json
+      }
+      action_create_finance_account: {
+        Args: {
+          p_currency: string
+          p_external_id?: string
+          p_name: string
+          p_project_id: string
+          p_provider: string
         }
         Returns: Json
       }
@@ -2584,6 +2999,16 @@ export type Database = {
           p_connection_id: string
           p_project_id?: string
           p_reason?: string
+        }
+        Returns: Json
+      }
+      action_import_transactions: {
+        Args: {
+          p_account_id: string
+          p_file_name?: string
+          p_project_id: string
+          p_rows: Json
+          p_source: string
         }
         Returns: Json
       }
@@ -2758,6 +3183,14 @@ export type Database = {
           p_mime_type?: string
           p_project_id?: string
           p_title: string
+        }
+        Returns: Json
+      }
+      action_remove_allocation: {
+        Args: {
+          p_allocation_id: string
+          p_project_id: string
+          p_reason: string
         }
         Returns: Json
       }
@@ -3007,6 +3440,10 @@ export type Database = {
         Args: { p_action_key: string; p_project_id: string }
         Returns: boolean
       }
+      can_read_finance: {
+        Args: { p_project_id: string; p_vessel_id: string }
+        Returns: boolean
+      }
       can_read_part: {
         Args: { p_project_id: string; p_vessel_id: string }
         Returns: boolean
@@ -3025,6 +3462,41 @@ export type Database = {
       discipline_abbrev: {
         Args: { p_discipline: Database["public"]["Enums"]["discipline"] }
         Returns: string
+      }
+      finance_by_object: {
+        Args: { p_project_id: string }
+        Returns: {
+          currency: string
+          object_id: string
+          object_type: Database["public"]["Enums"]["object_type"]
+          received: number
+          spent: number
+          transactions: number
+        }[]
+      }
+      finance_event: {
+        Args: {
+          p_after: Json
+          p_before: Json
+          p_object_id: string
+          p_object_type: Database["public"]["Enums"]["object_type"]
+          p_project_id: string
+          p_type: string
+        }
+        Returns: undefined
+      }
+      finance_object_scope: {
+        Args: { p_object_id: string; p_object_type: string }
+        Returns: Record<string, unknown>
+      }
+      finance_summary: {
+        Args: { p_from: string; p_project_id: string; p_to: string }
+        Returns: {
+          amount: number
+          category: string
+          currency: string
+          month: string
+        }[]
       }
       is_project_member: { Args: { p_project_id: string }; Returns: boolean }
       log_alongside: {
@@ -3099,6 +3571,34 @@ export type Database = {
       require_approval_authority: {
         Args: { p_approval_id: string }
         Returns: undefined
+      }
+      require_finance: {
+        Args: { p_project_id: string }
+        Returns: {
+          actual_delivery: string | null
+          actual_start: string | null
+          budget_contingency: number | null
+          budget_locked: number | null
+          budget_spent: number | null
+          class_society: Database["public"]["Enums"]["class_society"] | null
+          created_at: string | null
+          id: string
+          name: string
+          phase: Database["public"]["Enums"]["project_phase"]
+          planned_delivery: string | null
+          planned_start: string | null
+          project_type: Database["public"]["Enums"]["project_type"]
+          survey_due_date: string | null
+          vessel_id: string | null
+          yard_location: string | null
+          yard_name: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "projects"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       require_permission: {
         Args: { p_action_key: string; p_project_id: string }
@@ -3335,6 +3835,11 @@ export type Database = {
         | "SERVICE_RECORD"
         | "CREW_CERTIFICATE"
         | "ORB_ENTRY"
+        | "FINANCE_ACCOUNT"
+        | "FINANCE_TRANSACTION"
+        | "FINANCE_ALLOCATION"
+        | "FINANCE_IMPORT"
+        | "FINANCE_RECEIPT"
       project_phase:
         | "PRE_SURVEY"
         | "HAUL_OUT"
@@ -3623,6 +4128,11 @@ export const Constants = {
         "SERVICE_RECORD",
         "CREW_CERTIFICATE",
         "ORB_ENTRY",
+        "FINANCE_ACCOUNT",
+        "FINANCE_TRANSACTION",
+        "FINANCE_ALLOCATION",
+        "FINANCE_IMPORT",
+        "FINANCE_RECEIPT",
       ],
       project_phase: [
         "PRE_SURVEY",

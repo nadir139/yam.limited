@@ -43,6 +43,13 @@ import type {
   SeaTime,
   YardDay,
   OrbEntry,
+  FinanceAccount,
+  FinanceTransaction,
+  FinanceAllocation,
+  FinanceImport,
+  FinanceReceipt,
+  FinanceSummaryRow,
+  FinanceByObject,
 } from './types'
 import type { RestSchedule } from './rest-hours'
 
@@ -2014,4 +2021,118 @@ export async function strikeOrbEntry(projectId: string, entryId: string, reason:
 export async function masterSignOrb(projectId: string): Promise<{ signed: number; entry_nos?: number[] }> {
   const { data, error } = await supabase.rpc('action_master_sign_orb', { p_project_id: projectId })
   return unwrap(data, error, 'Countersign the Oil Record Book') as unknown as { signed: number; entry_nos?: number[] }
+}
+
+// ─── Finance (migration 040) ──────────────────────────────────────────────────
+//
+// Read by the owner side and the captain only (RLS: can_read_finance). The
+// rows of a vessel's accounts are read by vessel, so the same ledger shows
+// from the logbook and from a refit.
+
+export interface FinanceLedger {
+  accounts: FinanceAccount[]
+  transactions: FinanceTransaction[]
+  allocations: FinanceAllocation[]
+  receipts: FinanceReceipt[]
+  imports: FinanceImport[]
+}
+
+export async function fetchFinanceLedger(projectId: string, vesselId: string | null): Promise<FinanceLedger> {
+  // Scoped by vessel when there is one, so every project of the boat sees the same ledger.
+  const accountsQ = supabase.from('finance_accounts').select('*').order('created_at')
+  const txQ = supabase.from('finance_transactions').select('*').order('booked_at', { ascending: false }).limit(2000)
+  const [accounts, transactions] = await Promise.all([
+    vesselId ? accountsQ.eq('vessel_id', vesselId) : accountsQ.eq('project_id', projectId),
+    vesselId ? txQ.eq('vessel_id', vesselId) : txQ.eq('project_id', projectId),
+  ])
+  if (accounts.error) throw accounts.error
+  if (transactions.error) throw transactions.error
+  const ids = (accounts.data ?? []).map((a) => a.id)
+  const txIds = (transactions.data ?? []).map((t) => t.id)
+  // Ids go in the URL, so they are sent 150 at a time (2,000 uuids would
+  // overflow the request line).
+  const chunks: string[][] = []
+  for (let i = 0; i < txIds.length; i += 150) chunks.push(txIds.slice(i, i + 150))
+  const [allocations, receipts, imports] = await Promise.all([
+    Promise.all(chunks.map((c) => supabase.from('finance_allocations').select('*').in('transaction_id', c))),
+    Promise.all(chunks.map((c) => supabase.from('finance_receipts').select('*').in('transaction_id', c))),
+    ids.length ? supabase.from('finance_imports').select('*').in('account_id', ids).order('created_at', { ascending: false }) : Promise.resolve({ data: [], error: null }),
+  ])
+  const failed = [...allocations, ...receipts].find((r) => r.error)
+  if (failed?.error) throw failed.error
+  if (imports.error) throw imports.error
+  return {
+    accounts: accounts.data ?? [],
+    transactions: transactions.data ?? [],
+    allocations: allocations.flatMap((r) => r.data ?? []) as FinanceAllocation[],
+    receipts: receipts.flatMap((r) => r.data ?? []) as FinanceReceipt[],
+    imports: (imports.data ?? []) as FinanceImport[],
+  }
+}
+
+export async function fetchFinanceSummary(projectId: string, from: string, to: string): Promise<FinanceSummaryRow[]> {
+  const { data, error } = await supabase.rpc('finance_summary', { p_project_id: projectId, p_from: from, p_to: to })
+  if (error) throw error
+  return ((data ?? []) as unknown as FinanceSummaryRow[]).map((r) => ({ ...r, amount: Number(r.amount) }))
+}
+
+export async function fetchFinanceByObject(projectId: string): Promise<FinanceByObject[]> {
+  const { data, error } = await supabase.rpc('finance_by_object', { p_project_id: projectId })
+  if (error) throw error
+  return (data ?? []) as unknown as FinanceByObject[]
+}
+
+export async function createFinanceAccount(
+  projectId: string,
+  input: { name: string; provider: string; currency: string; externalId?: string },
+): Promise<FinanceAccount> {
+  const { data, error } = await supabase.rpc('action_create_finance_account', {
+    p_project_id: projectId,
+    p_name: input.name,
+    p_provider: input.provider,
+    p_currency: input.currency,
+    p_external_id: input.externalId || undefined,
+  })
+  return (unwrap(data, error, 'Add account') as unknown as { account: FinanceAccount }).account
+}
+
+export async function importTransactions(
+  projectId: string,
+  input: { accountId: string; source: 'REVOLUT_CSV' | 'REVOLUT_API' | 'MANUAL'; rows: unknown[]; fileName?: string },
+): Promise<FinanceImport> {
+  const { data, error } = await supabase.rpc('action_import_transactions', {
+    p_project_id: projectId,
+    p_account_id: input.accountId,
+    p_source: input.source,
+    p_rows: input.rows as unknown as Json,
+    p_file_name: input.fileName || undefined,
+  })
+  return (unwrap(data, error, 'Import transactions') as unknown as { import: FinanceImport }).import
+}
+
+export interface AllocationInput {
+  transactionId: string
+  amount: number
+  category: string
+  objectType?: string | null
+  objectId?: string | null
+  note?: string
+}
+
+export async function allocateTransaction(projectId: string, input: AllocationInput): Promise<FinanceAllocation> {
+  const { data, error } = await supabase.rpc('action_allocate_transaction', {
+    p_project_id: projectId,
+    p_transaction_id: input.transactionId,
+    p_amount: input.amount,
+    p_category: input.category,
+    p_object_type: input.objectType ?? undefined,
+    p_object_id: input.objectId ?? undefined,
+    p_note: input.note || undefined,
+  })
+  return (unwrap(data, error, 'Allocate') as unknown as { allocation: FinanceAllocation }).allocation
+}
+
+export async function removeAllocation(projectId: string, allocationId: string, reason: string): Promise<FinanceAllocation> {
+  const { data, error } = await supabase.rpc('action_remove_allocation', { p_project_id: projectId, p_allocation_id: allocationId, p_reason: reason })
+  return (unwrap(data, error, 'Remove allocation') as unknown as { allocation: FinanceAllocation }).allocation
 }
