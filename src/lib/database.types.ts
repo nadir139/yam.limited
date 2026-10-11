@@ -1185,6 +1185,98 @@ export type Database = {
           },
         ]
       }
+      part_readings: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          id: string
+          kind: string
+          log_entry_id: string | null
+          note: string | null
+          part_id: string
+          project_id: string
+          read_at: string
+          recorded_by: string | null
+          recorded_by_name: string | null
+          reset_reason: string | null
+          unit: string
+          value: number
+          vessel_id: string
+          void_reason: string | null
+          voided_at: string | null
+          voided_by_name: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          log_entry_id?: string | null
+          note?: string | null
+          part_id: string
+          project_id: string
+          read_at: string
+          recorded_by?: string | null
+          recorded_by_name?: string | null
+          reset_reason?: string | null
+          unit: string
+          value: number
+          vessel_id: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by_name?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          log_entry_id?: string | null
+          note?: string | null
+          part_id?: string
+          project_id?: string
+          read_at?: string
+          recorded_by?: string | null
+          recorded_by_name?: string | null
+          reset_reason?: string | null
+          unit?: string
+          value?: number
+          vessel_id?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "part_readings_log_entry_id_fkey"
+            columns: ["log_entry_id"]
+            isOneToOne: false
+            referencedRelation: "log_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "part_readings_part_id_fkey"
+            columns: ["part_id"]
+            isOneToOne: false
+            referencedRelation: "parts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "part_readings_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "part_readings_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       part_references: {
         Row: {
           bbox: number[] | null
@@ -1599,6 +1691,191 @@ export type Database = {
             columns: ["vessel_id"]
             isOneToOne: false
             referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_intervals: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          created_by_name: string | null
+          every_days: number | null
+          every_hours: number | null
+          id: string
+          notes: string | null
+          part_id: string
+          project_id: string
+          retired_at: string | null
+          retired_by_name: string | null
+          retired_reason: string | null
+          title: string
+          updated_at: string | null
+          updated_by_name: string | null
+          vessel_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          every_days?: number | null
+          every_hours?: number | null
+          id?: string
+          notes?: string | null
+          part_id: string
+          project_id: string
+          retired_at?: string | null
+          retired_by_name?: string | null
+          retired_reason?: string | null
+          title: string
+          updated_at?: string | null
+          updated_by_name?: string | null
+          vessel_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          created_by_name?: string | null
+          every_days?: number | null
+          every_hours?: number | null
+          id?: string
+          notes?: string | null
+          part_id?: string
+          project_id?: string
+          retired_at?: string | null
+          retired_by_name?: string | null
+          retired_reason?: string | null
+          title?: string
+          updated_at?: string | null
+          updated_by_name?: string | null
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_intervals_part_id_fkey"
+            columns: ["part_id"]
+            isOneToOne: false
+            referencedRelation: "parts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_intervals_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_intervals_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_records: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          done_on: string
+          hours_at: number | null
+          id: string
+          interval_id: string | null
+          is_baseline: boolean
+          log_entry_id: string | null
+          note: string | null
+          part_id: string
+          project_id: string
+          recorded_by: string | null
+          recorded_by_name: string | null
+          vessel_id: string
+          void_reason: string | null
+          voided_at: string | null
+          voided_by_name: string | null
+          work_package_id: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          done_on: string
+          hours_at?: number | null
+          id?: string
+          interval_id?: string | null
+          is_baseline?: boolean
+          log_entry_id?: string | null
+          note?: string | null
+          part_id: string
+          project_id: string
+          recorded_by?: string | null
+          recorded_by_name?: string | null
+          vessel_id: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by_name?: string | null
+          work_package_id?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          done_on?: string
+          hours_at?: number | null
+          id?: string
+          interval_id?: string | null
+          is_baseline?: boolean
+          log_entry_id?: string | null
+          note?: string | null
+          part_id?: string
+          project_id?: string
+          recorded_by?: string | null
+          recorded_by_name?: string | null
+          vessel_id?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by_name?: string | null
+          work_package_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_records_interval_id_fkey"
+            columns: ["interval_id"]
+            isOneToOne: false
+            referencedRelation: "service_intervals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_records_log_entry_id_fkey"
+            columns: ["log_entry_id"]
+            isOneToOne: false
+            referencedRelation: "log_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_records_part_id_fkey"
+            columns: ["part_id"]
+            isOneToOne: false
+            referencedRelation: "parts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_records_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_records_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_records_work_package_id_fkey"
+            columns: ["work_package_id"]
+            isOneToOne: false
+            referencedRelation: "work_packages"
             referencedColumns: ["id"]
           },
         ]
@@ -2189,6 +2466,20 @@ export type Database = {
         Args: { p_project_id: string }
         Returns: Json
       }
+      action_record_reading: {
+        Args: {
+          p_client_id?: string
+          p_kind?: string
+          p_note?: string
+          p_part_id: string
+          p_project_id: string
+          p_read_at?: string
+          p_reset_reason?: string
+          p_unit?: string
+          p_value: number
+        }
+        Returns: Json
+      }
       action_record_rest: {
         Args: {
           p_crew_id: string
@@ -2197,6 +2488,19 @@ export type Database = {
           p_reason?: string
           p_schedule: Json
           p_year: number
+        }
+        Returns: Json
+      }
+      action_record_service: {
+        Args: {
+          p_client_id?: string
+          p_done_on?: string
+          p_hours_at?: number
+          p_interval_id?: string
+          p_note?: string
+          p_part_id: string
+          p_project_id: string
+          p_work_package_id?: string
         }
         Returns: Json
       }
@@ -2229,6 +2533,10 @@ export type Database = {
           p_reason?: string
           p_work_package_id: string
         }
+        Returns: Json
+      }
+      action_retire_service_interval: {
+        Args: { p_interval_id: string; p_project_id: string; p_reason: string }
         Returns: Json
       }
       action_save_part_import: {
@@ -2308,6 +2616,21 @@ export type Database = {
       }
       action_set_schedule_baseline: {
         Args: { p_project_id?: string; p_reason?: string }
+        Returns: Json
+      }
+      action_set_service_interval: {
+        Args: {
+          p_every_days?: number
+          p_every_hours?: number
+          p_interval_id?: string
+          p_last_done_hours?: number
+          p_last_done_on?: string
+          p_notes?: string
+          p_part_id: string
+          p_project_id: string
+          p_reason?: string
+          p_title: string
+        }
         Returns: Json
       }
       action_set_vessel_model: {
@@ -2390,6 +2713,14 @@ export type Database = {
         Args: { p_entry_id: string; p_project_id: string; p_reason: string }
         Returns: Json
       }
+      action_void_reading: {
+        Args: { p_project_id: string; p_reading_id: string; p_reason: string }
+        Returns: Json
+      }
+      action_void_service_record: {
+        Args: { p_project_id: string; p_reason: string; p_record_id: string }
+        Returns: Json
+      }
       approval_days_for_tier: {
         Args: { p_tier: Database["public"]["Enums"]["approval_tier"] }
         Returns: number
@@ -2422,6 +2753,16 @@ export type Database = {
         Returns: string
       }
       is_project_member: { Args: { p_project_id: string }; Returns: boolean }
+      log_alongside: {
+        Args: {
+          p_body: string
+          p_kind: Database["public"]["Enums"]["log_entry_kind"]
+          p_part_id: string
+          p_project_id: string
+          p_when: string
+        }
+        Returns: string
+      }
       mention_context: {
         Args: {
           p_id: string
@@ -2502,12 +2843,91 @@ export type Database = {
         Args: { p_month: number; p_project_id: string; p_year: number }
         Returns: Json
       }
+      service_due: {
+        Args: { p_project_id: string }
+        Returns: {
+          days_left: number
+          due_hours: number
+          due_on: string
+          every_days: number
+          every_hours: number
+          hours_left: number
+          hours_now: number
+          hours_read_at: string
+          hours_since: number
+          interval_id: string
+          last_done_on: string
+          last_hours: number
+          last_is_baseline: boolean
+          part_id: string
+          part_name: string
+          status: string
+          title: string
+        }[]
+      }
+      service_due_superseded_036: {
+        Args: { p_project_id: string }
+        Returns: {
+          days_left: number
+          due_hours: number
+          due_on: string
+          every_days: number
+          every_hours: number
+          hours_left: number
+          hours_now: number
+          hours_read_at: string
+          interval_id: string
+          last_done_on: string
+          last_hours: number
+          last_is_baseline: boolean
+          part_id: string
+          part_name: string
+          status: string
+          title: string
+        }[]
+      }
       space_is_on_project: {
         Args: {
           p_project_id: string
           p_space: Database["public"]["Tables"]["spaces"]["Row"]
         }
         Returns: boolean
+      }
+      vessel_part: {
+        Args: { p_part_id: string; p_project_id: string }
+        Returns: {
+          category: Database["public"]["Enums"]["discipline"] | null
+          created_at: string
+          created_by: string | null
+          created_by_name: string | null
+          designation: string | null
+          id: string
+          installed_on: string | null
+          kind: string | null
+          location: string | null
+          manufacturer: string | null
+          model: string | null
+          model_position: Json | null
+          model_size: Json | null
+          name: string
+          notes: string | null
+          parent_id: string | null
+          project_id: string | null
+          removed_at: string | null
+          removed_by_name: string | null
+          removed_reason: string | null
+          safety_critical: boolean
+          serial_number: string | null
+          space_id: string | null
+          updated_at: string | null
+          vessel_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "parts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
     }
     Enums: {
@@ -2609,6 +3029,9 @@ export type Database = {
         | "LOG_DAY"
         | "LOG_ENTRY"
         | "REST_RECORD"
+        | "READING"
+        | "SERVICE_INTERVAL"
+        | "SERVICE_RECORD"
       project_phase:
         | "PRE_SURVEY"
         | "HAUL_OUT"
@@ -2892,6 +3315,9 @@ export const Constants = {
         "LOG_DAY",
         "LOG_ENTRY",
         "REST_RECORD",
+        "READING",
+        "SERVICE_INTERVAL",
+        "SERVICE_RECORD",
       ],
       project_phase: [
         "PRE_SURVEY",

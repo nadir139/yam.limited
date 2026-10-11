@@ -79,6 +79,34 @@ export type LogDayCrew = Row<'log_day_crew'>
 export type LogEntry = Row<'log_entries'>
 /** Hours of rest (migration 033): one month for one crew member, readable by them and the captain. */
 export type RestRecord = Row<'rest_records'>
+/** Maintenance (migration 036): readings, intervals and services belong to the vessel. */
+export type PartReading = Row<'part_readings'>
+export type ServiceInterval = Row<'service_intervals'>
+export type ServiceRecord = Row<'service_records'>
+export type ReadingKind = 'RUNNING_HOURS' | 'FUEL_LEVEL' | 'OTHER'
+export type ServiceStatus = 'OVERDUE' | 'DUE_SOON' | 'OK' | 'NO_BASELINE' | 'NO_READING'
+/** One row of service_due(): what an interval needs next. The generated type marks every column non-null; most can be null. */
+export interface ServiceDue {
+  interval_id: string
+  part_id: string
+  part_name: string
+  title: string
+  every_hours: number | null
+  every_days: number | null
+  last_done_on: string | null
+  last_hours: number | null
+  last_is_baseline: boolean | null
+  hours_now: number | null
+  hours_read_at: string | null
+  /** Running hours since the last service, counted across meter resets. */
+  hours_since: number | null
+  /** The meter reading at which it falls due, on the meter as it is now. */
+  due_hours: number | null
+  hours_left: number | null
+  due_on: string | null
+  days_left: number | null
+  status: ServiceStatus
+}
 export type PartLink = Row<'part_links'>
 export type Space = Row<'spaces'>
 export type PartConnection = Row<'part_connections'>

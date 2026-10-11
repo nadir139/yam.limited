@@ -40,6 +40,7 @@ export const it: Record<string, string> = {
   'nav.logbook': 'Giornale di bordo',
   'nav.crew': 'Equipaggio',
   'nav.rest': 'Ore di riposo',
+  'nav.maintenance': 'Manutenzione',
   'nav.signOut': 'Esci',
   'nav.noRole': 'Nessun ruolo nel progetto',
 

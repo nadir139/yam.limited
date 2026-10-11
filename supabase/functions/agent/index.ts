@@ -213,6 +213,18 @@ function buildTools(
       },
     },
     {
+      name: "get_maintenance",
+      description:
+        "The vessel's maintenance: every current service interval (what a part needs and how often, in running hours and/or days) with when it was last done, the part's running hours now, hours run since the last service (counted across meter replacements), when it is next due and its status (OVERDUE, DUE_SOON, OK, NO_BASELINE = never recorded, NO_READING = needs an hours reading); plus the latest readings and services, struck-out ones included with their reason. Belongs to the vessel, so it is the same from the logbook and from a refit. Call this before answering what is due, when something was last serviced or how many hours an engine has, and before recording a reading or a service (to find the part and the interval).",
+      input_schema: {
+        type: "object",
+        properties: {
+          part_id: { type: "string", description: "Only this part's intervals, readings and services" },
+        },
+        required: [],
+      },
+    },
+    {
       name: "get_logbook",
       description:
         "The boat's logbook for a date range (default: the last 14 days, at most 62): each day's status (SEA_SERVICE, STANDBY, YARD), position, ports, nautical miles, watchkeeping, notes and who was aboard; every timestamped entry (navigation, engine, defect, safety, bunkering, weather, maintenance, note) including struck-out ones with the reason, and the NCR a defect entry was raised as; the crew list; the days in the range nobody logged; and hours-of-rest counts for the month (how many crew recorded, how many in breach -- never anyone's hours). From a refit project it reads the same vessel's logbook when the caller is on it. Call this before answering what the boat did, where it was, who was aboard, what went wrong at sea, or before raising an NCR from a log entry. Dates are YYYY-MM-DD.",
@@ -315,6 +327,11 @@ Parts also have a place (action_create_space, then action_set_part_details with 
 
 ## The logbook
 A boat in service keeps a logbook: a project of type OPERATIONS, one per vessel, recording each day (sea service, standby or yard; position, ports, miles, who was aboard) and timestamped entries. Call get_logbook before answering what the boat did, where it was, who was aboard or what went wrong at sea, and name days nobody logged when they matter -- a gap is the first thing a surveyor or insurer asks about. A DEFECT entry can become an NCR in one step with action_raise_ncr_from_entry; suggest it when a defect entry has none and the fault needs following up. Hours of rest are private to each crew member and the captain: you see only counts, so never guess or report anyone's hours.
+
+You can write the log: "log: left Palma 08:00, 42 nm to Ibiza" becomes action_add_log_entry with the right kind (NAVIGATION here) and time. Write what was said, not a summary of it. An entry is never edited; a wrong one is struck out by its author or the captain in the app.
+
+## Maintenance
+Parts carry readings (running hours on a meter) and service intervals ("oil and filter every 250 h or 12 months"). Call get_maintenance before answering what is due or when something was last done, and answer from its status and hours: it counts hours run since the last service across meter replacements. "Main engine 4,312 h" is action_record_reading on that part (it is also written in the log); a figure lower than the last needs p_reset_reason, so ask whether the meter was replaced rather than guessing. "Changed the oil on the port genset" is action_record_service against the matching interval (or with p_note when there is none); give p_hours_at when the hours were said. Set intervals up with action_set_service_interval, including when it was last done if known, or nothing can be counted. Never invent hours or dates.
 
 ## Act
 When you are asked to record something, record it. A list of jobs is a list of records: one work package per item, all issued together as parallel tool calls in a single turn, not one per turn. Check what already exists once, up front, so you do not file a duplicate. Fill the fields you were given, leave unknown optional fields empty, and state your assumptions in one line afterwards -- a filed record that ${actorName} corrects beats an interrogation.
@@ -926,6 +943,36 @@ Deno.serve(async (req: Request) => {
     // people said afterwards. Reporting an NCR's cost from the row and calling
     // the closure uncommented -- when the comment is sitting on its thread --
     // is exactly the failure this exists to prevent.
+    if (name === "get_maintenance") {
+      if (!project.vessel_id) return { error: "This project has no vessel, so no maintenance record." };
+      const partId = typeof input.part_id === "string" && input.part_id ? input.part_id : null;
+      let readingsQ = supabase
+        .from("part_readings")
+        .select("id, part_id, kind, value, unit, read_at, note, reset_reason, recorded_by_name, voided_at, void_reason")
+        .eq("vessel_id", project.vessel_id)
+        .order("read_at", { ascending: false })
+        .limit(40);
+      let servicesQ = supabase
+        .from("service_records")
+        .select("id, part_id, interval_id, done_on, hours_at, note, is_baseline, work_package_id, recorded_by_name, voided_at, void_reason")
+        .eq("vessel_id", project.vessel_id)
+        .order("done_on", { ascending: false })
+        .limit(40);
+      if (partId) {
+        readingsQ = readingsQ.eq("part_id", partId);
+        servicesQ = servicesQ.eq("part_id", partId);
+      }
+      const [dueRes, readingsRes, servicesRes] = await Promise.all([
+        supabase.rpc("service_due", { p_project_id: projectId }),
+        readingsQ,
+        servicesQ,
+      ]);
+      const failed = [dueRes, readingsRes, servicesRes].find((r) => r.error);
+      if (failed?.error) return { error: failed.error.message };
+      const due = ((dueRes.data ?? []) as Array<{ part_id: string }>).filter((r) => !partId || r.part_id === partId);
+      return { intervals: due, readings: readingsRes.data, services: servicesRes.data };
+    }
+
     if (name === "get_logbook") {
       // A boat's log lives on its OPERATIONS project (migration 032). From a
       // refit project of the same vessel, read that one -- the projects read

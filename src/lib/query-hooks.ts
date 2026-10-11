@@ -42,6 +42,7 @@ export const QUERY_KEYS = {
   logDays: (p: string) => ['log-days', p],
   logEntries: (p: string) => ['log-entries', p],
   rest: (p: string) => ['rest', p],
+  maintenance: (p: string) => ['maintenance', p],
 }
 
 export const useProject = () => {
@@ -1225,5 +1226,92 @@ export function useRecordRest() {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.rest(projectId) })
       qc.invalidateQueries({ queryKey: QUERY_KEYS.events(projectId) })
     },
+  })
+}
+
+// ─── Maintenance (migration 036) ──────────────────────────────────────────────
+
+/** What each service interval on this vessel needs next. */
+export const useServiceDue = () => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: [...QUERY_KEYS.maintenance(projectId), 'due'],
+    queryFn: () => db.fetchServiceDue(projectId),
+    enabled: !!projectId,
+  })
+}
+
+/** Readings, intervals and services of the project's vessel. */
+export const useMaintenanceRecord = () => {
+  const projectId = useProjectId()
+  const { data: project } = useProject()
+  const vesselId = project?.vessel_id ?? null
+  return useQuery({
+    queryKey: [...QUERY_KEYS.maintenance(projectId), 'record', vesselId],
+    queryFn: async () => {
+      const [readings, intervals, services] = await Promise.all([
+        db.fetchReadings(vesselId!),
+        db.fetchServiceIntervals(vesselId!),
+        db.fetchServiceRecords(vesselId!),
+      ])
+      return { readings, intervals, services }
+    },
+    enabled: !!projectId && !!vesselId,
+  })
+}
+
+function useMaintenanceInvalidation() {
+  const qc = useQueryClient()
+  const projectId = useProjectId()
+  return () => {
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.maintenance(projectId) })
+    // Readings and services are written into the log too.
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.logEntries(projectId) })
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.events(projectId) })
+  }
+}
+
+export function useRecordReading() {
+  const invalidate = useMaintenanceInvalidation()
+  const projectId = useProjectId()
+  return useMutation({ mutationFn: (input: db.ReadingInput) => db.recordReading(projectId, input), onSuccess: invalidate })
+}
+
+export function useVoidReading() {
+  const invalidate = useMaintenanceInvalidation()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (v: { id: string; reason: string }) => db.voidReading(projectId, v.id, v.reason),
+    onSuccess: invalidate,
+  })
+}
+
+export function useSetServiceInterval() {
+  const invalidate = useMaintenanceInvalidation()
+  const projectId = useProjectId()
+  return useMutation({ mutationFn: (input: db.ServiceIntervalInput) => db.setServiceInterval(projectId, input), onSuccess: invalidate })
+}
+
+export function useRetireServiceInterval() {
+  const invalidate = useMaintenanceInvalidation()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (v: { id: string; reason: string }) => db.retireServiceInterval(projectId, v.id, v.reason),
+    onSuccess: invalidate,
+  })
+}
+
+export function useRecordService() {
+  const invalidate = useMaintenanceInvalidation()
+  const projectId = useProjectId()
+  return useMutation({ mutationFn: (input: db.ServiceInput) => db.recordService(projectId, input), onSuccess: invalidate })
+}
+
+export function useVoidServiceRecord() {
+  const invalidate = useMaintenanceInvalidation()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (v: { id: string; reason: string }) => db.voidServiceRecord(projectId, v.id, v.reason),
+    onSuccess: invalidate,
   })
 }

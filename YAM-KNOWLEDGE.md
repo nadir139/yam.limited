@@ -2042,3 +2042,58 @@ reads the same vessel's logbook if the caller is on it.
 
 The logbook's own app (`nadir139/d-logbook`) is retired, not migrated: its
 data was declared expendable on 11 Oct 2026.
+
+## 40. Maintenance: readings, service intervals, work done (migration 036)
+
+Phase 3 of the logbook merge, first part. An engineer writes "main engine
+4,312 h"; the reading lands on the part, the part's service intervals say
+what is due, and the Maintenance page, the part's Maintenance tab, the 3D
+view (colour by maintenance) and the agent all show it.
+
+**Three tables, all belonging to the vessel** (readable by any member of
+any project on it, through `can_read_part`): the engine's hours are the same
+fact for the crew, the yard and the next owner.
+- `part_readings`: a meter reading on a part (`RUNNING_HOURS` in h,
+  `FUEL_LEVEL` in L, or `OTHER` with a unit), when it was read and by whom.
+  Running hours only go up: a figure out of step with the readings around it
+  is refused unless `reset_reason` says the meter was replaced or reset.
+- `service_intervals`: what a part needs and how often (`every_hours`
+  and/or `every_days`). A change records before and after and needs a reason
+  once services count against it; retiring needs a reason. Never deleted.
+- `service_records`: maintenance done, against an interval or described in
+  a note, with the running hours at the time (given, which also records a
+  reading, or taken from the last reading that day). The "last done" given
+  when an interval is set up is kept as a baseline record
+  (`is_baseline`), so the due date has a start without pretending the work
+  was recorded here.
+
+**Nothing is lost.** Readings and services are struck out with a reason
+(voided), never edited or deleted; striking out the log entry a reading or
+service was written as strikes those out too, and the other way round. Each
+write is a `world_model_events` row on the project it was made from. On a
+boat's logbook each reading and service is also a log entry (ENGINE,
+MAINTENANCE) in its place in the day. Every write from the browser carries
+a `client_id`; the same write sent twice (a retry after lost signal, an
+offline queue replayed) is recorded once and the first row returned.
+
+**What is due** is decided in one place, `service_due(project)` (security
+invoker, so the caller's read rights apply). Hours run since the last
+service are added reading by reading, and a reading with a `reset_reason`
+starts a new count instead of making the engine look new (verified: 251 h
+before a meter swap + 48 h after = 299 h). Status: `OVERDUE`, `DUE_SOON`
+(within a tenth of the interval, at least 10 h / 14 days), `OK`,
+`NO_BASELINE` (never recorded: say when it was last done), `NO_READING`.
+`src/lib/maintenance.ts` only words and colours it (unit-tested).
+
+**Who.** Readings and services: captain, crew, owner's rep, yard PM.
+Intervals: those plus the owner. The agent can record readings, services
+and intervals, write log entries and raise NCRs from them
+(`is_agent_usable`), and reads it all through `get_maintenance`.
+
+Verified in rolled-back transactions on the live database: due soon at
+4,245 h of a 250 h interval from 4,000 h, overdue at 4,251 h, back in date
+after a service at 4,260 h (next at 4,510 h), overdue again when that
+service's log entry is struck out; a backwards reading refused without a
+reason; a repeated client id recorded once; the refit's owner's rep sees
+the same intervals and readings and records a reading (event on the refit,
+no log entry); an outsider sees and writes nothing.
