@@ -178,6 +178,16 @@ export function useRealtimeSync() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rest_records' }, () =>
         qc.invalidateQueries({ queryKey: ['rest'] }),
       )
+      // Maintenance: a reading or a service on one phone moves what is due on every screen.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'part_readings' }, () =>
+        qc.invalidateQueries({ queryKey: ['maintenance'] }),
+      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'service_intervals' }, () =>
+        qc.invalidateQueries({ queryKey: ['maintenance'] }),
+      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'service_records' }, () =>
+        qc.invalidateQueries({ queryKey: ['maintenance'] }),
+      )
       .subscribe()
 
     return () => {

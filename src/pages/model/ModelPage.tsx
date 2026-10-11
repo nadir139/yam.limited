@@ -26,6 +26,7 @@ import {
   usePlacePart,
   usePlaceSpace,
   useProject,
+  useServiceDue,
   useSizePart,
   useSpaces,
   useTeam,
@@ -35,6 +36,7 @@ import {
 } from '@/lib/query-hooks'
 import { FALLBACK_ONTOLOGY, fetchOntology } from '@/lib/ontology'
 import { buildPartTree, descendantIds, partPath, partSystem } from '@/lib/parts'
+import { STATUS_META, worstByPart } from '@/lib/maintenance'
 import {
   CONNECTION_COLOURS,
   SYSTEM_PALETTE,
@@ -61,6 +63,8 @@ const VesselScene = lazy(() => import('@/components/model/VesselScene'))
 const muted = { color: 'hsl(var(--muted-foreground))' }
 
 const STATUS_COLOURS = { ncr: '#dc2626', wp: '#d97706', clear: '#16a34a' }
+/** A part with no service interval, when colouring by maintenance. */
+const NO_SERVICE_COLOUR = '#9ca3af'
 
 const CONNECTION_NAMES: Record<string, [string, string]> = {
   POWERS: ['powers', 'powered by'],
@@ -191,7 +195,10 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
   const [params, setParams] = useSearchParams()
   const systemId = params.get('system')
   const selectedPartId = params.get('part')
-  const [colourBy, setColourBy] = useState<'system' | 'status'>('system')
+  const [colourBy, setColourBy] = useState<'system' | 'status' | 'maintenance'>('system')
+  const { data: due = [] } = useServiceDue()
+  // What each part needs next (migration 036): its worst service interval.
+  const serviceStatus = useMemo(() => worstByPart(due), [due])
   const [options, setOptions] = useState<SceneOptions>({
     showHull: true,
     showSpaces: true,
@@ -293,10 +300,14 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
     return out
   }, [links, defects, wps])
 
-  const colourOf = (p: PlacedPart) =>
-    colourBy === 'status'
-      ? STATUS_COLOURS[status.get(p.part.id) ?? 'clear']
-      : systemColour.get(partSystem(p.part, byId).id) ?? SYSTEM_PALETTE[0]
+  const colourOf = (p: PlacedPart) => {
+    if (colourBy === 'status') return STATUS_COLOURS[status.get(p.part.id) ?? 'clear']
+    if (colourBy === 'maintenance') {
+      const s = serviceStatus.get(p.part.id)
+      return s ? STATUS_META[s].colour : NO_SERVICE_COLOUR
+    }
+    return systemColour.get(partSystem(p.part, byId).id) ?? SYSTEM_PALETTE[0]
+  }
 
   const isProperty = project?.project_type === 'PROPERTY'
   const selected = selectedPartId ? byId.get(selectedPartId) ?? null : null
@@ -397,7 +408,7 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
         </Panel>
         <Panel title="Colour parts by">
           <div className="flex gap-1">
-            {(['system', 'status'] as const).map((c) => (
+            {(['system', 'status', 'maintenance'] as const).map((c) => (
               <Button key={c} size="sm" variant={colourBy === c ? 'default' : 'outline'} onClick={() => setColourBy(c)} className="flex-1 capitalize">
                 {c}
               </Button>
@@ -408,6 +419,17 @@ function VesselView({ onOpenGraph }: { onOpenGraph: () => void }) {
               <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ background: STATUS_COLOURS.ncr }} /> Open NCR</div>
               <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ background: STATUS_COLOURS.wp }} /> Work in progress</div>
               <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ background: STATUS_COLOURS.clear }} /> Nothing open</div>
+            </div>
+          )}
+          {colourBy === 'maintenance' && (
+            <div className="space-y-1 text-xs">
+              {(['OVERDUE', 'DUE_SOON', 'OK'] as const).map((s) => (
+                <div key={s} className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: STATUS_META[s].colour }} /> {STATUS_META[s].label}
+                  <span style={muted}>({[...serviceStatus.values()].filter((v) => v === s).length})</span>
+                </div>
+              ))}
+              <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ background: NO_SERVICE_COLOUR }} /> No interval set</div>
             </div>
           )}
         </Panel>

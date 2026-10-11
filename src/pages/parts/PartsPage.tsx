@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import PartMaintenancePanel from '@/components/maintenance/PartMaintenancePanel'
 import { Link, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
@@ -577,12 +578,16 @@ export function PartDetail({
       )}
 
       <Tabs defaultValue="record">
-        <TabsList>
+        <TabsList className="h-auto flex-wrap">
           <TabsTrigger value="record">Record ({live.length})</TabsTrigger>
+          <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
           <TabsTrigger value="connections">Connections</TabsTrigger>
           <TabsTrigger value="drawings">Drawings</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
+        <TabsContent value="maintenance">
+          <PartMaintenancePanel part={part} />
+        </TabsContent>
         <TabsContent value="connections">
           <PartConnectionsPanel part={part} parts={parts} onSelect={onSelect} />
         </TabsContent>

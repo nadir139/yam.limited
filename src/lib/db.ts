@@ -34,6 +34,11 @@ import type {
   AttendanceStatus,
   LogEntryKind,
   RestRecord,
+  PartReading,
+  ServiceInterval,
+  ServiceRecord,
+  ServiceDue,
+  ReadingKind,
 } from './types'
 import type { RestSchedule } from './rest-hours'
 
@@ -1743,4 +1748,146 @@ export async function recordRest(
     p_reason: input.reason || undefined,
   })
   return (unwrap(data, error, 'Save hours of rest') as unknown as { rest_record: RestRecord }).rest_record
+}
+
+// ─── Maintenance (migration 036) ──────────────────────────────────────────────
+//
+// Readings, intervals and services belong to the vessel, so they are read by
+// vessel; the project only says which vessel. Every write carries a client id:
+// a request repeated after a dropped connection is recorded once.
+
+/** A fresh id for one write, so sending it twice records it once. */
+export const newClientId = () => crypto.randomUUID()
+
+export async function fetchServiceDue(projectId: string): Promise<ServiceDue[]> {
+  const { data, error } = await supabase.rpc('service_due', { p_project_id: projectId })
+  if (error) throw error
+  return (data ?? []) as unknown as ServiceDue[]
+}
+
+export async function fetchReadings(vesselId: string): Promise<PartReading[]> {
+  const { data, error } = await supabase
+    .from('part_readings')
+    .select('*')
+    .eq('vessel_id', vesselId)
+    .order('read_at', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(500)
+  if (error) throw error
+  return data ?? []
+}
+
+export async function fetchServiceIntervals(vesselId: string): Promise<ServiceInterval[]> {
+  const { data, error } = await supabase
+    .from('service_intervals')
+    .select('*')
+    .eq('vessel_id', vesselId)
+    .order('created_at')
+  if (error) throw error
+  return data ?? []
+}
+
+export async function fetchServiceRecords(vesselId: string): Promise<ServiceRecord[]> {
+  const { data, error } = await supabase
+    .from('service_records')
+    .select('*')
+    .eq('vessel_id', vesselId)
+    .order('done_on', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(500)
+  if (error) throw error
+  return data ?? []
+}
+
+export interface ReadingInput {
+  partId: string
+  value: number
+  kind?: ReadingKind
+  unit?: string
+  readAt?: string | null
+  note?: string
+  resetReason?: string
+  clientId?: string
+}
+
+export async function recordReading(projectId: string, input: ReadingInput): Promise<PartReading> {
+  const { data, error } = await supabase.rpc('action_record_reading', {
+    p_project_id: projectId,
+    p_part_id: input.partId,
+    p_value: input.value,
+    p_kind: input.kind ?? 'RUNNING_HOURS',
+    p_unit: input.unit || undefined,
+    p_read_at: input.readAt ?? undefined,
+    p_note: input.note || undefined,
+    p_reset_reason: input.resetReason || undefined,
+    p_client_id: input.clientId ?? newClientId(),
+  })
+  return (unwrap(data, error, 'Record reading') as unknown as { reading: PartReading }).reading
+}
+
+export async function voidReading(projectId: string, readingId: string, reason: string): Promise<PartReading> {
+  const { data, error } = await supabase.rpc('action_void_reading', { p_project_id: projectId, p_reading_id: readingId, p_reason: reason })
+  return (unwrap(data, error, 'Strike out reading') as unknown as { reading: PartReading }).reading
+}
+
+export interface ServiceIntervalInput {
+  intervalId?: string | null
+  partId: string
+  title: string
+  everyHours?: number | null
+  everyDays?: number | null
+  notes?: string
+  lastDoneOn?: string | null
+  lastDoneHours?: number | null
+  reason?: string
+}
+
+export async function setServiceInterval(projectId: string, input: ServiceIntervalInput): Promise<ServiceInterval> {
+  const { data, error } = await supabase.rpc('action_set_service_interval', {
+    p_project_id: projectId,
+    p_part_id: input.partId,
+    p_title: input.title,
+    p_every_hours: input.everyHours ?? undefined,
+    p_every_days: input.everyDays ?? undefined,
+    p_notes: input.notes || undefined,
+    p_interval_id: input.intervalId ?? undefined,
+    p_last_done_on: input.lastDoneOn ?? undefined,
+    p_last_done_hours: input.lastDoneHours ?? undefined,
+    p_reason: input.reason || undefined,
+  })
+  return (unwrap(data, error, 'Save service interval') as unknown as { interval: ServiceInterval }).interval
+}
+
+export async function retireServiceInterval(projectId: string, intervalId: string, reason: string): Promise<ServiceInterval> {
+  const { data, error } = await supabase.rpc('action_retire_service_interval', { p_project_id: projectId, p_interval_id: intervalId, p_reason: reason })
+  return (unwrap(data, error, 'Retire service interval') as unknown as { interval: ServiceInterval }).interval
+}
+
+export interface ServiceInput {
+  partId: string
+  intervalId?: string | null
+  doneOn?: string | null
+  hoursAt?: number | null
+  note?: string
+  workPackageId?: string | null
+  clientId?: string
+}
+
+export async function recordService(projectId: string, input: ServiceInput): Promise<ServiceRecord> {
+  const { data, error } = await supabase.rpc('action_record_service', {
+    p_project_id: projectId,
+    p_part_id: input.partId,
+    p_interval_id: input.intervalId ?? undefined,
+    p_done_on: input.doneOn ?? undefined,
+    p_hours_at: input.hoursAt ?? undefined,
+    p_note: input.note || undefined,
+    p_work_package_id: input.workPackageId ?? undefined,
+    p_client_id: input.clientId ?? newClientId(),
+  })
+  return (unwrap(data, error, 'Record maintenance') as unknown as { service: ServiceRecord }).service
+}
+
+export async function voidServiceRecord(projectId: string, recordId: string, reason: string): Promise<ServiceRecord> {
+  const { data, error } = await supabase.rpc('action_void_service_record', { p_project_id: projectId, p_record_id: recordId, p_reason: reason })
+  return (unwrap(data, error, 'Strike out service record') as unknown as { service: ServiceRecord }).service
 }

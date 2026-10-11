@@ -29,6 +29,7 @@ const ModelPage = lazy(() => import("./pages/model/ModelPage"));
 const LogbookPage = lazy(() => import("./pages/logbook/LogbookPage"));
 const CrewPage = lazy(() => import("./pages/logbook/CrewPage"));
 const RestPage = lazy(() => import("./pages/logbook/RestPage"));
+const MaintenancePage = lazy(() => import("./pages/logbook/MaintenancePage"));
 const PartsImportPage = lazy(() => import("./pages/parts/PartsImportPage"));
 const InspectionList = lazy(() => import("./pages/inspections/InspectionList"));
 const DefectList = lazy(() => import("./pages/defects/DefectList"));
@@ -93,6 +94,7 @@ const App = () => (
                 <Route path="/app/logbook" element={<ProtectedRoute><LogbookPage /></ProtectedRoute>} />
                 <Route path="/app/crew" element={<ProtectedRoute><CrewPage /></ProtectedRoute>} />
                 <Route path="/app/rest" element={<ProtectedRoute><RestPage /></ProtectedRoute>} />
+                <Route path="/app/maintenance" element={<ProtectedRoute><MaintenancePage /></ProtectedRoute>} />
                 <Route path="/app/parts" element={<ProtectedRoute><PartsPage /></ProtectedRoute>} />
                 <Route path="/app/parts/import" element={<ProtectedRoute><PartsImportPage /></ProtectedRoute>} />
                 <Route path="/app/parts/import/:importId" element={<ProtectedRoute><PartsImportPage /></ProtectedRoute>} />
