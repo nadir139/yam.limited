@@ -1,7 +1,7 @@
 import { day, eur, NONE } from '@/lib/format'
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BookOpen, Pencil, Plus } from 'lucide-react'
+import { Anchor, BookOpen, Pencil, Plus } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -19,6 +19,7 @@ import {
   usePermissions,
   useMyRole,
   useOpenLogbook,
+  useYardDays,
 } from '@/lib/query-hooks'
 import { useActiveProject } from '@/contexts/ProjectContext'
 
@@ -52,6 +53,9 @@ export default function ProjectOverview() {
   const { projects, setActiveProjectId } = useActiveProject()
   const openLogbook = useOpenLogbook()
   const [logbookError, setLogbookError] = useState<string | null>(null)
+  // Days the boat's crew logged in the yard for this refit (migration 037).
+  const workOnVessel = !!project?.vessel_id && project.project_type !== 'OPERATIONS' && project.project_type !== 'PROPERTY'
+  const { data: yardDays = [] } = useYardDays(workOnVessel)
 
   // Only the record itself gates the page.
   //
@@ -214,6 +218,41 @@ export default function ProjectOverview() {
                 </Button>
               )}
               {logbookError && <p className="text-xs" style={{ color: 'hsl(var(--destructive))' }}>{logbookError}</p>}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* The real days in the yard, from the boat's own log, against the plan. */}
+        {workOnVessel && yardDays.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Anchor size={16} /> Days in the yard, from the logbook
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-2 px-4 pb-4 pt-0 text-sm">
+              <p>
+                <span className="text-lg font-bold">{yardDays.length}</span> day{yardDays.length === 1 ? '' : 's'} logged in
+                the yard by the crew, {day(yardDays[0].log_date)} to {day(yardDays[yardDays.length - 1].log_date)}
+                {yardDays[yardDays.length - 1].port ? `, latest at ${yardDays[yardDays.length - 1].port}` : ''}.
+              </p>
+              <p className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
+                Planned {project.planned_start ? day(project.planned_start) : NONE} to{' '}
+                {project.planned_delivery ? day(project.planned_delivery) : NONE}. A day the crew log as yard while this
+                project is under way counts here; the crew's notes stay in their log.
+              </p>
+              <details className="text-xs">
+                <summary className="cursor-pointer">Each day</summary>
+                <ul className="mt-1 flex flex-col gap-0.5">
+                  {yardDays.map((d) => (
+                    <li key={d.log_date}>
+                      {day(d.log_date)}
+                      {d.port ? ` · ${d.port}` : ''} · {d.crew_aboard} aboard
+                      {d.recorded_by_name ? ` · logged by ${d.recorded_by_name}` : ''}
+                    </li>
+                  ))}
+                </ul>
+              </details>
             </CardContent>
           </Card>
         )}

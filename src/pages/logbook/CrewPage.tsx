@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertCircle, Pencil, UserPlus } from 'lucide-react'
+import { AlertCircle, ChevronDown, ChevronRight, Pencil, UserPlus } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,7 +8,10 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { DateField } from '@/components/ui/date-field'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { useCrew, usePermissions, useProject, useSetCrew, useTeam } from '@/lib/query-hooks'
+import { useCrew, useCrewCertificates, useMyRole, usePermissions, useProject, useSeaTime, useSetCrew, useTeam } from '@/lib/query-hooks'
+import { useAuth } from '@/contexts/AuthContext'
+import { certState } from '@/lib/crew'
+import CrewRecord from './CrewRecord'
 import { day } from '@/lib/format'
 import type { Crew, ProjectMember } from '@/lib/types'
 
@@ -37,31 +40,67 @@ export default function CrewPage() {
   const { can } = usePermissions()
   const canEdit = can('action_set_crew')
   const [editing, setEditing] = useState<Crew | 'new' | null>(null)
+  const [open, setOpen] = useState<string | null>(null)
+  const { user } = useAuth()
+  const { data: role = null } = useMyRole()
+  const { data: certificates = [] } = useCrewCertificates()
 
   const today = new Date().toISOString().slice(0, 10)
+  const { data: seaAll = [] } = useSeaTime()
+  const { data: seaYear = [] } = useSeaTime(`${today.slice(0, 4)}-01-01`, `${today.slice(0, 4)}-12-31`)
   const current = crew.filter((c) => !c.left_on || c.left_on >= today)
   const former = crew.filter((c) => c.left_on && c.left_on < today)
+  // Certificates of the crew aboard that have lapsed or lapse within 90 days.
+  const currentIds = new Set(current.map((c) => c.id))
+  const flagged = certificates.filter((c) => !c.retired_at && currentIds.has(c.crew_id) && ['EXPIRED', 'EXPIRING'].includes(certState(c, today)))
+  const myMemberIds = new Set(team.filter((m) => user?.email && m.email?.toLowerCase() === user.email.toLowerCase()).map((m) => m.id))
+  // Who may keep a crew member's certificates: themselves, or those who run the crew list.
+  const canKeep = (c: Crew) =>
+    can('action_set_crew_certificate') &&
+    (role === 'CAPTAIN' || role === 'OWNER' || role === 'OWNERS_REP' || (c.member_id !== null && myMemberIds.has(c.member_id)))
 
   const row = (c: Crew) => {
     const login = loginState(c, team)
     return (
-      <li key={c.id} className="flex items-center gap-3 px-3 py-2.5">
-        <div className="min-w-0 flex-1">
+      <li key={c.id}>
+      <div className="flex items-center gap-3 px-3 py-2.5">
+        <button
+          type="button"
+          className="flex min-w-0 flex-1 items-start gap-1 text-left"
+          onClick={() => setOpen((o) => (o === c.id ? null : c.id))}
+          aria-expanded={open === c.id}
+        >
+          {open === c.id ? <ChevronDown size={14} className="mt-1 shrink-0" /> : <ChevronRight size={14} className="mt-1 shrink-0" />}
+          <div className="min-w-0 flex-1">
           <div className="truncate font-medium">
             {c.first_name} {c.last_name}
+            {flagged.some((f) => f.crew_id === c.id) && (
+              <span className="ml-2 text-[11px] font-normal" style={{ color: '#d97706' }}>certificate due</span>
+            )}
           </div>
           <div className="truncate text-xs" style={muted}>
             {[c.position, c.department].filter(Boolean).join(' · ')}
             {c.joined_on ? ` · since ${day(c.joined_on)}` : ''}
             {c.left_on ? ` · left ${day(c.left_on)}` : ''}
           </div>
-        </div>
+          </div>
+        </button>
         {login && <Badge variant={login.tone} className="shrink-0 text-[10px]">{login.label}</Badge>}
         {canEdit && (
           <Button size="icon" variant="ghost" aria-label={`Edit ${c.first_name}`} onClick={() => setEditing(c)}>
             <Pencil size={14} />
           </Button>
         )}
+      </div>
+      {open === c.id && (
+        <CrewRecord
+          crew={c}
+          certificates={certificates.filter((x) => x.crew_id === c.id)}
+          seaAll={seaAll.find((t) => t.crew_id === c.id)}
+          seaYear={seaYear.find((t) => t.crew_id === c.id)}
+          canKeep={canKeep(c)}
+        />
+      )}
       </li>
     )
   }
@@ -81,6 +120,23 @@ export default function CrewPage() {
           </Button>
         )}
       </div>
+
+      {flagged.length > 0 && (
+        <Card>
+          <CardContent className="flex items-start gap-2 p-3 text-sm">
+            <AlertCircle size={16} className="mt-0.5 shrink-0" style={{ color: '#d97706' }} />
+            <div>
+              {flagged.length} certificate{flagged.length === 1 ? '' : 's'} expired or expiring within 90 days:{' '}
+              {flagged
+                .map((f) => {
+                  const who = crew.find((c) => c.id === f.crew_id)
+                  return `${who?.first_name ?? ''} ${who?.last_name ?? ''}`.trim() + ` (${f.title}, ${day(f.expires_on!)})`
+                })
+                .join('; ')}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardContent className="p-0">

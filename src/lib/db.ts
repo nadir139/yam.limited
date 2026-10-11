@@ -39,6 +39,9 @@ import type {
   ServiceRecord,
   ServiceDue,
   ReadingKind,
+  CrewCertificate,
+  SeaTime,
+  YardDay,
 } from './types'
 import type { RestSchedule } from './rest-hours'
 
@@ -1890,4 +1893,67 @@ export async function recordService(projectId: string, input: ServiceInput): Pro
 export async function voidServiceRecord(projectId: string, recordId: string, reason: string): Promise<ServiceRecord> {
   const { data, error } = await supabase.rpc('action_void_service_record', { p_project_id: projectId, p_record_id: recordId, p_reason: reason })
   return (unwrap(data, error, 'Strike out service record') as unknown as { service: ServiceRecord }).service
+}
+
+// ─── Certificates, sea time, yard days (migration 037) ────────────────────────
+
+export async function fetchCrewCertificates(projectId: string): Promise<CrewCertificate[]> {
+  const { data, error } = await supabase
+    .from('crew_certificates')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('expires_on', { ascending: true, nullsFirst: false })
+  if (error) throw error
+  return data ?? []
+}
+
+export interface CertificateInput {
+  certificateId?: string | null
+  crewId: string
+  title: string
+  number?: string
+  issuedBy?: string
+  issuedOn?: string | null
+  expiresOn?: string | null
+  notes?: string
+  reason?: string
+}
+
+export async function setCrewCertificate(projectId: string, input: CertificateInput): Promise<CrewCertificate> {
+  const { data, error } = await supabase.rpc('action_set_crew_certificate', {
+    p_project_id: projectId,
+    p_crew_id: input.crewId,
+    p_title: input.title,
+    p_number: input.number || undefined,
+    p_issued_by: input.issuedBy || undefined,
+    p_issued_on: input.issuedOn || undefined,
+    p_expires_on: input.expiresOn || undefined,
+    p_notes: input.notes || undefined,
+    p_certificate_id: input.certificateId ?? undefined,
+    p_reason: input.reason || undefined,
+  })
+  return (unwrap(data, error, 'Save certificate') as unknown as { certificate: CrewCertificate }).certificate
+}
+
+export async function retireCrewCertificate(projectId: string, certificateId: string, reason: string): Promise<CrewCertificate> {
+  const { data, error } = await supabase.rpc('action_retire_crew_certificate', {
+    p_project_id: projectId,
+    p_certificate_id: certificateId,
+    p_reason: reason,
+  })
+  return (unwrap(data, error, 'Retire certificate') as unknown as { certificate: CrewCertificate }).certificate
+}
+
+/** Days aboard per crew member, worked out from the log. */
+export async function fetchSeaTime(projectId: string, from?: string, to?: string): Promise<SeaTime[]> {
+  const { data, error } = await supabase.rpc('sea_time', { p_project_id: projectId, p_from: from, p_to: to })
+  if (error) throw error
+  return (data ?? []) as unknown as SeaTime[]
+}
+
+/** The days the boat's crew logged in the yard for this refit. */
+export async function fetchYardDays(projectId: string): Promise<YardDay[]> {
+  const { data, error } = await supabase.rpc('yard_days', { p_project_id: projectId })
+  if (error) throw error
+  return (data ?? []) as unknown as YardDay[]
 }

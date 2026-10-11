@@ -57,6 +57,10 @@ export function useRealtimeSync() {
           if ((payload.new as { event_type?: string } | null)?.event_type === 'REST_RECORDED') {
             qc.invalidateQueries({ queryKey: ['rest'] })
           }
+          // A refit hears of yard days through its own events (migration 037).
+          if ((payload.new as { event_type?: string } | null)?.event_type?.startsWith('YARD_DAY_')) {
+            qc.invalidateQueries({ queryKey: ['yard-days'] })
+          }
         },
       )
       .on(
@@ -161,17 +165,22 @@ export function useRealtimeSync() {
       )
       // The logbook: a day or an entry written on one phone aboard shows on the
       // others. Attendance rows change with their day, so one key covers both.
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'log_days' }, () =>
-        qc.invalidateQueries({ queryKey: ['log-days'] }),
-      )
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'log_day_crew' }, () =>
-        qc.invalidateQueries({ queryKey: ['log-days'] }),
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'log_days' }, () => {
+        qc.invalidateQueries({ queryKey: ['log-days'] })
+        qc.invalidateQueries({ queryKey: ['sea-time'] })
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'log_day_crew' }, () => {
+        qc.invalidateQueries({ queryKey: ['log-days'] })
+        qc.invalidateQueries({ queryKey: ['sea-time'] })
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'log_entries' }, () =>
         qc.invalidateQueries({ queryKey: ['log-entries'] }),
       )
       .on('postgres_changes', { event: '*', schema: 'public', table: 'crew' }, () =>
         qc.invalidateQueries({ queryKey: ['crew'] }),
+      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'crew_certificates' }, () =>
+        qc.invalidateQueries({ queryKey: ['crew-certificates'] }),
       )
       // Hours of rest: RLS decides who receives these, so only the crew member
       // and the captain see the record change live.

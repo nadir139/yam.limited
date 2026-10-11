@@ -83,6 +83,25 @@ export type RestRecord = Row<'rest_records'>
 export type PartReading = Row<'part_readings'>
 export type ServiceInterval = Row<'service_intervals'>
 export type ServiceRecord = Row<'service_records'>
+/** Crew certificates, sea time and yard days (migration 037). */
+export type CrewCertificate = Row<'crew_certificates'>
+export interface SeaTime {
+  crew_id: string
+  days_aboard: number
+  sea_service_days: number
+  standby_days: number
+  yard_days: number
+  watchkeeping_days: number
+  nautical_miles: number
+  first_day: string | null
+  last_day: string | null
+}
+export interface YardDay {
+  log_date: string
+  port: string | null
+  crew_aboard: number
+  recorded_by_name: string | null
+}
 export type ReadingKind = 'RUNNING_HOURS' | 'FUEL_LEVEL' | 'OTHER'
 export type ServiceStatus = 'OVERDUE' | 'DUE_SOON' | 'OK' | 'NO_BASELINE' | 'NO_READING'
 /** One row of service_due(): what an interval needs next. The generated type marks every column non-null; most can be null. */
