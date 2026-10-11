@@ -43,6 +43,9 @@ export const QUERY_KEYS = {
   logEntries: (p: string) => ['log-entries', p],
   rest: (p: string) => ['rest', p],
   maintenance: (p: string) => ['maintenance', p],
+  crewCertificates: (p: string) => ['crew-certificates', p],
+  seaTime: (p: string) => ['sea-time', p],
+  yardDays: (p: string) => ['yard-days', p],
 }
 
 export const useProject = () => {
@@ -1141,6 +1144,7 @@ function useLogbookInvalidation() {
   return () => {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.crew(projectId) })
     qc.invalidateQueries({ queryKey: QUERY_KEYS.logDays(projectId) })
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.seaTime(projectId) })
     qc.invalidateQueries({ queryKey: QUERY_KEYS.logEntries(projectId) })
     qc.invalidateQueries({ queryKey: QUERY_KEYS.team(projectId) })
     qc.invalidateQueries({ queryKey: QUERY_KEYS.events(projectId) })
@@ -1312,6 +1316,59 @@ export function useVoidServiceRecord() {
   const projectId = useProjectId()
   return useMutation({
     mutationFn: (v: { id: string; reason: string }) => db.voidServiceRecord(projectId, v.id, v.reason),
+    onSuccess: invalidate,
+  })
+}
+
+// ─── Certificates, sea time, yard days (migration 037) ────────────────────────
+
+export const useCrewCertificates = () => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: QUERY_KEYS.crewCertificates(projectId),
+    queryFn: () => db.fetchCrewCertificates(projectId),
+    enabled: !!projectId,
+  })
+}
+
+export const useSeaTime = (from?: string, to?: string) => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: [...QUERY_KEYS.seaTime(projectId), from ?? null, to ?? null],
+    queryFn: () => db.fetchSeaTime(projectId, from, to),
+    enabled: !!projectId,
+  })
+}
+
+export const useYardDays = (enabled = true) => {
+  const projectId = useProjectId()
+  return useQuery({
+    queryKey: QUERY_KEYS.yardDays(projectId),
+    queryFn: () => db.fetchYardDays(projectId),
+    enabled: !!projectId && enabled,
+  })
+}
+
+function useCertificateInvalidation() {
+  const qc = useQueryClient()
+  const projectId = useProjectId()
+  return () => {
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.crewCertificates(projectId) })
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.events(projectId) })
+  }
+}
+
+export function useSetCrewCertificate() {
+  const invalidate = useCertificateInvalidation()
+  const projectId = useProjectId()
+  return useMutation({ mutationFn: (input: db.CertificateInput) => db.setCrewCertificate(projectId, input), onSuccess: invalidate })
+}
+
+export function useRetireCrewCertificate() {
+  const invalidate = useCertificateInvalidation()
+  const projectId = useProjectId()
+  return useMutation({
+    mutationFn: (v: { id: string; reason: string }) => db.retireCrewCertificate(projectId, v.id, v.reason),
     onSuccess: invalidate,
   })
 }

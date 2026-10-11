@@ -2097,3 +2097,40 @@ service's log entry is struck out; a backwards reading refused without a
 reason; a repeated client id recorded once; the refit's owner's rep sees
 the same intervals and readings and records a reading (event on the refit,
 no log entry); an outsider sees and writes nothing.
+
+## 41. Yard days, crew certificates, sea time (migration 037)
+
+Phase 3 of the logbook merge, second part.
+
+**Yard days count toward the refit.** `log_days.refit_project_id` is set by
+`action_record_log_day` when a day is logged as YARD and a project of work
+on the same vessel is under way that day (`refit_for_day`: started by then,
+not yet delivered; the latest started wins). The refit's own event log gets
+`YARD_DAY_LOGGED`, and `YARD_DAY_UNLINKED` (with the reason) when the day is
+corrected to something else, so the refit's people see the real days in the
+yard without being members of the boat's logbook. They read them through
+`yard_days(refit)`: date, port, how many aboard, who logged it; never the
+crew's notes, positions or names. Shown on the refit's overview ("Days in
+the yard, from the logbook") and in the agent's `get_schedule`.
+
+**Crew certificates** (`crew_certificates`): title, number, issuer, issued
+and expiry dates, one row each so an expiry can be flagged (expired, or
+within 90 days: `src/lib/crew.ts`). A correction records before and after
+(and what was wrong); a renewal or lapse retires the row with a reason;
+nothing is deleted. Kept by the crew member themselves or by the captain,
+owner and owner's rep (`can_keep_crew_record`). The crew page flags due
+certificates and opens each person's record.
+
+**Sea time** is worked out, never typed: `sea_time(project, from, to)`
+counts the days each crew member was PRESENT, by what the boat was doing
+(sea service, standby, yard), watchkeeping days and miles. It cannot drift
+from the log it comes from.
+
+Verified in a rolled-back transaction on the live database (inside the
+real Lucky Bird logbook, left as it was): a yard day on 1 Oct links to the
+refit under way and appears in `yard_days` with port and headcount but no
+notes; a yard day corrected to standby unlinks with an event on the refit;
+a sea day never links; a crew member records their own certificate and is
+refused for another's; retiring needs a reason and keeps the row; sea time
+adds up (3 days aboard: 1 at sea with watch and 80 nm, 1 yard, 1 standby);
+an outsider gets nothing from either function.

@@ -317,6 +317,98 @@ export type Database = {
           },
         ]
       }
+      crew_certificates: {
+        Row: {
+          created_at: string
+          created_by_name: string | null
+          crew_id: string
+          document_id: string | null
+          expires_on: string | null
+          id: string
+          issued_by: string | null
+          issued_on: string | null
+          notes: string | null
+          number: string | null
+          project_id: string
+          retired_at: string | null
+          retired_by_name: string | null
+          retired_reason: string | null
+          title: string
+          updated_at: string | null
+          updated_by_name: string | null
+          vessel_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by_name?: string | null
+          crew_id: string
+          document_id?: string | null
+          expires_on?: string | null
+          id?: string
+          issued_by?: string | null
+          issued_on?: string | null
+          notes?: string | null
+          number?: string | null
+          project_id: string
+          retired_at?: string | null
+          retired_by_name?: string | null
+          retired_reason?: string | null
+          title: string
+          updated_at?: string | null
+          updated_by_name?: string | null
+          vessel_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by_name?: string | null
+          crew_id?: string
+          document_id?: string | null
+          expires_on?: string | null
+          id?: string
+          issued_by?: string | null
+          issued_on?: string | null
+          notes?: string | null
+          number?: string | null
+          project_id?: string
+          retired_at?: string | null
+          retired_by_name?: string | null
+          retired_reason?: string | null
+          title?: string
+          updated_at?: string | null
+          updated_by_name?: string | null
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_certificates_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "crew"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_certificates_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_certificates_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_certificates_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       defect_records: {
         Row: {
           change_order_id: string | null
@@ -597,6 +689,7 @@ export type Database = {
           port_to: string | null
           position: string | null
           project_id: string
+          refit_project_id: string | null
           status: Database["public"]["Enums"]["log_status"]
           updated_at: string | null
           updated_by_name: string | null
@@ -614,6 +707,7 @@ export type Database = {
           port_to?: string | null
           position?: string | null
           project_id: string
+          refit_project_id?: string | null
           status: Database["public"]["Enums"]["log_status"]
           updated_at?: string | null
           updated_by_name?: string | null
@@ -631,6 +725,7 @@ export type Database = {
           port_to?: string | null
           position?: string | null
           project_id?: string
+          refit_project_id?: string | null
           status?: Database["public"]["Enums"]["log_status"]
           updated_at?: string | null
           updated_by_name?: string | null
@@ -641,6 +736,13 @@ export type Database = {
           {
             foreignKeyName: "log_days_project_id_fkey"
             columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "log_days_refit_project_id_fkey"
+            columns: ["refit_project_id"]
             isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
@@ -2535,6 +2637,14 @@ export type Database = {
         }
         Returns: Json
       }
+      action_retire_crew_certificate: {
+        Args: {
+          p_certificate_id: string
+          p_project_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       action_retire_service_interval: {
         Args: { p_interval_id: string; p_project_id: string; p_reason: string }
         Returns: Json
@@ -2580,6 +2690,21 @@ export type Database = {
           p_phone?: string
           p_position?: string
           p_project_id: string
+        }
+        Returns: Json
+      }
+      action_set_crew_certificate: {
+        Args: {
+          p_certificate_id?: string
+          p_crew_id: string
+          p_expires_on?: string
+          p_issued_by?: string
+          p_issued_on?: string
+          p_notes?: string
+          p_number?: string
+          p_project_id: string
+          p_reason?: string
+          p_title: string
         }
         Returns: Json
       }
@@ -2729,6 +2854,10 @@ export type Database = {
         Args: { p_cost: number }
         Returns: Database["public"]["Enums"]["approval_tier"]
       }
+      can_keep_crew_record: {
+        Args: { p_crew_id: string; p_project_id: string }
+        Returns: boolean
+      }
       can_perform: {
         Args: { p_action_key: string; p_project_id: string }
         Returns: boolean
@@ -2818,6 +2947,10 @@ export type Database = {
         Args: { p_project_type: Database["public"]["Enums"]["project_type"] }
         Returns: string[]
       }
+      refit_for_day: {
+        Args: { p_day: string; p_vessel_id: string }
+        Returns: string
+      }
       require_approval_authority: {
         Args: { p_approval_id: string }
         Returns: undefined
@@ -2842,6 +2975,20 @@ export type Database = {
       rest_summary: {
         Args: { p_month: number; p_project_id: string; p_year: number }
         Returns: Json
+      }
+      sea_time: {
+        Args: { p_from?: string; p_project_id: string; p_to?: string }
+        Returns: {
+          crew_id: string
+          days_aboard: number
+          first_day: string
+          last_day: string
+          nautical_miles: number
+          sea_service_days: number
+          standby_days: number
+          watchkeeping_days: number
+          yard_days: number
+        }[]
       }
       service_due: {
         Args: { p_project_id: string }
@@ -2928,6 +3075,15 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      yard_days: {
+        Args: { p_project_id: string }
+        Returns: {
+          crew_aboard: number
+          log_date: string
+          port: string
+          recorded_by_name: string
+        }[]
       }
     }
     Enums: {
@@ -3032,6 +3188,7 @@ export type Database = {
         | "READING"
         | "SERVICE_INTERVAL"
         | "SERVICE_RECORD"
+        | "CREW_CERTIFICATE"
       project_phase:
         | "PRE_SURVEY"
         | "HAUL_OUT"
@@ -3318,6 +3475,7 @@ export const Constants = {
         "READING",
         "SERVICE_INTERVAL",
         "SERVICE_RECORD",
+        "CREW_CERTIFICATE",
       ],
       project_phase: [
         "PRE_SURVEY",

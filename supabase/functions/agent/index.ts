@@ -227,7 +227,7 @@ function buildTools(
     {
       name: "get_logbook",
       description:
-        "The boat's logbook for a date range (default: the last 14 days, at most 62): each day's status (SEA_SERVICE, STANDBY, YARD), position, ports, nautical miles, watchkeeping, notes and who was aboard; every timestamped entry (navigation, engine, defect, safety, bunkering, weather, maintenance, note) including struck-out ones with the reason, and the NCR a defect entry was raised as; the crew list; the days in the range nobody logged; and hours-of-rest counts for the month (how many crew recorded, how many in breach -- never anyone's hours). From a refit project it reads the same vessel's logbook when the caller is on it. Call this before answering what the boat did, where it was, who was aboard, what went wrong at sea, or before raising an NCR from a log entry. Dates are YYYY-MM-DD.",
+        "The boat's logbook for a date range (default: the last 14 days, at most 62): each day's status (SEA_SERVICE, STANDBY, YARD), position, ports, nautical miles, watchkeeping, notes and who was aboard; every timestamped entry (navigation, engine, defect, safety, bunkering, weather, maintenance, note) including struck-out ones with the reason, and the NCR a defect entry was raised as; the crew list with each member's certificates (expiry dates; retired ones with the reason) and days aboard over the whole log by status (sea service, standby, yard, watchkeeping); the days in the range nobody logged; and hours-of-rest counts for the month (how many crew recorded, how many in breach -- never anyone's hours). From a refit project it reads the same vessel's logbook when the caller is on it. Call this before answering what the boat did, where it was, who was aboard, what went wrong at sea, or before raising an NCR from a log entry. Dates are YYYY-MM-DD.",
       input_schema: {
         type: "object",
         properties: {
@@ -327,6 +327,8 @@ Parts also have a place (action_create_space, then action_set_part_details with 
 
 ## The logbook
 A boat in service keeps a logbook: a project of type OPERATIONS, one per vessel, recording each day (sea service, standby or yard; position, ports, miles, who was aboard) and timestamped entries. Call get_logbook before answering what the boat did, where it was, who was aboard or what went wrong at sea, and name days nobody logged when they matter -- a gap is the first thing a surveyor or insurer asks about. A DEFECT entry can become an NCR in one step with action_raise_ncr_from_entry; suggest it when a defect entry has none and the fault needs following up. Hours of rest are private to each crew member and the captain: you see only counts, so never guess or report anyone's hours.
+
+get_logbook also gives each crew member's certificates (expired or expiring ones are worth naming) and their days aboard from the log; days logged as YARD while a refit is under way count toward that refit, and get_schedule on the refit lists them as yard_days_logged. Record a certificate someone tells you about with action_set_crew_certificate.
 
 You can write the log: "log: left Palma 08:00, 42 nm to Ibiza" becomes action_add_log_entry with the right kind (NAVIGATION here) and time. Write what was said, not a summary of it. An entry is never edited; a wrong one is struck out by its author or the captain in the app.
 
@@ -717,9 +719,12 @@ Deno.serve(async (req: Request) => {
       });
       const day = (d: number | null) => (d === null ? null : fromDay(d));
       const numberOf = (id: string) => sched.byId[id]?.wpNumber ?? id;
+      // The days the boat's crew logged in the yard for this project (migration 037).
+      const { data: yardDays } = await supabase.rpc("yard_days", { p_project_id: projectId });
 
       return {
         today: day(sched.today),
+        yard_days_logged: yardDays ?? [],
         committed_finish: day(sched.committedFinish),
         forecast_finish: day(sched.forecastFinish),
         finish_slip_days:
@@ -1002,7 +1007,7 @@ Deno.serve(async (req: Request) => {
       const afterTo = new Date(Date.parse(to) + dayMs).toISOString().slice(0, 10);
       const [year, month] = to.split("-").map(Number);
 
-      const [daysRes, entriesRes, crewRes, restRes] = await Promise.all([
+      const [daysRes, entriesRes, crewRes, restRes, certRes, seaRes] = await Promise.all([
         supabase
           .from("log_days")
           .select("log_date, status, position, port_from, port_to, nautical_miles, watchkeeping, notes, updated_by_name, log_day_crew(crew_id, attendance)")
@@ -1024,6 +1029,12 @@ Deno.serve(async (req: Request) => {
           .select("id, first_name, last_name, position, department, joined_on, left_on")
           .eq("project_id", logProjectId),
         supabase.rpc("rest_summary", { p_project_id: logProjectId, p_year: year, p_month: month }),
+        supabase
+          .from("crew_certificates")
+          .select("crew_id, title, number, issued_by, issued_on, expires_on, retired_at, retired_reason")
+          .eq("project_id", logProjectId),
+        // Days aboard per crew member over the whole log.
+        supabase.rpc("sea_time", { p_project_id: logProjectId }),
       ]);
       const failed = [daysRes, entriesRes, crewRes].find((r) => r.error);
       if (failed?.error) return { error: failed.error.message };
@@ -1044,6 +1055,8 @@ Deno.serve(async (req: Request) => {
         crew: crewRes.data,
         unlogged_days: unlogged,
         hours_of_rest: restRes.error ? null : { year, month, ...(restRes.data as Record<string, unknown>) },
+        certificates: certRes.error ? null : certRes.data,
+        sea_time_all: seaRes.error ? null : seaRes.data,
       };
     }
 

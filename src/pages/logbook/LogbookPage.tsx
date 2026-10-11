@@ -322,6 +322,13 @@ function DayEditor({ date, day, crew, canWrite }: { date: string; day: LogDayWit
             <span className="text-[11px]" style={muted}>{future ? 'not yet' : 'not logged'}</span>
           )}
         </div>
+        {day?.status === 'YARD' && (
+          <p className="text-[11px]" style={muted}>
+            {day.refit_project_id
+              ? 'Counts as a yard day of the refit under way: its team sees the date, port and how many were aboard, not the notes.'
+              : 'No refit under way on this boat for this day, so it is not counted toward one.'}
+          </p>
+        )}
 
         <div className="grid grid-cols-3 gap-1" role="radiogroup" aria-label="Status">
           {(Object.keys(STATUS) as LogStatus[]).map((k) => (
