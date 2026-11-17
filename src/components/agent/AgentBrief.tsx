@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2, MessageSquarePlus, RefreshCw, Sparkles } from 'lucide-react'
+import { Loader2, Mail, MessageSquarePlus, RefreshCw, Sparkles } from 'lucide-react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Switch } from '@/components/ui/switch'
+import { useAuth } from '@/contexts/AuthContext'
+import { fetchBriefEmail, setBriefEmail, todaysBrief, useAgentNotes } from './notes'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { callAgent, type AgentStep } from '@/lib/agent-client'
@@ -11,10 +15,12 @@ import { openAgent, routeForObject } from './page-context'
 
 // The agent speaks first.
 //
-// Once a day per project (per device), the dashboard and the logbook open on a
-// short brief the agent wrote by reading the record: what needs attention,
-// most urgent first, with every record it names one tap away. It is cached for
-// the day so a revisit costs nothing; Refresh asks again.
+// The dashboard and the logbook open on a short brief the agent wrote by
+// reading the record: what needs attention, most urgent first, with every
+// record it names one tap away. The morning run (agent-watch, 05:30 UTC)
+// writes one per project for everyone; when there is none yet today, this
+// device asks the agent itself, once a day. Refresh asks again. The same brief
+// can come by email each morning (the switch at the bottom).
 
 const BRIEF_PROMPT =
   'Brief me for today. In 3 to 5 short bullets, most urgent first: what needs my attention on this project, ' +
@@ -77,6 +83,28 @@ export default function AgentBrief() {
   const [brief, setBrief] = useState<Brief | null>(() => (projectId ? readCached(projectId) : null))
   const [steps, setSteps] = useState<AgentStep[]>([])
   const [loading, setLoading] = useState(false)
+  const qc = useQueryClient()
+  const { user } = useAuth()
+  const notesQ = useAgentNotes(projectId)
+  const serverBrief = todaysBrief(notesQ.data)
+  const email = user?.email ?? ''
+  const emailQ = useQuery({
+    queryKey: ['agent-brief-email', projectId, email],
+    queryFn: () => fetchBriefEmail(projectId, email),
+    enabled: !!projectId && !!email,
+  })
+  const [savingEmail, setSavingEmail] = useState(false)
+  const toggleEmail = async (on: boolean) => {
+    setSavingEmail(true)
+    try {
+      await setBriefEmail(projectId, on)
+      qc.setQueryData(['agent-brief-email', projectId, email], on)
+    } catch (e) {
+      console.error('Could not change the morning email', e)
+    } finally {
+      setSavingEmail(false)
+    }
+  }
 
   const run = (force = false) => {
     if (!projectId) return
@@ -107,12 +135,18 @@ export default function AgentBrief() {
     }
   }
 
-  // Runs on arrival and when the project changes.
+  // On arrival (and on switching project): today's brief from the morning run
+  // if there is one, else this device's cached one, else ask.
   useEffect(() => {
     setBrief(null)
+    if (!projectId || notesQ.isLoading) return
+    if (serverBrief) {
+      setBrief({ text: serverBrief.body, index: serverBrief.refs, at: serverBrief.created_at })
+      return
+    }
     return run()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId])
+  }, [projectId, notesQ.isLoading, serverBrief?.id])
 
   const openObject = (_n: string, target: ObjectRef) => {
     const to = routeForObject(target.type, target.id)
@@ -166,7 +200,17 @@ export default function AgentBrief() {
         )}
 
         {!loading && brief && !brief.error && (
-          <div className="mt-3 flex justify-end">
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <label className="flex cursor-pointer items-center gap-2 text-xs" style={muted}>
+              <Switch
+                checked={emailQ.data ?? false}
+                disabled={!emailQ.isSuccess || savingEmail}
+                onCheckedChange={(on) => void toggleEmail(on)}
+                aria-label="Email me this brief every morning"
+              />
+              <Mail size={12} />
+              Email me this every morning
+            </label>
             <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => openAgent()}>
               <MessageSquarePlus size={13} />
               Ask a follow-up

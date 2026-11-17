@@ -79,7 +79,8 @@ Ordered by impact over effort. Most items are a day or less.
 1. **Jobs inside a work package.** The Lucky Bird list mixes real packages ("new loop system for
    Genua") with ten-minute tasks ("remove old windex"). A checklist of jobs under a package fits that
    better than ten separate packages. Needs one table, one Action and a checklist UI.
-2. **Notifications for action items.** "Nothing emails them" — the sidebar badge is the only
+2. *Half done (Nov 2026, migration 046):* the agent writes its own notes (`agent_notes`, `agent-watch`): a notice when an NCR, change order, approval, failed inspection or package on hold is recorded, a morning brief per project at 05:30 UTC, payment stages coming due, and the brief by email to members who switch it on (dashboard). Still open: web push, and the action-item digest below.
+   **Notifications for action items.** "Nothing emails them" — the sidebar badge is the only
    reminder. Send a daily digest email of open items plus an instant email on mention (Supabase
    Edge Function + Resend, or a pg_cron job).
 3. **Capture from the boat.** *Half done:* the app is laid out for phones and installs to the home

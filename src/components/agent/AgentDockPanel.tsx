@@ -8,6 +8,7 @@ import { CascadeChain, LinkedText } from './AgentReply'
 import { MAX_PROMPT_CHARS, prettyTool, type ObjectRef } from './thread'
 import { pageContext, routeForObject } from './page-context'
 import { useAgentThread } from './useAgentThread'
+import { noticesOf, useAgentNotes } from './notes'
 
 // The agent beside every page. Loaded lazily the first time the dock opens,
 // so the shell stays light for people who never ask.
@@ -25,6 +26,7 @@ export default function AgentDockPanel({
   const navigate = useNavigate()
   const page = pageContext(pathname)
   const { turns, busy, progress, ask, stop, clear } = useAgentThread(projectId)
+  const notices = noticesOf(useAgentNotes(projectId).data).slice(0, 4)
   const [prompt, setPrompt] = useState('')
   const endRef = useRef<HTMLDivElement>(null)
   const askedInitial = useRef<string | undefined>()
@@ -91,6 +93,37 @@ export default function AgentDockPanel({
 
       {/* Conversation */}
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4 text-sm">
+        {/* What it noticed on its own, before anyone asked */}
+        {turns.length === 0 && !busy && notices.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wider" style={muted}>
+              Noticed
+            </p>
+            {notices.map((n) => (
+              <div key={n.id} className="rounded-lg border bg-muted/30 p-3">
+                <div className="mb-1 flex items-baseline justify-between gap-2">
+                  <p className="text-[13px] font-semibold leading-snug">{n.title}</p>
+                  <span className="flex-shrink-0 text-[10px]" style={muted}>
+                    {new Date(n.created_at).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+                <div className="text-[13px] leading-relaxed" style={muted}>
+                  <LinkedText text={n.body} index={n.refs} openNumbers={[]} onToggle={openObject} />
+                </div>
+                {n.suggestion && (
+                  <button
+                    type="button"
+                    onClick={() => send(n.suggestion!)}
+                    className="mt-2 rounded-full border px-2.5 py-1 text-left text-[11px] transition-colors hover:border-accent/50 hover:bg-accent/5"
+                  >
+                    {n.suggestion}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
         {turns.length === 0 && !busy && (
           <div className="space-y-3">
             <p style={muted}>
