@@ -328,6 +328,18 @@ function DayEditor({ date, day, crew, canWrite }: { date: string; day: LogDayWit
             <span className="text-[11px]" style={muted}>{future ? 'not yet' : 'not logged'}</span>
           )}
         </div>
+        {/* Why the fields are disabled, where it is seen: at the top, not in one
+            line under the form (an owner's rep found every field dead and the
+            reason below the fold). Since migration 047 the owner and owner's rep
+            write the log too; this is for the other roles, and future days. */}
+        {readOnly && (
+          <p className="rounded-[var(--radius)] border px-3 py-2 text-xs" style={{ borderColor: 'hsl(var(--border))', ...muted }}>
+            {future
+              ? 'This day has not happened yet: it can be logged from the day before.'
+              : 'Read only: the captain, the crew, the owner and the owner\'s representative keep the log. Your role on this logbook can read it.'}
+          </p>
+        )}
+
         {day?.status === 'YARD' && (
           <p className="text-[11px]" style={muted}>
             {day.refit_project_id
@@ -445,7 +457,7 @@ function DayEditor({ date, day, crew, canWrite }: { date: string; day: LogDayWit
             {record.isPending ? 'Saving…' : day ? 'Save changes' : 'Log this day'}
           </Button>
         ) : (
-          <p className="text-xs" style={muted}>The captain and crew keep the log; you can read it.</p>
+          <p className="text-xs" style={muted}>The captain, crew, owner and owner's representative keep the log; you can read it.</p>
         )}
       </CardContent>
     </Card>
