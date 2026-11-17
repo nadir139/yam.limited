@@ -4,6 +4,7 @@ import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import References from "@/components/landing/References";
 import Method from "@/components/landing/Method";
+import Connected from "@/components/landing/Connected";
 import RecordStory from "@/components/landing/RecordStory";
 import Projects from "@/components/landing/Projects";
 import WhyYam from "@/components/landing/WhyYam";
@@ -13,7 +14,7 @@ import Footer from "@/components/Footer";
 import "@/components/landing/landing.css";
 
 // The public home page (Nov 2026 rework): what YAM is, how it works, the
-// record behind it, the boats, how it differs, who is behind it, contact.
+// record behind it (as a graph, then as a story), the boats, how it differs, who is behind it, contact.
 // The Sardinia concierge has its own page (/sardinia).
 
 const Index = () => {
@@ -33,6 +34,7 @@ const Index = () => {
         <Hero />
         <References />
         <Method />
+        <Connected />
         <RecordStory />
         <Projects />
         <WhyYam />

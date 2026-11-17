@@ -1,7 +1,7 @@
 // Where the experience comes from, as names a reader recognises, not as a CV.
 // Plain type, no logos: the programmes and yards are referenced, not endorsing.
 
-const NAMES = ["America's Cup", "SailGP", "Volvo Ocean Race", "J-Class", "Perini Navi", "Superyacht regattas"];
+const NAMES = ["America's Cup", "SailGP", "Volvo Ocean Race", "J-Class", "Offshore sailing", "Superyacht regattas"];
 
 const References = () => (
   <section aria-label="Experience" className="border-b rule">

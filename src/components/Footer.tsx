@@ -7,7 +7,7 @@ import "@/components/landing/landing.css";
 
 const LINKS = [
   { label: "Method", to: "/#method" },
-  { label: "The record", to: "/#record" },
+  { label: "The record", to: "/#graph" },
   { label: "References", to: "/#references" },
   { label: "Contact", to: "/#contact" },
 ];
@@ -48,7 +48,7 @@ const Footer = () => (
       </div>
       <div className="mono mt-12 flex flex-wrap justify-between gap-3 border-t border-[hsl(var(--paper)/0.15)] pt-6 text-[11px] opacity-60">
         <span>© {new Date().getFullYear()} YAM · Yacht Architectural Management</span>
-        <span>Sardinia · Mediterranean · Caribbean</span>
+        <span>Sardinia based · operating worldwide</span>
       </div>
     </div>
     </div>

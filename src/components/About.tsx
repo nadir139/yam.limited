@@ -25,8 +25,7 @@ const About = () => (
             necessary, from having done it rather than from asking the yard.
           </p>
           <p className="soft">
-            Based in Sardinia, working across Mediterranean and Caribbean yards, in Italian, English
-            and Spanish.
+            Sardinia based, operating worldwide. Working in Italian, English and Spanish.
           </p>
         </div>
       </div>

@@ -13,7 +13,7 @@ import "@/components/landing/landing.css";
 
 const SECTIONS = [
   { id: "#method", label: "Method" },
-  { id: "#record", label: "The record" },
+  { id: "#graph", label: "The record" },
   { id: "#references", label: "References" },
   { id: "#about", label: "About" },
 ];

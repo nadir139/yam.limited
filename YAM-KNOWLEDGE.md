@@ -2717,20 +2717,30 @@ gradient, counters, fade-ins everywhere and copy any brokerage could sign
   (navbar and footer, which also sit on /ontology). One markup colour (the
   surveyor's red), Source Serif 4 for what we say, IBM Plex Mono for what we
   label, both self-hosted with @fontsource. Light and dark.
-- **Drawings instead of photographs**: `HullLines.tsx` draws profile, half
-  breadths and body plan from the same hull maths as the 3D model
-  (`vessel-model.ts`), and draws itself once on load. No owner's boat is shown.
-- **Home** (`pages/Index.tsx`): Hero ("Your refit, on the record.") → References
-  strip (America's Cup, SailGP, Volvo Ocean Race, J-Class, Perini Navi,
-  superyacht regattas: names, no logos) → Method (four moments where a refit is
-  won or lost) → The record (an illustrated morning in a yard: found → priced →
-  decided → moved, plus the agent's brief and the logbook; labelled as an
-  illustration) → References by boat (J-Class, Perini Navi 56 m, Aragon 72,
-  SY Sonny, a 115-footer, schooner Adix; scope only, no client figures) → Why
-  YAM (kinds of service compared, not named firms) → Behind YAM (a background,
-  not a CV) → Contact → Footer. `/#section` links scroll on arrival.
-- **Sardinia concierge** has its own page, `/sardinia` (in the sitemap), with
-  the same eight services.
-- Removed: `Services.tsx`, `RefitIntelligence.tsx`, the counters and the
-  personal credential cards.
+- **No pictures.** A first version drew hull lines in place of photographs;
+  the owner found them ugly and they were removed. The hero is type only.
+- **The ontology as a graph** (`landing/OntologyMap.tsx`, section `#graph`):
+  18 object types in five groups (people, the project, the work, the asset,
+  in service) joined by the link names stored in `ontology_links`. Hover or
+  tap a type to light its links and list them in words; until someone does,
+  it tours NCR, Part, Log entry, Project, Change order. Positions were found
+  by clipping every link against every other node's box, so no edge runs
+  under a node it does not belong to (re-check with any change of nodes or
+  links). On a phone it scrolls sideways at a readable size.
+- **Home** (`pages/Index.tsx`): Hero ("Your refit, on the record.", "Sardinia
+  based · operating worldwide") → Experience strip (America's Cup, SailGP,
+  Volvo Ocean Race, J-Class, Offshore sailing, superyacht regattas: names, no
+  logos) → Method → The ontology graph → The record (an illustrated morning in
+  a yard, the agent's brief, the logbook; labelled as an illustration) →
+  References (J-Class, Offshore sailing: five Atlantic crossings and one
+  Pacific through Point Nemo, Aragon 72, SY Sonny, a 115-footer, schooner
+  Adix; scope only) → Why YAM (kinds of service compared, not named firms) →
+  Behind YAM (a background, not a CV) → Contact → Footer. `/#section` links
+  scroll on arrival. Perini Navi is no longer mentioned, on the page or in the
+  JSON-LD.
+- **Sardinia concierge** has its own page, `/sardinia` (in the sitemap).
+- **/ontology graph fix**: types beyond the 14 hand-placed cells used to stack
+  on two spots; they now fill rows of four below and the canvas grows.
+- Removed: `Services.tsx`, `RefitIntelligence.tsx`, `landing/HullLines.tsx`,
+  the counters and the personal credential cards.
 - Not yet: /ontology still has the old gradient hero; an Italian version.
