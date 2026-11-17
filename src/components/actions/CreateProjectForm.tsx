@@ -8,6 +8,7 @@ import { useTranslation } from '@/lib/i18n'
 import type { Project } from '@/lib/types'
 import { DateField } from '@/components/ui/date-field'
 import { kindForProjectType } from '@/lib/asset'
+import { projectTypeIsShown } from '@/lib/features'
 
 // Starting a project.
 //
@@ -17,7 +18,9 @@ import { kindForProjectType } from '@/lib/asset'
 // placeholder data into it. The Action defaults the phase to PRE_SURVEY and
 // enrols the creator as owner's representative.
 
-const TYPES: Project['project_type'][] = [
+// Property and aircraft types are offered only when those asset kinds are
+// switched on (src/lib/features.ts).
+const TYPES: Project['project_type'][] = ([
   'FIVE_YEAR_SURVEY',
   'REFIT',
   'NEWBUILD',
@@ -26,7 +29,7 @@ const TYPES: Project['project_type'][] = [
   'PROPERTY',
   'AIRCRAFT_CHECK',
   'AIRCRAFT_REFURB',
-]
+] as Project['project_type'][]).filter(projectTypeIsShown)
 
 const CLASS_SOCIETIES = ['RINA', 'LR', 'DNV', 'ABS', 'BV']
 
