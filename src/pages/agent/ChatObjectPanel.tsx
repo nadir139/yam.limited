@@ -76,11 +76,14 @@ export default function ChatObjectPanel({
   objectId,
   number,
   onClose,
+  onOpenFull,
 }: {
   objectType: string
   objectId: string
   number: string
   onClose: () => void
+  /** Called before going to the record's page (the dock closes itself so the page is visible). */
+  onOpenFull?: () => void
 }) {
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
@@ -384,7 +387,10 @@ export default function ChatObjectPanel({
         <span className="min-w-0 flex-1 truncate text-xs font-medium">{title}</span>
         {route && (
           <button
-            onClick={() => navigate(route!)}
+            onClick={() => {
+              onOpenFull?.()
+              navigate(route!)
+            }}
             title="Open the full record"
             className="rounded p-1 hover:bg-muted"
             style={{ color: 'hsl(var(--muted-foreground))' }}
