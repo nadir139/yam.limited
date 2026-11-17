@@ -1,7 +1,7 @@
 # YAM — Maritime Intelligence Platform
 ## Knowledge Base · Session Log · Development Roadmap
 
-> Last updated: 17 November 2026 (sections 50–56)  
+> Last updated: 17 November 2026 (sections 50–57)  
 > Primary repo: `nadir139/yam.limited` (deployed by Vercel from `main`; GitHub Pages is being retired -- see section 12)  
 > Live URL: `yam.limited`  
 > App URL: `yam.limited/app/dashboard`  
@@ -2779,4 +2779,24 @@ now share one set of tokens in `src/index.css`:
 Checked in a local harness (the real shadcn components and sidebar colours,
 light and dark), and on /ontology and /login. The signed-in pages were not
 seen with live data from the sandbox.
+
+## 57. The owner's side may write the log (migration 047)
+
+The owner's rep opened Lucky Bird's logbook and found every field disabled:
+since migration 032 only CAPTAIN and CREW could run `action_record_log_day`
+and `action_add_log_entry`, and the reason was one line under the form, below
+the fold on a phone.
+
+- Decided with the owner (17 Nov 2026): OWNER and OWNERS_REP may record log
+  days and add log entries on any logbook. Entries stay signed with the
+  writer's name and in `world_model_events`.
+- Unchanged on purpose: hours of rest (`action_record_rest`, captain and
+  crew), the Oil Record Book (`action_add_orb_entry`; signing it, the master
+  only), striking out an entry (its author or the captain).
+- The two Actions check only `require_permission` (no role logic of their
+  own), so the change is rows in `action_permissions`.
+- The day editor now says why it is read only, at the top of the card.
+- Verified on the live database as the owner's rep, in a rolled-back
+  transaction: logging 17 Nov succeeded and was signed by name; nothing was
+  left behind.
 
