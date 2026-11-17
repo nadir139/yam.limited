@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Mail, Phone, MapPin, Send, ExternalLink, MessageCircle, ArrowRight } from "lucide-react";
+import { Mail, Phone, MapPin, Send, ExternalLink, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -144,34 +144,34 @@ const Contact = () => {
   };
 
   return (
-    <section id="contact" className="py-24 section-muted">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="contact" className="border-b rule">
+      <div className="container mx-auto px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
         {/* Section Header */}
-        <div className="text-center max-w-2xl mx-auto mb-16">
-          <h2 className="text-sm font-semibold text-accent uppercase tracking-wider mb-3">
-            Get in Touch
-          </h2>
-          <h3 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">
-            Start Your Project Today
-          </h3>
-          <p className="text-lg text-muted-foreground">
-            Ready to navigate your next maritime venture? Contact us to discuss
-            how we can support your yacht project.
-          </p>
+        <div className="mb-14 grid gap-6 lg:grid-cols-12">
+          <p className="label lg:col-span-3">Contact</p>
+          <div className="lg:col-span-9">
+            <h2 className="serif mb-5 text-3xl font-semibold leading-tight sm:text-5xl">
+              Tell us about the boat.
+            </h2>
+            <p className="soft max-w-2xl text-lg leading-relaxed">
+              The yard, the dates if you have them, and what worries you. The first conversation is
+              about the boat, not about a contract.
+            </p>
+          </div>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-12 max-w-6xl mx-auto">
+        <div className="grid lg:grid-cols-3 gap-12">
           {/* Contact Info */}
           <div className="lg:col-span-1 space-y-8">
             <div className="flex items-start gap-4">
-              <div className="icon-container flex-shrink-0">
+              <div className="flex-shrink-0 pt-0.5 soft">
                 <Mail className="h-5 w-5" />
               </div>
               <div>
-                <h4 className="font-semibold text-foreground mb-1">Email</h4>
+                <h4 className="label mb-1">Email</h4>
                 <a
                   href={`mailto:${CONTACT_EMAIL}`}
-                  className="text-muted-foreground hover:text-accent transition-colors"
+                  className="ink underline-offset-4 hover:underline"
                 >
                   {CONTACT_EMAIL}
                 </a>
@@ -179,14 +179,14 @@ const Contact = () => {
             </div>
 
             <div className="flex items-start gap-4">
-              <div className="icon-container flex-shrink-0">
+              <div className="flex-shrink-0 pt-0.5 soft">
                 <Phone className="h-5 w-5" />
               </div>
               <div>
-                <h4 className="font-semibold text-foreground mb-1">Phone</h4>
+                <h4 className="label mb-1">Phone</h4>
                 <a
                   href={`tel:+${WHATSAPP_NUMBER}`}
-                  className="text-muted-foreground hover:text-accent transition-colors"
+                  className="ink underline-offset-4 hover:underline"
                 >
                   {PHONE_DISPLAY}
                 </a>
@@ -194,16 +194,16 @@ const Contact = () => {
             </div>
 
             <div className="flex items-start gap-4">
-              <div className="icon-container flex-shrink-0">
+              <div className="flex-shrink-0 pt-0.5 soft">
                 <MessageCircle className="h-5 w-5" />
               </div>
               <div>
-                <h4 className="font-semibold text-foreground mb-1">WhatsApp</h4>
+                <h4 className="label mb-1">WhatsApp</h4>
                 <a
                   href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WHATSAPP_PREFILL)}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-accent transition-colors"
+                  className="inline-flex items-center gap-1.5 ink underline-offset-4 hover:underline"
                 >
                   Send a quick message
                   <ExternalLink className="h-3.5 w-3.5" />
@@ -212,30 +212,17 @@ const Contact = () => {
             </div>
 
             <div className="flex items-start gap-4">
-              <div className="icon-container flex-shrink-0">
+              <div className="flex-shrink-0 pt-0.5 soft">
                 <MapPin className="h-5 w-5" />
               </div>
               <div>
-                <h4 className="font-semibold text-foreground mb-1">Location</h4>
-                <p className="text-muted-foreground">
-                  Mediterranean & Worldwide
+                <h4 className="label mb-1">Location</h4>
+                <p className="ink">
+                  Sardinia · Mediterranean and Caribbean yards
                 </p>
               </div>
             </div>
 
-            {/* Digital Logbook Promo */}
-            <div className="mt-8 p-6 rounded-xl border border-accent/20 bg-accent/5">
-              <h4 className="font-semibold text-foreground mb-2">The logbook, in the same record</h4>
-              <p className="text-sm text-muted-foreground mb-4">
-                Log days, crew, hours of rest and the Oil Record Book, recorded in the same ontology as the refit.
-              </p>
-              <a
-                href="/ontology"
-                className="inline-flex items-center gap-2 text-accent hover:text-accent/80 transition-colors text-sm font-medium"
-              >
-                Explore the ontology <ArrowRight className="h-4 w-4" />
-              </a>
-            </div>
           </div>
 
           {/* Contact Form */}
@@ -243,7 +230,7 @@ const Contact = () => {
             <Form {...form}>
               <form
                 onSubmit={form.handleSubmit(onSubmit)}
-                className="card-elevated p-8 space-y-6"
+                className="border rule bg-paper-2 p-6 sm:p-8 space-y-6"
               >
                 <div className="grid sm:grid-cols-2 gap-6">
                   <FormField
@@ -349,11 +336,11 @@ const Contact = () => {
                 <Button
                   type="submit"
                   size="lg"
-                  className="w-full bg-accent hover:bg-accent/90 text-accent-foreground"
+                  className="w-full rounded-[2px] bg-[hsl(var(--ink))] text-[hsl(var(--paper))] hover:bg-[hsl(var(--ink)/0.9)]"
                   disabled={form.formState.isSubmitting}
                 >
                   <Send className="mr-2 h-4 w-4" />
-                  Send Inquiry
+                  Send
                 </Button>
               </form>
             </Form>

@@ -18,6 +18,7 @@ import { BoatOnly } from "./components/layout/BoatOnly";
 // marketing site never downloads the authenticated application.
 const AppShell = lazy(() => import("@/components/layout/AppShell"));
 const Ontology = lazy(() => import("./pages/Ontology"));
+const Sardinia = lazy(() => import("./pages/Sardinia"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Login = lazy(() => import("./pages/auth/Login"));
 const AuthCallback = lazy(() => import("./pages/auth/AuthCallback"));
@@ -92,6 +93,7 @@ const App = () => (
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/ontology" element={<Ontology />} />
+                <Route path="/sardinia" element={<Sardinia />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/auth/callback" element={<AuthCallback />} />
                 <Route path="/app" element={<Navigate to="/app/dashboard" replace />} />
