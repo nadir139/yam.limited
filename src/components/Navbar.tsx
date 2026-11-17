@@ -7,9 +7,9 @@ import Logo from "@/assets/logo.svg";
 import { ThemeToggle } from "./ThemeToggle";
 import "@/components/landing/landing.css";
 
-// The public pages' navigation. On the home page and /sardinia it sits on
-// paper and is ink; on /ontology, whose hero is dark, it is light until the
-// page scrolls. Section links work from any page: elsewhere they go home first.
+// The public pages' navigation, ink on paper on every public page (the home
+// page, /ontology, /sardinia). Section links work from any page: elsewhere
+// they go home first.
 
 const SECTIONS = [
   { id: "#method", label: "Method" },
@@ -23,7 +23,8 @@ const Navbar = () => {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const onHome = pathname === "/";
-  const lightText = pathname === "/ontology" && !scrolled;
+  // Every public page is on paper now; kept as a switch for a dark hero.
+  const lightText = false;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);

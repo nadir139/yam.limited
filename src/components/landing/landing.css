@@ -2,13 +2,10 @@
  * The public site's own look: a drawing office, not a template.
  *
  * Paper and ink, one markup colour (the red a surveyor uses on a drawing),
- * a serif for what we say and a mono for what we label. Scoped to .landing so
- * the app keeps its own design system. Fonts are self-hosted (@fontsource):
- * no request leaves for a font CDN.
+ * a serif for what we say and a mono for what we label. The fonts and the
+ * neutral palette are shared with the app (index.css); this file adds the
+ * public pages' classes, scoped to .landing / .landing-vars.
  */
-@import '@fontsource-variable/source-serif-4/index.css';
-@import '@fontsource/ibm-plex-mono/400.css';
-@import '@fontsource/ibm-plex-mono/500.css';
 
 :is(.landing, .landing-vars) {
   --paper: 40 30% 97%;
