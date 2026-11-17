@@ -1,113 +1,56 @@
-import { ArrowDown, ChevronDown } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import Logo from "@/assets/logo.svg";
-import AsciiVideo from "@/components/AsciiVideo";
-const Hero = () => {
-  const scrollToServices = () => {
-    const element = document.querySelector("#services");
-    if (element) {
-      element.scrollIntoView({
-        behavior: "smooth"
-      });
-    }
-  };
-  const scrollToContact = () => {
-    const element = document.querySelector("#contact");
-    if (element) {
-      element.scrollIntoView({
-        behavior: "smooth"
-      });
-    }
-  };
-  return <section className="relative min-h-screen flex flex-col hero-gradient overflow-hidden">
-      {/* Background Pattern */}
-      <div className="absolute inset-0 opacity-20">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-accent/30 rounded-full blur-3xl" />
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-primary-foreground/10 rounded-full blur-3xl" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-accent/10 rounded-full blur-3xl" />
-      </div>
+import { ArrowRight } from "lucide-react";
+import HullLines from "@/components/landing/HullLines";
 
-      {/* Wave decoration at bottom */}
-      <div className="wave-decoration" />
+// The first screen. One sentence that says what YAM is, who it works for, and
+// what is different about it, then a drawing instead of a stock photograph.
+// No counters, no gradient, no bouncing arrow.
 
-      {/* ASCII Video - Full width below navbar */}
-      <div className="relative z-10 w-full mt-16 px-2 sm:px-4">
-        <div className="relative w-full aspect-[16/10] sm:aspect-[16/9] max-h-[70vh] mx-auto overflow-hidden rounded-lg bg-slate-900/95">
-          {/* ASCII Video Background */}
-          <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
-            <AsciiVideo className="text-cyan-400/90" fps={24} />
-          </div>
-          {/* Logo Overlay - centered */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <img
-              src={Logo}
-              alt="YAM Logo"
-              className="w-20 h-20 sm:w-28 sm:h-28 md:w-36 md:h-36 lg:w-44 lg:h-44 object-contain [&_*]:stroke-white [&_.cls-1]:stroke-white [&_.cls-2]:stroke-white [&_path]:fill-white"
-              style={{ filter: 'drop-shadow(0 0 15px rgba(255,255,255,0.5))' }}
-            />
-          </div>
+const scrollTo = (id: string) => document.querySelector(id)?.scrollIntoView({ behavior: "smooth" });
+
+const Hero = () => (
+  <section className="drafting relative overflow-hidden border-b rule pt-24 sm:pt-28">
+    <div className="container mx-auto grid items-center gap-10 px-4 pb-14 sm:px-6 lg:grid-cols-12 lg:gap-6 lg:px-8 lg:pb-20">
+      <div className="lg:col-span-6 xl:col-span-5">
+        <p className="label mb-6">Owner's representation · Refit &amp; new build · Sailing yachts</p>
+        <h1 className="serif mb-6 text-[2.6rem] font-semibold leading-[1.05] sm:text-6xl lg:text-[4.2rem]">
+          Your refit, <span className="italic font-normal">on the record.</span>
+        </h1>
+        <p className="soft mb-8 max-w-xl text-lg leading-relaxed">
+          Independent representation on the owner's side of the table, led by a naval architect who
+          came to refits from grand-prix sailing. Every finding, variation and euro is recorded against the part it
+          concerns, so you decide on facts rather than on the yard's word.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <button type="button" onClick={() => scrollTo("#contact")} className="btn-ink">
+            Talk about your boat <ArrowRight className="h-4 w-4" />
+          </button>
+          <button type="button" onClick={() => scrollTo("#record")} className="btn-line">
+            See how the record works
+          </button>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10 flex-1 flex items-center">
-        <div className="max-w-4xl mx-auto text-center w-full py-8">
-
-          {/* Main Headline */}
-          
-
-          {/* Subtitle */}
-          <p className="animate-fade-up-delay-2 text-xl sm:text-2xl text-primary-foreground/80 mb-8 max-w-2xl mx-auto leading-relaxed">
-            Owner's representation and refit management, run by a naval architect
-            who sails the boats he specifies.
-          </p>
-
-          {/* CTA Buttons */}
-          <div className="animate-fade-up-delay-3 flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" onClick={scrollToContact} className="bg-accent hover:bg-accent/90 text-accent-foreground px-8 py-6 text-lg shadow-lg">
-              Start Your Project
-            </Button>
-            <Button size="lg" variant="outline" onClick={scrollToServices} className="bg-transparent border-2 border-primary-foreground/30 hover:bg-primary-foreground/10 text-primary-foreground px-8 py-6 text-lg">
-              Our Services
-            </Button>
-          </div>
-
-          {/* Digital Logbook Promotion */}
-          <div className="animate-fade-up-delay-3 mt-8">
-            {/* The logbook now lives inside YAM's ontology (migration 032), so this
-                goes to that section rather than to the old standalone app. */}
-            <a href="#logbook" className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary-foreground/10 border border-primary-foreground/20 text-primary-foreground/90 hover:bg-primary-foreground/20 transition-all duration-300 text-sm">
-              <span>The logbook, in the same record</span>
-              <ArrowDown className="h-4 w-4" />
-            </a>
-          </div>
-
-          {/* Stats
-              Every number here is checkable against a CV and a results sheet.
-              What was here before — "10+ Projects", "+50 Clients" — was neither
-              true nor verifiable, and it contradicted the About section three
-              screens down, which claimed 25 years and 15 industry awards. A
-              prospect who notices that stops reading. */}
-          <div className="animate-fade-up-delay-3 mt-16 grid grid-cols-3 gap-8 max-w-lg mx-auto">
-            <div className="text-center">
-              <div className="text-3xl sm:text-4xl font-bold text-slate-50">100,000+</div>
-              <div className="text-sm text-primary-foreground/60 mt-1">Nautical miles logged</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl sm:text-4xl font-bold text-slate-50">6</div>
-              <div className="text-sm text-primary-foreground/60 mt-1">Ocean crossings</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl sm:text-4xl font-bold text-slate-50">63m</div>
-              <div className="text-sm text-primary-foreground/60 mt-1">Largest yacht optimised</div>
-            </div>
-          </div>
+      {/* The sheet: a lines plan with a title block, drawn on arrival */}
+      <figure className="relative lg:col-span-6 lg:col-start-7 xl:col-span-7 xl:col-start-6">
+        <div className="bg-paper border rule p-3 sm:p-5 shadow-[0_1px_0_hsl(var(--rule)),0_20px_40px_-24px_hsl(var(--ink)/0.25)]">
+          <HullLines loa={34} beam={7.6} draft={4.4} rig="sloop" view="sheet" mastScale={0.62} animate className="ink h-auto w-full" title="Lines plan of a 34-metre sloop, illustrative" />
+          <figcaption className="mt-3 grid grid-cols-2 border-t rule text-[10px] sm:grid-cols-4">
+            {[
+              ["Drawing", "Lines plan"],
+              ["Vessel", "Illustrative, 34 m sloop"],
+              ["Scale", "NTS"],
+              ["Sheet", "YAM / 001"],
+            ].map(([k, v]) => (
+              <div key={k} className="border-r rule px-2 py-1.5 last:border-r-0">
+                <span className="label block text-[9px]">{k}</span>
+                <span className="mono ink">{v}</span>
+              </div>
+            ))}
+          </figcaption>
         </div>
-      </div>
+      </figure>
+    </div>
+  </section>
+);
 
-      {/* Scroll Indicator */}
-      <button onClick={scrollToServices} className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce text-primary-foreground/60 hover:text-primary-foreground transition-colors" aria-label="Scroll to services">
-        <ChevronDown className="h-8 w-8" />
-      </button>
-    </section>;
-};
 export default Hero;

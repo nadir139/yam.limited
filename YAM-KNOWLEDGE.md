@@ -1,7 +1,7 @@
 # YAM — Maritime Intelligence Platform
 ## Knowledge Base · Session Log · Development Roadmap
 
-> Last updated: 17 November 2026 (sections 50–54)  
+> Last updated: 17 November 2026 (sections 50–55)  
 > Primary repo: `nadir139/yam.limited` (deployed by Vercel from `main`; GitHub Pages is being retired -- see section 12)  
 > Live URL: `yam.limited`  
 > App URL: `yam.limited/app/dashboard`  
@@ -2705,3 +2705,32 @@ per-user briefs (the brief is per project and audience, not per person).
 - A slow turntable (`autoRotate`) until the first touch, and never while
   something is picked or the layout is being edited.
 - Chunk: `VesselScene` 888 → 960 kB.
+
+## 55. The public site, reworked (Nov 2026)
+
+The landing read as a generated template: four grids of icon cards, a teal
+gradient, counters, fade-ins everywhere and copy any brokerage could sign
+("Comprehensive Yacht Management", "Seamless"). It is now a drawing office.
+
+- **Design layer** `src/components/landing/landing.css`, scoped: `.landing`
+  paints paper and ink, `.landing-vars` only brings the variables and classes
+  (navbar and footer, which also sit on /ontology). One markup colour (the
+  surveyor's red), Source Serif 4 for what we say, IBM Plex Mono for what we
+  label, both self-hosted with @fontsource. Light and dark.
+- **Drawings instead of photographs**: `HullLines.tsx` draws profile, half
+  breadths and body plan from the same hull maths as the 3D model
+  (`vessel-model.ts`), and draws itself once on load. No owner's boat is shown.
+- **Home** (`pages/Index.tsx`): Hero ("Your refit, on the record.") → References
+  strip (America's Cup, SailGP, Volvo Ocean Race, J-Class, Perini Navi,
+  superyacht regattas: names, no logos) → Method (four moments where a refit is
+  won or lost) → The record (an illustrated morning in a yard: found → priced →
+  decided → moved, plus the agent's brief and the logbook; labelled as an
+  illustration) → References by boat (J-Class, Perini Navi 56 m, Aragon 72,
+  SY Sonny, a 115-footer, schooner Adix; scope only, no client figures) → Why
+  YAM (kinds of service compared, not named firms) → Behind YAM (a background,
+  not a CV) → Contact → Footer. `/#section` links scroll on arrival.
+- **Sardinia concierge** has its own page, `/sardinia` (in the sitemap), with
+  the same eight services.
+- Removed: `Services.tsx`, `RefitIntelligence.tsx`, the counters and the
+  personal credential cards.
+- Not yet: /ontology still has the old gradient hero; an Italian version.

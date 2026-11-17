@@ -1,0 +1,108 @@
+/*
+ * The public site's own look: a drawing office, not a template.
+ *
+ * Paper and ink, one markup colour (the red a surveyor uses on a drawing),
+ * a serif for what we say and a mono for what we label. Scoped to .landing so
+ * the app keeps its own design system. Fonts are self-hosted (@fontsource):
+ * no request leaves for a font CDN.
+ */
+@import '@fontsource-variable/source-serif-4/index.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+
+:is(.landing, .landing-vars) {
+  --paper: 40 30% 97%;
+  --paper-2: 40 22% 93%;
+  --ink: 216 45% 13%;
+  --ink-soft: 216 14% 38%;
+  --rule: 38 14% 80%;
+  --mark: 8 72% 48%;
+  --sea: 196 48% 34%;
+}
+/* .landing paints the page; .landing-vars only brings the variables and classes
+   (the navbar and footer, which also sit on /ontology). */
+.landing {
+  background-color: hsl(var(--paper));
+  color: hsl(var(--ink));
+}
+
+.dark :is(.landing, .landing-vars) {
+  --paper: 216 32% 7%;
+  --paper-2: 216 26% 10%;
+  --ink: 40 22% 91%;
+  --ink-soft: 216 12% 66%;
+  --rule: 216 18% 21%;
+  --mark: 8 85% 62%;
+  --sea: 196 50% 62%;
+}
+
+:is(.landing, .landing-vars) .serif {
+  font-family: 'Source Serif 4 Variable', 'Iowan Old Style', Georgia, serif;
+  font-optical-sizing: auto;
+  letter-spacing: -0.01em;
+}
+:is(.landing, .landing-vars) .mono {
+  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.02em;
+}
+:is(.landing, .landing-vars) .label {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: hsl(var(--ink-soft));
+}
+
+:is(.landing, .landing-vars) .ink { color: hsl(var(--ink)); }
+:is(.landing, .landing-vars) .soft { color: hsl(var(--ink-soft)); }
+:is(.landing, .landing-vars) .mark { color: hsl(var(--mark)); }
+:is(.landing, .landing-vars) .sea { color: hsl(var(--sea)); }
+:is(.landing, .landing-vars) .bg-paper { background-color: hsl(var(--paper)); }
+:is(.landing, .landing-vars) .bg-paper-2 { background-color: hsl(var(--paper-2)); }
+:is(.landing, .landing-vars) .rule { border-color: hsl(var(--rule)); }
+:is(.landing, .landing-vars) .bg-ink { background-color: hsl(var(--ink)); color: hsl(var(--paper)); }
+
+/* Drafting paper: a faint 8 mm grid with a heavier line every 40 mm. */
+:is(.landing, .landing-vars) .drafting {
+  background-image:
+    linear-gradient(hsl(var(--rule) / 0.45) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--rule) / 0.45) 1px, transparent 1px),
+    linear-gradient(hsl(var(--rule) / 0.18) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--rule) / 0.18) 1px, transparent 1px);
+  background-size: 160px 160px, 160px 160px, 32px 32px, 32px 32px;
+}
+
+/* Buttons: ink on paper, and one in the markup colour. */
+:is(.landing, .landing-vars) .btn-ink {
+  display: inline-flex; align-items: center; gap: .5rem;
+  background: hsl(var(--ink)); color: hsl(var(--paper));
+  padding: .8rem 1.25rem; border-radius: 2px; font-weight: 500; font-size: .95rem;
+  transition: transform .15s ease, background-color .15s ease;
+}
+:is(.landing, .landing-vars) .btn-ink:hover { transform: translateY(-1px); }
+:is(.landing, .landing-vars) .btn-line {
+  display: inline-flex; align-items: center; gap: .5rem;
+  border: 1px solid hsl(var(--ink) / 0.35); color: hsl(var(--ink));
+  padding: .8rem 1.25rem; border-radius: 2px; font-weight: 500; font-size: .95rem;
+  transition: border-color .15s ease, background-color .15s ease;
+}
+:is(.landing, .landing-vars) .btn-line:hover { border-color: hsl(var(--ink)); background: hsl(var(--ink) / 0.04); }
+
+:is(.landing, .landing-vars) a.underline-mark {
+  text-decoration: underline; text-decoration-color: hsl(var(--mark));
+  text-underline-offset: 4px; text-decoration-thickness: 1.5px;
+}
+
+/* The lines plan draws itself once, like a pen on the sheet. */
+@keyframes draw-line { to { stroke-dashoffset: 0; } }
+:is(.landing, .landing-vars) .draw path,
+:is(.landing, .landing-vars) .draw line,
+:is(.landing, .landing-vars) .draw polyline {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw-line 2.2s cubic-bezier(.4, 0, .2, 1) forwards;
+}
+:is(.landing, .landing-vars) .draw .late { animation-delay: .9s; }
+@media (prefers-reduced-motion: reduce) {
+  :is(.landing, .landing-vars) .draw path, :is(.landing, .landing-vars) .draw line, :is(.landing, .landing-vars) .draw polyline { animation: none; stroke-dashoffset: 0; }
+}

@@ -1,186 +1,117 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Menu } from "lucide-react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-  SheetClose,
-} from "@/components/ui/sheet";
+import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import Logo from "@/assets/logo.svg";
 import { ThemeToggle } from "./ThemeToggle";
+import "@/components/landing/landing.css";
 
-const navLinks = [
-  { href: "#services", label: "Services" },
-  { href: "#about", label: "About" },
-  { href: "#refit-intelligence", label: "Refit Intelligence" },
-  { href: "#contact", label: "Contact" },
+// The public pages' navigation. On the home page and /sardinia it sits on
+// paper and is ink; on /ontology, whose hero is dark, it is light until the
+// page scrolls. Section links work from any page: elsewhere they go home first.
+
+const SECTIONS = [
+  { id: "#method", label: "Method" },
+  { id: "#record", label: "The record" },
+  { id: "#references", label: "References" },
+  { id: "#about", label: "About" },
 ];
 
 const Navbar = () => {
-  const [isScrolled, setIsScrolled] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation();
-  const isOntologyPage = location.pathname === "/ontology";
-  const isAppPage = location.pathname.startsWith("/app");
+  const { pathname } = useLocation();
+  const onHome = pathname === "/";
+  const lightText = pathname === "/ontology" && !scrolled;
 
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50);
-    };
-
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+    const onScroll = () => setScrolled(window.scrollY > 24);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const scrollToSection = (href: string) => {
-    if (isOntologyPage) {
-      // Navigate home first, then scroll
-      navigate("/");
-      setTimeout(() => {
-        const element = document.querySelector(href);
-        if (element) {
-          element.scrollIntoView({ behavior: "smooth" });
-        }
-      }, 100);
-      return;
-    }
-    const element = document.querySelector(href);
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth" });
-    }
+  const go = (id: string) => {
+    if (onHome) document.querySelector(id)?.scrollIntoView({ behavior: "smooth" });
+    else navigate(`/${id}`);
   };
+
+  const text = lightText ? "text-white/85 hover:text-white" : "ink opacity-80 hover:opacity-100";
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled
-          ? "glass shadow-lg"
-          : "bg-transparent"
+      className={`landing-vars fixed inset-x-0 top-0 z-50 transition-colors duration-300 ${
+        scrolled ? "border-b rule bg-[hsl(var(--paper)/0.92)] backdrop-blur" : "bg-transparent"
       }`}
     >
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
-          {/* Logo */}
-          <a
-            href={isAppPage ? "/app/dashboard" : isOntologyPage ? "/" : "#"}
-            onClick={(e) => {
-              e.preventDefault();
-              if (isAppPage) {
-                navigate("/app/dashboard");
-              } else if (isOntologyPage) {
-                navigate("/");
-              } else {
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }
-            }}
-            className="flex items-center gap-3"
-          >
-            <img src={Logo} alt="YAM Logo" className="h-12 sm:h-14 w-auto drop-shadow-md" />
-            <div>
-              <span className={`text-lg sm:text-2xl font-bold tracking-tight ${isScrolled ? 'text-primary' : 'text-primary-foreground'}`}>YAM</span>
-              <p className={`text-[10px] sm:text-xs tracking-wide ${isScrolled ? 'text-muted-foreground' : 'text-primary-foreground/70'}`}>
-                Yacht Architectural Management
-              </p>
-            </div>
-          </a>
+      <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:h-20 sm:px-6 lg:px-8">
+        <a
+          href="/"
+          onClick={(e) => {
+            e.preventDefault();
+            if (onHome) window.scrollTo({ top: 0, behavior: "smooth" });
+            else navigate("/");
+          }}
+          className="flex items-center gap-3"
+        >
+          <img src={Logo} alt="" className={`h-10 w-auto sm:h-11 ${lightText ? "brightness-0 invert" : "dark:invert"}`} />
+          <span className={`serif text-xl font-semibold sm:text-2xl ${lightText ? "text-white" : "ink"}`}>YAM</span>
+          <span className={`label hidden text-[10px] lg:inline ${lightText ? "!text-white/60" : ""}`}>Yacht Architectural Management</span>
+        </a>
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-8">
-            {navLinks.map((link) => (
-              <button
-                key={link.href}
-                onClick={() => scrollToSection(link.href)}
-                className={`nav-link font-medium ${isScrolled ? 'text-foreground/80 hover:text-primary' : 'text-primary-foreground/80 hover:text-primary-foreground'}`}
-              >
-                {link.label}
-              </button>
-            ))}
-            <button
-              onClick={() => navigate("/ontology")}
-              className={`nav-link font-medium ${isScrolled ? 'text-foreground/80 hover:text-primary' : 'text-primary-foreground/80 hover:text-primary-foreground'}`}
-            >
-              Ontology
+        <div className="hidden items-center gap-7 md:flex">
+          {SECTIONS.map((s) => (
+            <button key={s.id} type="button" onClick={() => go(s.id)} className={`text-[15px] transition-opacity ${text}`}>
+              {s.label}
             </button>
-            {/*
-              `bg-transparent` is required when unscrolled: the `outline` variant
-              ships `bg-background` (white), which over the dark hero renders a
-              white pill with white text and hides the label entirely.
-            */}
-            <Button
-              variant="outline"
-              onClick={() => navigate("/login")}
-              className={`border ${isScrolled ? 'border-foreground/30 text-foreground hover:bg-muted' : 'bg-transparent border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10'}`}
-            >
-              Sign In
-            </Button>
-            <Button
-              onClick={() => scrollToSection("#contact")}
-              className="bg-accent hover:bg-accent/90 text-accent-foreground"
-            >
-              Get in Touch
-            </Button>
-            <ThemeToggle variant="navbar" isScrolled={isScrolled} />
-          </div>
+          ))}
+          <button type="button" onClick={() => navigate("/ontology")} className={`text-[15px] transition-opacity ${text}`}>
+            Ontology
+          </button>
+          <span className={`h-5 w-px ${lightText ? "bg-white/30" : "bg-[hsl(var(--rule))]"}`} />
+          <button type="button" onClick={() => navigate("/login")} className={`text-[15px] transition-opacity ${text}`}>
+            Sign in
+          </button>
+          <button type="button" onClick={() => go("#contact")} className={`btn-ink !py-2 text-sm ${lightText ? "!bg-white !text-[hsl(216_45%_13%)]" : ""}`}>
+            Talk to us
+          </button>
+          <ThemeToggle variant="navbar" isScrolled={!lightText} />
+        </div>
 
-          {/* Mobile Navigation */}
-          <div className="flex items-center gap-2 md:hidden">
-            <ThemeToggle variant="navbar" isScrolled={isScrolled} />
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className={isScrolled ? '' : 'text-primary-foreground hover:bg-primary-foreground/10'}>
-                  <Menu className="h-6 w-6" />
-                  <span className="sr-only">Open menu</span>
-                </Button>
-              </SheetTrigger>
-            <SheetContent side="right" className="w-[280px] bg-background">
-              <div className="flex flex-col gap-8 mt-8">
-                <div className="flex items-center gap-3">
-                  <img src={Logo} alt="YAM Logo" className="h-12 w-auto" />
-                  <span className="text-xl font-bold text-primary">YAM</span>
-                </div>
-                <nav className="flex flex-col gap-4">
-                  {navLinks.map((link) => (
-                    <SheetClose asChild key={link.href}>
-                      <button
-                        onClick={() => scrollToSection(link.href)}
-                        className="text-lg font-medium text-foreground/80 hover:text-primary transition-colors text-left py-2"
-                      >
-                        {link.label}
-                      </button>
-                    </SheetClose>
-                  ))}
-                  <SheetClose asChild>
-                    <button
-                      onClick={() => navigate("/ontology")}
-                      className="text-lg font-medium text-foreground/80 hover:text-primary transition-colors text-left py-2"
-                    >
-                      Ontology
+        <div className="flex items-center gap-1 md:hidden">
+          <ThemeToggle variant="navbar" isScrolled={!lightText} />
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className={lightText ? "text-white hover:bg-white/10" : ""}>
+                <Menu className="h-6 w-6" />
+                <span className="sr-only">Open menu</span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="landing-vars w-[280px] bg-[hsl(var(--paper))]">
+              <SheetTitle className="serif ink text-2xl">YAM</SheetTitle>
+              <nav className="mt-8 flex flex-col">
+                {[...SECTIONS, { id: "#contact", label: "Contact" }].map((s) => (
+                  <SheetClose asChild key={s.id}>
+                    <button type="button" onClick={() => go(s.id)} className="serif ink border-b rule py-3 text-left text-xl">
+                      {s.label}
                     </button>
                   </SheetClose>
-                  <SheetClose asChild>
-                    <Button
-                      variant="outline"
-                      onClick={() => navigate("/login")}
-                      className="mt-2 border-foreground/30 text-foreground"
-                    >
-                      Sign In
-                    </Button>
+                ))}
+                {[
+                  { to: "/ontology", label: "Ontology" },
+                  { to: "/sardinia", label: "Sardinia concierge" },
+                  { to: "/login", label: "Client sign in" },
+                ].map((l) => (
+                  <SheetClose asChild key={l.to}>
+                    <button type="button" onClick={() => navigate(l.to)} className="soft border-b rule py-3 text-left text-[15px]">
+                      {l.label}
+                    </button>
                   </SheetClose>
-                  <SheetClose asChild>
-                    <Button
-                      onClick={() => scrollToSection("#contact")}
-                      className="mt-2 bg-accent hover:bg-accent/90 text-accent-foreground"
-                    >
-                      Get in Touch
-                    </Button>
-                  </SheetClose>
-                </nav>
-              </div>
+                ))}
+              </nav>
             </SheetContent>
-            </Sheet>
-          </div>
+          </Sheet>
         </div>
       </div>
     </nav>

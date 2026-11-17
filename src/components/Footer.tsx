@@ -1,101 +1,58 @@
-import { ArrowRight } from "lucide-react";
+import { Link } from "react-router-dom";
 import Logo from "@/assets/logo.svg";
+import "@/components/landing/landing.css";
 
-const Footer = () => {
-  const currentYear = new Date().getFullYear();
+// The footer of the public pages (/, /ontology, /sardinia). Links that point at
+// sections of the home page are full paths, so they work from every page.
 
-  const scrollToSection = (href: string) => {
-    const element = document.querySelector(href);
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth" });
-    }
-  };
+const LINKS = [
+  { label: "Method", to: "/#method" },
+  { label: "The record", to: "/#record" },
+  { label: "References", to: "/#references" },
+  { label: "Contact", to: "/#contact" },
+];
+const MORE = [
+  { label: "Ontology", to: "/ontology" },
+  { label: "Sardinia concierge", to: "/sardinia" },
+  { label: "Client sign in", to: "/login" },
+];
 
-  return (
-    <footer className="cta-gradient text-primary-foreground py-16">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid md:grid-cols-4 gap-12 mb-12">
-          {/* Brand */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-card p-2 shadow-lg">
-                <img src={Logo} alt="YAM Logo" className="w-full h-full object-contain" />
-              </div>
-              <div>
-                <span className="text-2xl font-bold tracking-tight">YAM</span>
-                <p className="text-sm text-primary-foreground/70">
-                  Yacht Architectural Management
-                </p>
-              </div>
-            </div>
-            <p className="text-primary-foreground/70 text-sm leading-relaxed">
-              Expert owner representation and project management for yacht
-              construction, refit, and racing programs worldwide.
-            </p>
+const Footer = () => (
+  <footer className="landing-vars">
+    <div className="bg-ink">
+    <div className="container mx-auto px-4 py-14 sm:px-6 lg:px-8">
+      <div className="grid gap-10 md:grid-cols-12">
+        <div className="md:col-span-6">
+          <div className="mb-4 flex items-center gap-3">
+            <img src={Logo} alt="" className="h-10 w-10 rounded-full bg-[hsl(var(--paper))] p-1" />
+            <span className="serif text-2xl font-semibold">YAM</span>
           </div>
-
-          {/* Quick Links */}
-          <div>
-            <h4 className="font-semibold mb-4">Quick Links</h4>
-            <ul className="space-y-3">
-              {[
-                { label: "Services", href: "#services" },
-                { label: "About Us", href: "#about" },
-                { label: "Contact", href: "#contact" },
-              ].map((link) => (
-                <li key={link.href}>
-                  <button
-                    onClick={() => scrollToSection(link.href)}
-                    className="text-primary-foreground/70 hover:text-accent transition-colors text-sm"
-                  >
-                    {link.label}
-                  </button>
+          <p className="max-w-sm text-[15px] leading-relaxed opacity-75">
+            Yacht Architectural Management. Owner's representation and a live record for refits and
+            new builds of sailing yachts.
+          </p>
+        </div>
+        <nav className="grid grid-cols-2 gap-8 md:col-span-6" aria-label="Footer">
+          {[LINKS, MORE].map((group, i) => (
+            <ul key={i} className="space-y-2.5">
+              {group.map((l) => (
+                <li key={l.to}>
+                  <Link to={l.to} className="text-[15px] opacity-80 hover:opacity-100 hover:underline underline-offset-4">
+                    {l.label}
+                  </Link>
                 </li>
               ))}
             </ul>
-          </div>
-
-          {/* Services */}
-          <div>
-            <h4 className="font-semibold mb-4">Our Services</h4>
-            <ul className="space-y-3 text-sm text-primary-foreground/70">
-              <li>Owner Representation</li>
-              <li>Project Management</li>
-              <li>Racing Program Management</li>
-              <li>Refit Coordination</li>
-            </ul>
-          </div>
-
-          {/* Digital Logbook */}
-          <div>
-            <h4 className="font-semibold mb-4">Our Products</h4>
-            <a
-              href="/ontology"
-              className="inline-flex items-center gap-2 px-4 py-3 rounded-lg bg-primary-foreground/10 border border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/20 transition-all duration-300 text-sm"
-            >
-              <span>Logbook & ontology</span>
-              <ArrowRight className="h-4 w-4" />
-            </a>
-            <p className="mt-3 text-sm text-primary-foreground/60">
-              The modern solution for yacht documentation and operations.
-            </p>
-          </div>
-        </div>
-
-        {/* Bottom */}
-        <div className="pt-8 border-t border-primary-foreground/10 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <p className="text-sm text-primary-foreground/60">
-            © {currentYear} YAM - Yacht Architectural Management. All rights
-            reserved.
-          </p>
-          <div className="flex items-center gap-2 text-sm text-primary-foreground/60">
-            <img src={Logo} alt="YAM" className="h-5 w-5" />
-            <span>Navigating Excellence</span>
-          </div>
-        </div>
+          ))}
+        </nav>
       </div>
-    </footer>
-  );
-};
+      <div className="mono mt-12 flex flex-wrap justify-between gap-3 border-t border-[hsl(var(--paper)/0.15)] pt-6 text-[11px] opacity-60">
+        <span>© {new Date().getFullYear()} YAM · Yacht Architectural Management</span>
+        <span>Sardinia · Mediterranean · Caribbean</span>
+      </div>
+    </div>
+    </div>
+  </footer>
+);
 
 export default Footer;
