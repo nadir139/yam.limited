@@ -5,7 +5,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { callAgent, type AgentStep } from '@/lib/agent-client'
 import { useProjectId } from '@/lib/query-hooks'
-import { LinkedText, prettyTool, type ObjectRef } from '@/pages/agent/AgentConsole'
+import { LinkedText } from './AgentReply'
+import { prettyTool, type ObjectRef } from './thread'
 import { openAgent, routeForObject } from './page-context'
 
 // The agent speaks first.

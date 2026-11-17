@@ -4,7 +4,8 @@ import { AlertCircle, ArrowUpRight, Loader2, Send, Sparkles, Square, Trash2 } fr
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { useProjectId } from '@/lib/query-hooks'
-import { CascadeChain, LinkedText, MAX_PROMPT_CHARS, prettyTool, type ObjectRef } from '@/pages/agent/AgentConsole'
+import { CascadeChain, LinkedText } from './AgentReply'
+import { MAX_PROMPT_CHARS, prettyTool, type ObjectRef } from './thread'
 import { pageContext, routeForObject } from './page-context'
 import { useAgentThread } from './useAgentThread'
 
