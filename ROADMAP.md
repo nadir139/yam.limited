@@ -3,6 +3,23 @@
 Written after the 6 Oct 2026 audit (branch `claude/lucid-ptolemy-kj9j7a`).
 Ordered by impact over effort. Most items are a day or less.
 
+## Nov 2026 — where things stand
+
+Done 17 Nov (PRs #63–#65, `YAM-KNOWLEDGE.md` §50–54): boats only in the UI
+(flag), the logbook shown as part of the ontology on the landing page, the
+agent on every page with page context, the daily brief, agent notes on
+events and the morning run (migration 046), the 3D view dressed, one agent
+module for console and dock.
+
+Next, in order:
+
+1. **Landing page rework** — less generic, more proof (see the review of 17 Nov).
+2. **Web push** for agent notes — needs a service worker and VAPID keys;
+   phones only get it once the app is installed.
+3. **Turn on the morning email** for yourself and check one arrives
+   (confirms `RESEND_API_KEY` and the sender domain).
+4. Per-person briefs (today they are per project and audience).
+
 ## 0. Do now (no code)
 
 | | What | Why | Effort |

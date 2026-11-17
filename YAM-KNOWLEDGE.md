@@ -1,8 +1,8 @@
 # YAM — Maritime Intelligence Platform
 ## Knowledge Base · Session Log · Development Roadmap
 
-> Last updated: April 2026  
-> Primary repo: `nadir139/yam.limited` (deployed via GitHub Pages -- see section 12)  
+> Last updated: 17 November 2026 (sections 50–54)  
+> Primary repo: `nadir139/yam.limited` (deployed by Vercel from `main`; GitHub Pages is being retired -- see section 12)  
 > Live URL: `yam.limited`  
 > App URL: `yam.limited/app/dashboard`  
 > Supabase project: `xgpdfefxarllgykjbppn` -- provisioned and live (see section 12)
@@ -2564,3 +2564,144 @@ voiding the late flight leaves 1,203.5 h with readings 1201.5, 1203.5; a
 are refused. Browser test (mocked, browser in Rome time): aircraft
 details, open the tech log, a 23:40–01:20 UTC flight sent as UTC across
 midnight, totals, void with reason.
+
+## 50. Boats only, for now (Nov 2026, PR #63)
+
+The product is shown as boats only while buildings (043–044) and aircraft
+(045) wait. Nothing was deleted: `src/lib/features.ts` decides which asset
+kinds the client shows.
+
+- `ProjectContext` filters the project list with `projectIsShown()`
+  (`assetKindOf()`, so a PROPERTY project with no asset recorded counts as a
+  building). A stored selection pointing at a hidden project falls back to
+  the first boat project.
+- `CreateProjectForm` offers only the types `projectTypeIsShown()` allows.
+- The building/aircraft pages already redirect when the active project is a
+  boat (`BoatOnly`, `TechLogPage`), so hiding the projects hides the pages.
+- To show everything again: `VITE_SHOW_ALL_ASSET_KINDS=true` in Vercel, redeploy.
+- Not hidden: the agent's system prompt still knows about buildings and
+  aircraft (it only brings them up if asked); the database and Actions
+  still accept them.
+
+## 51. The landing page: the logbook is part of the ontology (Nov 2026)
+
+The Digital Logbook was advertised as a separate product (digital-logbook.com)
+from the Hero, About, Contact and Footer, and as its own section. Since
+migration 032 it lives inside YAM, so:
+
+- `DigitalLogbook.tsx` is now the "In service · the same record" block inside
+  the Refit Intelligence section (`id="logbook"` kept), each feature tagged
+  with the ontology type it is recorded as (LOG_DAY, CREW, REST_RECORD,
+  READING, SERVICE_INTERVAL, ORB_ENTRY...).
+- Hero and About link to `#logbook`; Contact and Footer to `/ontology`. The
+  /ontology hero names log days, rest hours, readings and ORB entries.
+
+## 52. The agent beside every page (Nov 2026, PRs #64–#65)
+
+The agent used to live only at `/app/agent`. It is now present everywhere,
+and all three surfaces share one module, `src/components/agent/`:
+
+| File | What |
+| --- | --- |
+| `thread.ts` | Turn types, sessionStorage thread per project, `INVALIDATE_ON_CHANGE`, `prettyTool` |
+| `useAgentThread.ts` | Ask / stop / clear; cache refresh after an Action. Used by the console and the dock |
+| `AgentReply.tsx` | `LinkedText` (number chips, bold, bullets) and `CascadeChain` |
+| `page-context.ts` | Per-route label, suggestions, and the record's type + id; `openAgent(prompt?)`; `routeForObject()` |
+| `AgentDock.tsx` / `AgentDockPanel.tsx` | Floating *Ask YAM* (⌘J / Ctrl+J), non-modal sheet, lazy panel |
+| `AgentBrief.tsx` | "Today's brief" on the dashboard and the logbook |
+| `notes.ts` | `agent_notes` reads, live subscription, seen/unseen, the email opt-in |
+
+- **Page context** travels as a bracketed note ahead of the question
+  (`withContext()` in `agent-client.ts`), written for the model: "this" means
+  the record whose type and id are named, read it with `get_object` first. The
+  stored thread keeps only what the user typed, and the `agent` Edge Function
+  did not change. The note is dropped rather than push a prompt past 2,000
+  characters. Tests: `src/lib/agent-context.test.ts`.
+- **One conversation:** the dock and the console read and write the same
+  `yam.agent.turns.<projectId>`; the dock hides on `/app/agent`.
+- **The brief** prefers today's BRIEF note from the morning run (§53); if
+  there is none it asks the agent from this device, once a day per project
+  (`yam.agent.brief.<project>.<date>`), with an in-flight map so remounts do
+  not double-ask. Refresh asks again.
+
+## 53. The agent speaks first (migration 046, `agent-watch`)
+
+```
+world_model_events ──trigger──▶ agent_watch_call() ──pg_net──▶ agent-watch ──▶ agent_notes ──realtime──▶ app
+pg_cron 05:30 UTC ──────────────▶ agent_watch_call({mode:"morning"}) ──▶ briefs, payment notes, email
+```
+
+- **`agent_notes`**: kind NOTICE or BRIEF; audience ALL or MONEY (MONEY only
+  where `payment_can_read()`); title, body, suggestion (a next question), the
+  object it is about, `refs` (number → {type,id,label}) so the app links the
+  numbers, `dedupe_key` (one per event / per project per day / per stage per
+  day). Read-only to members; only the service role writes. In realtime.
+- **Trigger** `agent_watch_after_event` fires on root events only
+  (`cascade_from_event_id is null`): DEFECT_CREATED, DEFECT_RAISED,
+  DEFECT_IMPACT_AMENDED, CHANGE_ORDER_CREATED, APPROVAL_REQUESTED,
+  INSPECTION_COMPLETED unless PASS, WORK_PACKAGE_STATUS_CHANGED to ON_HOLD.
+  It swallows its own errors: a note is never worth failing a write. pg_net
+  sends after commit, so cascaded rows exist when the function reads.
+- **`agent-watch`** (`supabase/functions/agent-watch`, `verify_jwt` off):
+  checks `x-agent-watch` against the Vault secret (`agent_watch_secret()`,
+  service role only; generated in the migration, never leaves the project),
+  reads the record around the event with the service role, and makes one
+  Claude call (Opus 5.5, structured JSON output, effort low for notices /
+  medium for briefs, server-side refusal fallback `"default"`). It answers
+  202 at once and finishes with `EdgeRuntime.waitUntil`.
+- **Morning**: per project, a brief from open NCRs, pending approvals and
+  change orders, packages late or due in 7 days, inspections in 7 days,
+  certificates expiring in 60, open action items, service due, and the last
+  24 h of events. A quiet project gets none. A MONEY variant only when
+  payment stages are due in 7 days or overdue, plus a note per stage.
+- **Email**: `project_members.agent_brief_email` (default **off**), set by the
+  member with `set_agent_brief_email()` from the switch on the brief card.
+  Sent through Resend (`RESEND_API_KEY`, `RESEND_FROM_EMAIL`); money roles
+  get the MONEY variant when there is one.
+- **App**: a toast for each new notice with *Ask*, a count on *Ask YAM*, a
+  *Noticed* list in the dock.
+
+Operations:
+
+```sql
+-- Run one project's morning now, no email, and wait for the result
+select public.agent_watch_call(jsonb_build_object('mode','morning','project_id','<uuid>','email',false,'wait',true));
+-- Re-run a note for an event
+select public.agent_watch_call(jsonb_build_object('mode','event','event_id','<uuid>','wait',true));
+-- What came back (pg_net keeps responses briefly)
+select status_code, content, error_msg from net._http_response order by created desc limit 5;
+-- Pause the morning run / resume it
+select cron.unschedule('agent-watch-morning');
+select cron.schedule('agent-watch-morning', '30 5 * * *', $$select public.agent_watch_call('{"mode":"morning"}'::jsonb)$$);
+-- Stop event notes without a migration
+alter table public.world_model_events disable trigger agent_watch_after_event;
+```
+
+Verified live (17 Nov 2026): a note on NCR-2026-001 and Lucky Bird's brief
+written through pg_net; a ping returns 200. Not verified: the email (nobody
+opted in yet). pg_net was first created in `public` and moved to
+`extensions` after the security advisor flagged it.
+
+Cost: one short call per qualifying event and one or two per active project
+per morning. Not yet: web push (needs a service worker; the app has none),
+per-user briefs (the brief is per project and audience, not per person).
+
+## 54. The 3D view, dressed (Nov 2026)
+
+`VesselScene.tsx` only; placement in `vessel-model.ts` is unchanged.
+
+- The drawn hull is built locally (`hullRing`): flare with a little
+  tumblehome, a teal boot stripe at the waterline, antifouling below, its own
+  deck, vertex-coloured physical material at 0.32 opacity so the parts stay
+  visible. Sailing yachts get a fin keel with bulb, a spade rudder, mast,
+  boom and stays (`Rig`).
+- Studio light: hemisphere + key + fill, and an `Environment` made of
+  `Lightformer`s (nothing is downloaded). A radial backdrop per theme, a sea
+  disc at the waterline, an infinite floor grid under the keel and a
+  one-frame `ContactShadows`.
+- Spaces and connections are quieter until something is picked; parts are
+  satin, `RoundedBox` at real size; the picked part gets a pulsing
+  `SelectionHalo`; labels are glass pills.
+- A slow turntable (`autoRotate`) until the first touch, and never while
+  something is picked or the layout is being edited.
+- Chunk: `VesselScene` 888 → 960 kB.

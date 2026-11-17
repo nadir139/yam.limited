@@ -145,6 +145,7 @@ and Development:
 | --- | --- |
 | `VITE_SUPABASE_URL` | `https://xgpdfefxarllgykjbppn.supabase.co` |
 | `VITE_SUPABASE_ANON_KEY` | the `anon` key from *Supabase → Project Settings → API* |
+| `VITE_SHOW_ALL_ASSET_KINDS` | optional; `true` shows building and aircraft projects again. Unset = boats only (`src/lib/features.ts`) |
 
 The `anon` key is designed to be public — it ships inside the client bundle and
 is protected by row-level security, not by secrecy.
@@ -251,21 +252,23 @@ select count(*) from work_packages;    -- must be 0
 
 ### Edge Functions
 
-Two Deno functions live in `supabase/functions/` and are deployed to the
-Supabase project (they are **not** part of the GitHub Pages build):
+Deno functions live in `supabase/functions/` and are deployed to the
+Supabase project (they are **not** part of the Vercel build). The main ones:
 
 | Function | Purpose |
 | --- | --- |
 | `contact-inquiry` | Validates the public contact form, writes it to `contact_inquiries`, then sends a notification via Resend |
 | `agent` | The world-model agent — reads the ontology registry, exposes it to Claude as tools, runs the tool loop |
+| `agent-watch` | The agent speaking first (migration 046): notes on important events, the morning brief, payment-due notes, the opt-in brief email. Called only by the database (trigger + pg_cron); `verify_jwt` off, authenticated by a Vault secret. Runbook in `YAM-KNOWLEDGE.md` §53 |
+| `extract-parts`, `finance-files`, `revolut` | Parts import from documents, receipts, the Revolut Business connection |
 
-Both need secrets set under *Supabase → Project Settings → Edge Functions →
+They need secrets set under *Supabase → Project Settings → Edge Functions →
 Secrets* (these are server-side and never reach the browser):
 
 | Secret | Used by |
 | --- | --- |
-| `RESEND_API_KEY` | `contact-inquiry` |
-| `ANTHROPIC_API_KEY` | `agent` |
+| `RESEND_API_KEY` (and optional `RESEND_FROM_EMAIL`) | `contact-inquiry`, `agent-watch` |
+| `ANTHROPIC_API_KEY` | `agent`, `agent-watch`, `extract-parts` |
 
 `SUPABASE_URL` and `SUPABASE_ANON_KEY` are injected by the platform.
 
@@ -275,6 +278,10 @@ exactly the signed-in user's permissions — the write guard from migration 008
 applies to it unchanged, and `world_model_events` records the human as the
 actor. Swapping in the service-role key would silently remove every one of those
 guarantees.
+
+`agent-watch` is the exception, by design: it runs with the service role because
+nobody is signed in at 05:30. It only reads, and writes nothing but
+`agent_notes`; what each member then sees of those notes is decided by RLS.
 
 ### Client-side routing
 
