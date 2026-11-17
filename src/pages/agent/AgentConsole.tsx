@@ -10,7 +10,7 @@ import ChatObjectPanel from './ChatObjectPanel'
 import AgentScheduleCard from '@/components/gantt/AgentScheduleCard'
 
 /** Cache prefixes an Action could have invalidated, whichever Action it was. */
-const INVALIDATE_ON_CHANGE = [
+export const INVALIDATE_ON_CHANGE = [
   'defects', 'defect', 'change-orders', 'change-order', 'approvals',
   'inspections', 'documents', 'work-packages', 'work-package',
   'project', 'events', 'messages',
@@ -32,20 +32,20 @@ const SCHEDULE_TOOLS = new Set([
 type ToolCall = AgentStep
 
 /** An object the agent read, keyed in the response by its human number. */
-interface ObjectRef {
+export interface ObjectRef {
   type: string
   id: string
   label: string
 }
 
-interface ChangedRef extends ObjectRef {
+export interface ChangedRef extends ObjectRef {
   number: string
   via: string
   /** False for the Action's own target, true for what the cascade produced. */
   cascaded: boolean
 }
 
-interface Turn {
+export interface Turn {
   role: 'user' | 'agent'
   text: string
   trace?: ToolCall[]
@@ -64,10 +64,10 @@ const SUGGESTIONS = [
 ]
 
 /** How many prior turns to replay. The function bounds this again server-side. */
-const HISTORY_TURNS = 12
+export const HISTORY_TURNS = 12
 
 /** The Edge Function refuses longer prompts; say so before sending, not after. */
-const MAX_PROMPT_CHARS = 2000
+export const MAX_PROMPT_CHARS = 2000
 
 /**
  * The conversation survives leaving the page.
@@ -81,9 +81,9 @@ const MAX_PROMPT_CHARS = 2000
 // Keyed by project. One key for every project meant switching from the ketch to
 // the property kept the ketch's thread on screen — and replayed it to the agent
 // as history for the property, where its NCR numbers mean nothing.
-const storageKey = (projectId: string) => `yam.agent.turns.${projectId}`
+export const storageKey = (projectId: string) => `yam.agent.turns.${projectId}`
 
-function loadTurns(projectId: string): Turn[] {
+export function loadTurns(projectId: string): Turn[] {
   if (!projectId) return []
   try {
     const raw = sessionStorage.getItem(storageKey(projectId))
@@ -97,7 +97,7 @@ function loadTurns(projectId: string): Turn[] {
 /** Actions mutate the world model; reads don't. Only the former need a label. */
 const isAction = (tool: string) => tool.startsWith('action_')
 
-const prettyTool = (call: ToolCall) => {
+export const prettyTool = (call: ToolCall) => {
   const base = call.tool.replace(/^action_/, '').replace(/_/g, ' ')
   // "list objects" five times in a row says nothing; "list objects · defect
   // record" says what the agent actually looked at.
@@ -168,7 +168,7 @@ function renderInline(
  * is built from ids the database returned, so a link can never point at
  * something that does not exist.
  */
-function LinkedText({
+export function LinkedText({
   text,
   index,
   openNumbers,
@@ -228,7 +228,7 @@ function LinkedText({
  * legible at a glance — which is the whole argument for a world model over a
  * task list, so it should not be buried in a paragraph.
  */
-function CascadeChain({
+export function CascadeChain({
   changed,
   openNumbers,
   onToggle,

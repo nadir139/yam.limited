@@ -1,4 +1,4 @@
-import { ExternalLink } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import Logo from "@/assets/logo.svg";
 
 const Footer = () => {
@@ -70,13 +70,11 @@ const Footer = () => {
           <div>
             <h4 className="font-semibold mb-4">Our Products</h4>
             <a
-              href="https://digital-logbook.com"
-              target="_blank"
-              rel="noopener noreferrer"
+              href="/ontology"
               className="inline-flex items-center gap-2 px-4 py-3 rounded-lg bg-primary-foreground/10 border border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/20 transition-all duration-300 text-sm"
             >
-              <span>Digital Logbook</span>
-              <ExternalLink className="h-4 w-4" />
+              <span>Logbook & ontology</span>
+              <ArrowRight className="h-4 w-4" />
             </a>
             <p className="mt-3 text-sm text-primary-foreground/60">
               The modern solution for yacht documentation and operations.

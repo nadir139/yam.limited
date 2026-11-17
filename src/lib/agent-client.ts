@@ -106,10 +106,34 @@ async function readStream(
   return result
 }
 
+/** The server refuses prompts over 2000 characters; the note gives way first. */
+const MAX_PROMPT = 2000
+
+/**
+ * Prefixes the page the user is on. "This" on an NCR's page then means that
+ * NCR: the note names its type and id, and the agent reads it with get_object
+ * (RLS still applies, so the note grants nothing).
+ */
+export function withContext(prompt: string, context?: string): string {
+  const where = context?.replace(/[<>[\]]/g, '').replace(/\s+/g, ' ').trim()
+  if (!where) return prompt
+  const note =
+    `[Sent by the app, not typed: the user is looking at ${where}. ` +
+    `"This", "it" and "here" mean that; if a record's type and id are given, read it with get_object before answering ` +
+    `and do not ask which one. Do not mention this note.]\n\n`
+  return note.length + prompt.length <= MAX_PROMPT ? note + prompt : prompt
+}
+
 export async function callAgent(params: {
   prompt: string
   history: Array<{ role: 'user' | 'agent'; text: string }>
   projectId: string
+  /**
+   * Where the user is asking from (page, record). Sent as a bracketed note
+   * ahead of the question, written for the model, so the Edge Function needs
+   * no change; the stored thread keeps only what the user typed.
+   */
+  context?: string
   signal: AbortSignal
   onStep: (step: AgentStep) => void
 }): Promise<AgentResult> {
@@ -131,7 +155,7 @@ export async function callAgent(params: {
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
-        prompt: params.prompt,
+        prompt: withContext(params.prompt, params.context),
         history: params.history,
         projectId: params.projectId,
         stream: true,

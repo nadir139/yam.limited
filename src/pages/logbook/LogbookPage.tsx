@@ -39,6 +39,7 @@ import { useOutbox } from '@/hooks/useOutbox'
 import { useProjectId } from '@/contexts/ProjectContext'
 import type { LogDayWithCrew } from '@/lib/db'
 import type { AttendanceStatus, Crew, DefectRecord, LogEntry, LogEntryKind, LogStatus } from '@/lib/types'
+import AgentBrief from '@/components/agent/AgentBrief'
 
 // The boat's logbook (migration 032).
 //
@@ -121,6 +122,8 @@ export default function LogbookPage() {
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-4">
+      {/* The agent's brief for today: what the log says needs attention */}
+      <AgentBrief />
       <div className="flex flex-wrap items-end justify-between gap-2 print:hidden">
         <div>
           <h1 className="text-2xl font-bold">{project?.vessel?.name ?? 'Logbook'}</h1>

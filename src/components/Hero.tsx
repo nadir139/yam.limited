@@ -1,4 +1,4 @@
-import { ChevronDown, ExternalLink } from "lucide-react";
+import { ArrowDown, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Logo from "@/assets/logo.svg";
 import AsciiVideo from "@/components/AsciiVideo";
@@ -73,9 +73,11 @@ const Hero = () => {
 
           {/* Digital Logbook Promotion */}
           <div className="animate-fade-up-delay-3 mt-8">
-            <a href="https://digital-logbook.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary-foreground/10 border border-primary-foreground/20 text-primary-foreground/90 hover:bg-primary-foreground/20 transition-all duration-300 text-sm">
-              <span>Discover Digital Logbook</span>
-              <ExternalLink className="h-4 w-4" />
+            {/* The logbook now lives inside YAM's ontology (migration 032), so this
+                goes to that section rather than to the old standalone app. */}
+            <a href="#logbook" className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary-foreground/10 border border-primary-foreground/20 text-primary-foreground/90 hover:bg-primary-foreground/20 transition-all duration-300 text-sm">
+              <span>The logbook, in the same record</span>
+              <ArrowDown className="h-4 w-4" />
             </a>
           </div>
 
