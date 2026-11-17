@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { fetchMyProjects, type ProjectWithVessel } from '@/lib/db'
 import { useAuth } from '@/contexts/AuthContext'
+import { projectIsShown } from '@/lib/features'
 
 // Which project the app is looking at.
 //
@@ -41,12 +42,16 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
   const email = user?.email ?? ''
 
-  const { data: projects = [], isLoading } = useQuery({
+  const { data: allProjects, isLoading } = useQuery({
     queryKey: ['my-projects', email],
     queryFn: fetchMyProjects,
     enabled: Boolean(email),
     staleTime: 5 * 60_000,
   })
+  // Boats only for now (src/lib/features.ts): projects on a building or an
+  // aircraft stay in the database but are not listed or selectable. A stored
+  // selection pointing at one falls back to the first boat project below.
+  const projects = useMemo(() => (allProjects ?? []).filter(projectIsShown), [allProjects])
 
   const [selected, setSelected] = useState<string | null>(null)
 
