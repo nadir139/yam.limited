@@ -4,6 +4,8 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import Logo from '@/assets/logo.svg'
+import '@/components/landing/landing.css'
 
 const RESEND_SECONDS = 30
 
@@ -48,28 +50,19 @@ export default function Login() {
   if (!isLoading && user) return <Navigate to="/app/dashboard" replace />
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-4"
-      style={{
-        background: 'linear-gradient(135deg, hsl(215 50% 15%) 0%, hsl(215 50% 28%) 100%)',
-      }}
-    >
-      <div
-        className="w-full max-w-sm rounded-[var(--radius)] shadow-2xl p-8"
-        style={{ backgroundColor: 'hsl(var(--card))' }}
-      >
+    // The door between the public site and the app, so it wears the site's
+    // look: drafting paper, a sheet with a title block, serif and mono.
+    <div className="landing drafting flex min-h-screen items-center justify-center p-4">
+      <div className="w-full max-w-sm border rule bg-paper p-8 shadow-[0_20px_40px_-24px_hsl(var(--ink)/0.3)]">
         {/* Logo */}
-        <div className="text-center mb-8">
-          <div
-            className="text-4xl font-black tracking-tight mb-1"
-            style={{ color: 'hsl(var(--primary))' }}
-          >
-            YAM
-          </div>
-          <div className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
-            Yacht Architectural Management
-          </div>
-        </div>
+        <a href="/" className="mb-8 flex items-center gap-3">
+          <img src={Logo} alt="" className="h-10 w-auto dark:invert" />
+          <span>
+            <span className="serif block text-2xl font-semibold leading-none">YAM</span>
+            <span className="label mt-1 block text-[10px]">Yacht Architectural Management</span>
+          </span>
+        </a>
+        <p className="serif mb-6 text-xl font-semibold">Sign in to the record</p>
 
         {sent ? (
           <div className="flex flex-col gap-4 text-center">
@@ -136,13 +129,13 @@ export default function Login() {
             )}
 
             <Button type="submit" className="w-full mt-2" disabled={isSubmitting}>
-              {isSubmitting ? 'Sending...' : 'Send Magic Link'}
+              {isSubmitting ? 'Sending…' : 'Email me a sign-in link'}
             </Button>
           </form>
         )}
 
-        <p className="text-center text-xs mt-6" style={{ color: 'hsl(var(--muted-foreground))' }}>
-          Maritime intelligence platform
+        <p className="label mt-8 border-t rule pt-4 text-[10px]">
+          Invite only · access comes from the project team
         </p>
       </div>
     </div>

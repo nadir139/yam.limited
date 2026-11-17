@@ -1,7 +1,7 @@
 # YAM — Maritime Intelligence Platform
 ## Knowledge Base · Session Log · Development Roadmap
 
-> Last updated: 17 November 2026 (sections 50–55)  
+> Last updated: 17 November 2026 (sections 50–56)  
 > Primary repo: `nadir139/yam.limited` (deployed by Vercel from `main`; GitHub Pages is being retired -- see section 12)  
 > Live URL: `yam.limited`  
 > App URL: `yam.limited/app/dashboard`  
@@ -2744,3 +2744,32 @@ gradient, counters, fade-ins everywhere and copy any brokerage could sign
 - Removed: `Services.tsx`, `RefitIntelligence.tsx`, `landing/HullLines.tsx`,
   the counters and the personal credential cards.
 - Not yet: /ontology still has the old gradient hero; an Italian version.
+
+## 56. One design system for the site, /ontology and the app (Nov 2026)
+
+The public site, /ontology and the app had three looks: paper and ink, a
+navy-to-teal gradient, and the app's cool blue-grey with rounded cards. They
+now share one set of tokens in `src/index.css`:
+
+- **Neutrals**: paper (`--background 40 30% 97%`) and ink (`216 45% 13%`),
+  inverted in dark mode (`216 32% 7%` / `40 22% 91%`). `--primary` is ink, so
+  primary buttons are ink on paper (paper on ink in dark).
+- **Accent**: the deep sea teal (`196 48% 34%`; `196 50% 60%` dark), the app's
+  colour for what you act on and for the agent. The public pages add the
+  surveyor's red for marks (`landing.css`, `--mark`).
+- **Type**: Source Serif 4 for `h1`/`h2` everywhere (a base rule), IBM Plex
+  Mono for `font-mono` (record numbers) and the public pages' labels; both
+  self-hosted with @fontsource, imported once in `index.css`. Tailwind
+  `font-serif` / `font-mono` map to them.
+- **Radius**: `--radius 0.3rem`: drawn, not inflated.
+- **Sidebar**: ink, with the sea teal for the current page.
+- `/ontology` has the drafting-paper hero (no gradient) and the stats as
+  labels; `/login` is a sheet on drafting paper in the same style.
+- Removed CSS helpers nothing used any more: `hero-gradient`, `cta-gradient`,
+  `wave-decoration`, `section-muted`, `card-elevated`, `feature-card`,
+  `stat-card`, `icon-container`, `nav-link`.
+
+Checked in a local harness (the real shadcn components and sidebar colours,
+light and dark), and on /ontology and /login. The signed-in pages were not
+seen with live data from the sandbox.
+

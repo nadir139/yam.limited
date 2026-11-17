@@ -1,17 +1,16 @@
+@import '@fontsource-variable/source-serif-4/index.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /*
- * YAM - YACHT ARCHITECTURAL MANAGEMENT DESIGN SYSTEM
- * Based on Digital Logbook maritime-tech design language
- *
- * DESIGN PHILOSOPHY:
- * - Deep ocean blues convey trust, professionalism, and maritime heritage
- * - Teal accents represent technology and innovation
- * - Clean, minimal aesthetic inspired by modern navigation instruments
- * - High contrast for outdoor/marine environment readability
- * - Subtle gradients evoke water and horizon
+ * YAM design system (Nov 2026): one look for the public site, /ontology and
+ * the app. Paper and ink for the neutrals, a deep sea teal for what you act
+ * on (the app's accent), the surveyor's red for marks on the public pages
+ * (landing.css), Source Serif 4 for headings and IBM Plex Mono for labels,
+ * self-hosted. Small radii: drawn, not inflated.
  */
 
 @layer base {
@@ -20,30 +19,30 @@
      * PRIMARY PALETTE - Ocean-inspired blues
      * These colors anchor the brand identity
      */
-    --background: 210 20% 99%;
-    --foreground: 215 25% 12%;
+    --background: 40 30% 97%;
+    --foreground: 216 45% 13%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 215 25% 12%;
+    --card: 40 33% 99%;
+    --card-foreground: 216 45% 13%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 215 25% 12%;
+    --popover: 40 33% 99%;
+    --popover-foreground: 216 45% 13%;
 
     /* Deep Navy - Primary brand color */
-    --primary: 215 50% 23%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 216 45% 13%;
+    --primary-foreground: 40 30% 97%;
 
     /* Soft blue-gray for secondary elements */
-    --secondary: 210 25% 95%;
-    --secondary-foreground: 215 25% 25%;
+    --secondary: 40 22% 93%;
+    --secondary-foreground: 216 30% 22%;
 
     /* Muted tones for backgrounds and disabled states */
-    --muted: 210 20% 96%;
-    --muted-foreground: 215 15% 45%;
+    --muted: 40 22% 93%;
+    --muted-foreground: 216 14% 38%;
 
     /* Teal accent for CTAs and highlights */
-    --accent: 185 60% 40%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 196 48% 34%;
+    --accent-foreground: 40 30% 98%;
 
     /* Error/destructive states */
     --destructive: 0 72% 51%;
@@ -58,21 +57,21 @@
     --warning-foreground: 0 0% 10%;
 
     /* Borders and inputs */
-    --border: 214 20% 88%;
-    --input: 214 20% 88%;
-    --ring: 215 50% 23%;
+    --border: 38 14% 84%;
+    --input: 38 14% 80%;
+    --ring: 216 45% 13%;
 
-    --radius: 0.625rem;
+    --radius: 0.3rem;
 
     /* Sidebar colors */
-    --sidebar-background: 215 30% 15%;
-    --sidebar-foreground: 210 20% 90%;
-    --sidebar-primary: 185 60% 45%;
+    --sidebar-background: 216 42% 11%;
+    --sidebar-foreground: 40 22% 88%;
+    --sidebar-primary: 196 50% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 215 30% 20%;
-    --sidebar-accent-foreground: 210 20% 95%;
-    --sidebar-border: 215 25% 22%;
-    --sidebar-ring: 185 60% 45%;
+    --sidebar-accent: 216 32% 17%;
+    --sidebar-accent-foreground: 40 22% 95%;
+    --sidebar-border: 216 28% 19%;
+    --sidebar-ring: 196 50% 58%;
 
     /* Gradient tokens */
     --gradient-ocean: linear-gradient(135deg, hsl(215 50% 23%) 0%, hsl(200 60% 30%) 100%);
@@ -81,28 +80,28 @@
   }
 
   .dark {
-    --background: 220 25% 8%;
-    --foreground: 210 25% 95%;
+    --background: 216 32% 7%;
+    --foreground: 40 22% 91%;
 
-    --card: 220 25% 11%;
-    --card-foreground: 210 25% 95%;
+    --card: 216 26% 10%;
+    --card-foreground: 40 22% 91%;
 
-    --popover: 220 25% 11%;
-    --popover-foreground: 210 25% 95%;
+    --popover: 216 26% 10%;
+    --popover-foreground: 40 22% 91%;
 
     /* Lighter navy for dark mode */
-    --primary: 210 50% 70%;
-    --primary-foreground: 220 25% 8%;
+    --primary: 40 22% 91%;
+    --primary-foreground: 216 32% 7%;
 
-    --secondary: 220 20% 18%;
-    --secondary-foreground: 210 25% 90%;
+    --secondary: 216 22% 15%;
+    --secondary-foreground: 40 22% 88%;
 
-    --muted: 220 20% 15%;
-    --muted-foreground: 215 15% 60%;
+    --muted: 216 22% 13%;
+    --muted-foreground: 216 12% 66%;
 
     /* Brighter teal for dark mode */
-    --accent: 185 55% 50%;
-    --accent-foreground: 220 25% 8%;
+    --accent: 196 50% 60%;
+    --accent-foreground: 216 32% 7%;
 
     --destructive: 0 62% 45%;
     --destructive-foreground: 210 40% 98%;
@@ -113,18 +112,18 @@
     --warning: 38 80% 55%;
     --warning-foreground: 0 0% 10%;
 
-    --border: 220 20% 18%;
-    --input: 220 20% 18%;
-    --ring: 210 50% 70%;
+    --border: 216 18% 21%;
+    --input: 216 18% 24%;
+    --ring: 40 22% 91%;
 
-    --sidebar-background: 220 25% 6%;
-    --sidebar-foreground: 210 20% 90%;
-    --sidebar-primary: 185 55% 50%;
+    --sidebar-background: 216 34% 5%;
+    --sidebar-foreground: 40 20% 88%;
+    --sidebar-primary: 196 50% 60%;
     --sidebar-primary-foreground: 220 25% 8%;
-    --sidebar-accent: 220 20% 12%;
+    --sidebar-accent: 216 26% 12%;
     --sidebar-accent-foreground: 210 20% 95%;
-    --sidebar-border: 220 20% 15%;
-    --sidebar-ring: 185 55% 50%;
+    --sidebar-border: 216 22% 14%;
+    --sidebar-ring: 196 50% 60%;
 
     --gradient-ocean: linear-gradient(135deg, hsl(210 50% 70%) 0%, hsl(185 55% 50%) 100%);
     --gradient-surface: linear-gradient(180deg, hsl(220 25% 8%) 0%, hsl(220 25% 11%) 100%);
@@ -155,6 +154,13 @@
     text-wrap: balance;
   }
 
+  /* Titles in the serif, as on the public site; smaller headings stay sans. */
+  h1, h2 {
+    font-family: 'Source Serif 4 Variable', 'Iowan Old Style', Georgia, serif;
+    font-optical-sizing: auto;
+    letter-spacing: -0.01em;
+  }
+
   h1 {
     @apply text-4xl font-bold md:text-5xl lg:text-6xl;
     letter-spacing: -0.02em;
@@ -176,90 +182,17 @@
 }
 
 @layer components {
-  /* Professional card styling */
-  .card-elevated {
-    @apply bg-card rounded-xl border border-border shadow-sm;
-    @apply hover:shadow-md hover:border-primary/20 transition-all duration-300;
-  }
 
-  /* Feature card with icon */
-  .feature-card {
-    @apply p-6 rounded-xl border border-border bg-card;
-    @apply hover:shadow-lg hover:border-primary/30 hover:-translate-y-1;
-    @apply transition-all duration-300 ease-out;
-  }
 
-  /* Stat card styling */
-  .stat-card {
-    @apply p-4 rounded-xl border border-border bg-card text-center;
-    @apply hover:border-primary/20 transition-colors duration-200;
-  }
 
-  /* Hero section styling */
-  .hero-gradient {
-    background: linear-gradient(
-      135deg,
-      hsl(215 50% 23%) 0%,
-      hsl(200 55% 28%) 50%,
-      hsl(185 50% 30%) 100%
-    );
-  }
 
-  /* Ocean wave decoration */
-  .wave-decoration {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 120px;
-    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320'%3E%3Cpath fill='%23f8fafc' fill-opacity='0.5' d='M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,122.7C672,117,768,139,864,154.7C960,171,1056,181,1152,165.3C1248,149,1344,107,1392,85.3L1440,64L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z'%3E%3C/path%3E%3C/svg%3E") no-repeat bottom;
-    background-size: cover;
-    pointer-events: none;
-  }
 
-  /* Section backgrounds */
-  .section-muted {
-    @apply bg-muted/30;
-    background-image: linear-gradient(180deg, transparent 0%, hsl(var(--muted) / 0.3) 100%);
-  }
 
-  /* Navigation link styling */
-  .nav-link {
-    @apply text-muted-foreground hover:text-foreground;
-    @apply relative transition-colors duration-200;
-  }
 
-  .nav-link::after {
-    content: '';
-    @apply absolute bottom-0 left-0 right-0 h-0.5 bg-primary;
-    @apply scale-x-0 origin-center transition-transform duration-200;
-  }
 
-  .nav-link:hover::after {
-    @apply scale-x-100;
-  }
 
-  /* Icon container */
-  .icon-container {
-    @apply w-12 h-12 rounded-xl flex items-center justify-center;
-    @apply bg-primary/10 text-primary;
-    @apply transition-all duration-200;
-  }
 
-  .icon-container-lg {
-    @apply w-14 h-14 rounded-xl flex items-center justify-center;
-    @apply bg-primary/10 text-primary;
-  }
 
-  /* CTA section background */
-  .cta-gradient {
-    background: linear-gradient(
-      135deg,
-      hsl(215 50% 23%) 0%,
-      hsl(200 55% 28%) 50%,
-      hsl(185 50% 30%) 100%
-    );
-  }
 
   /* Glass effect for overlays */
   .glass {

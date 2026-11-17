@@ -15,6 +15,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import ObjectGraph from '@/components/ontology/ObjectGraph'
+import '@/components/landing/landing.css'
 import {
   CARDINALITY_LABEL,
   FALLBACK_ONTOLOGY,
@@ -38,9 +39,10 @@ function TypeChip({ typeKey, label }: { typeKey: string; label: string }) {
   )
 }
 
+// A fact about the registry, as a label on the drawing rather than a pill.
 function StatPill({ icon: Icon, children }: { icon: typeof Database; children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/15 px-3 py-1.5 text-xs font-semibold text-primary-foreground">
+    <span className="label inline-flex items-center gap-1.5 border-r rule pr-4 last:border-r-0">
       <Icon className="h-3.5 w-3.5" />
       {children}
     </span>
@@ -79,33 +81,34 @@ export default function Ontology() {
   const cascadingActions = actions.filter((a) => a.cascades.length > 0)
 
   return (
-    <div className="min-h-screen bg-background">
+    // The public site's look (landing.css): paper and ink, serif titles, mono
+    // labels. The gradient hero this page had until Nov 2026 is gone.
+    <div className="landing min-h-screen">
       <Navbar />
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      <section className="hero-gradient pt-32 pb-20 text-primary-foreground">
-        <div className="container mx-auto px-4 text-center sm:px-6 lg:px-8">
-          <span className="mb-4 inline-block rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-accent-foreground/80">
-            The world model
-          </span>
-          <h1 className="mb-5 text-4xl font-bold text-primary-foreground sm:text-5xl lg:text-6xl">
-            One ontology, not a task list
+      <section className="drafting border-b rule pt-28 sm:pt-36">
+        <div className="container mx-auto px-4 pb-14 sm:px-6 lg:px-8 lg:pb-20">
+          <p className="label mb-8">The world model</p>
+          <h1 className="serif mb-8 max-w-5xl text-[2.6rem] font-semibold leading-[1.04] sm:text-6xl lg:text-[5rem]">
+            One ontology, <span className="italic font-normal">not a task list.</span>
           </h1>
-          <p className="mx-auto mb-8 max-w-2xl text-lg text-primary-foreground/80">
-            Every survey finding, change order and owner decision — and, once she is
-            back in service, every log day, rest hour, reading and Oil Record Book
-            entry — is a typed object with typed links. The refit and the logbook are
-            one record. State does not sit in a spreadsheet waiting to be reconciled —
-            it propagates.
-          </p>
-          <div className="flex flex-wrap justify-center gap-3">
-            <StatPill icon={Database}>
-              {types.length} object types · {links.length} links
-            </StatPill>
-            <StatPill icon={Zap}>{actions.length} Actions</StatPill>
-            <StatPill icon={live ? Radio : GitBranch}>
-              {live ? 'Read live from the registry' : 'Bundled copy'}
-            </StatPill>
+          <div className="grid gap-8 lg:grid-cols-12">
+            <p className="soft max-w-2xl text-lg leading-relaxed lg:col-span-7">
+              Every survey finding, change order and owner decision — and, once she is back in
+              service, every log day, rest hour, reading and Oil Record Book entry — is a typed
+              object with typed links. The refit and the logbook are one record. State does not sit
+              in a spreadsheet waiting to be reconciled: it propagates.
+            </p>
+            <div className="flex flex-wrap items-end gap-4 lg:col-span-5 lg:justify-end">
+              <StatPill icon={Database}>
+                {types.length} object types · {links.length} links
+              </StatPill>
+              <StatPill icon={Zap}>{actions.length} Actions</StatPill>
+              <StatPill icon={live ? Radio : GitBranch}>
+                {live ? 'Read live from the registry' : 'Bundled copy'}
+              </StatPill>
+            </div>
           </div>
         </div>
       </section>
