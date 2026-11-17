@@ -2619,6 +2619,13 @@ and all three surfaces share one module, `src/components/agent/`:
   characters. Tests: `src/lib/agent-context.test.ts`.
 - **One conversation:** the dock and the console read and write the same
   `yam.agent.turns.<projectId>`; the dock hides on `/app/agent`.
+- **Records open inside the dock** (as in the console): tapping a number in a
+  reply, in the "Recorded" chain or in a notice opens `ChatObjectPanel` under
+  it, where the record can be read and acted on (status, decision, impact).
+  Several can be open at once. The panel's "open the full record" button
+  closes the dock first (`onOpenFull`), since on a phone the page would
+  otherwise sit hidden behind it. Before this, a tap navigated to the page
+  behind the dock and looked like it did nothing.
 - **The brief** prefers today's BRIEF note from the morning run (§53); if
   there is none it asks the agent from this device, once a day per project
   (`yam.agent.brief.<project>.<date>`), with an in-flight map so remounts do

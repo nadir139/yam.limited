@@ -6,7 +6,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { useProjectId } from '@/lib/query-hooks'
 import { CascadeChain, LinkedText } from './AgentReply'
 import { MAX_PROMPT_CHARS, prettyTool, type ObjectRef } from './thread'
-import { pageContext, routeForObject } from './page-context'
+import { pageContext } from './page-context'
+import ChatObjectPanel from '@/pages/agent/ChatObjectPanel'
 import { useAgentThread } from './useAgentThread'
 import { noticesOf, useAgentNotes } from './notes'
 
@@ -43,11 +44,39 @@ export default function AgentDockPanel({
     endRef.current?.scrollIntoView({ block: 'end' })
   }, [turns.length, busy, progress.length])
 
-  /** A chip in a reply opens its record; the dock stays open beside it. */
-  const openObject = (_number: string, target: ObjectRef) => {
-    const to = routeForObject(target.type, target.id)
-    if (to) navigate(to)
+  // Records opened from the conversation, inline under the reply or notice
+  // they were tapped in (as in the full console). Navigating to the record's
+  // page instead left it hidden behind the dock on a phone, so a tap seemed to
+  // do nothing. Each panel has its own "open the full record" button.
+  const [open, setOpen] = useState<Record<string, Array<{ number: string; ref: ObjectRef }>>>({})
+  const [openFor, setOpenFor] = useState(projectId)
+  if (openFor !== projectId) {
+    setOpenFor(projectId)
+    setOpen({})
   }
+  const toggle = (key: string) => (number: string, target: ObjectRef) =>
+    setOpen((prev) => {
+      const list = prev[key] ?? []
+      return {
+        ...prev,
+        [key]: list.some((o) => o.number === number)
+          ? list.filter((o) => o.number !== number)
+          : [...list, { number, ref: { type: target.type, id: target.id, label: target.label } }],
+      }
+    })
+  const openNumbers = (key: string) => (open[key] ?? []).map((o) => o.number)
+  const panels = (key: string) =>
+    (open[key] ?? []).map((o) => (
+      <div key={o.number} className="-mx-1 mt-2">
+        <ChatObjectPanel
+          number={o.number}
+          objectType={o.ref.type}
+          objectId={o.ref.id}
+          onClose={() => toggle(key)(o.number, o.ref)}
+          onOpenFull={onClose}
+        />
+      </div>
+    ))
 
   const send = (text: string) => {
     if (!text.trim() || busy) return
@@ -73,7 +102,7 @@ export default function AgentDockPanel({
           </p>
         </div>
         {turns.length > 0 && (
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={clear} title="Clear the conversation">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { clear(); setOpen({}) }} title="Clear the conversation">
             <Trash2 size={14} />
           </Button>
         )}
@@ -108,8 +137,9 @@ export default function AgentDockPanel({
                   </span>
                 </div>
                 <div className="text-[13px] leading-relaxed" style={muted}>
-                  <LinkedText text={n.body} index={n.refs} openNumbers={[]} onToggle={openObject} />
+                  <LinkedText text={n.body} index={n.refs} openNumbers={openNumbers(`n:${n.id}`)} onToggle={toggle(`n:${n.id}`)} />
                 </div>
+                {panels(`n:${n.id}`)}
                 {n.suggestion && (
                   <button
                     type="button"
@@ -154,9 +184,10 @@ export default function AgentDockPanel({
               {t.isError && <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />}
               <div className="min-w-0 space-y-1 leading-relaxed">
                 {t.changed && t.changed.length > 0 && (
-                  <CascadeChain changed={t.changed} openNumbers={[]} onToggle={openObject} />
+                  <CascadeChain changed={t.changed} openNumbers={openNumbers(`t:${i}`)} onToggle={toggle(`t:${i}`)} />
                 )}
-                <LinkedText text={t.text} index={t.index} openNumbers={[]} onToggle={openObject} />
+                <LinkedText text={t.text} index={t.index} openNumbers={openNumbers(`t:${i}`)} onToggle={toggle(`t:${i}`)} />
+                {panels(`t:${i}`)}
               </div>
             </div>
           ),
