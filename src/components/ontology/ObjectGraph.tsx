@@ -129,14 +129,30 @@ export default function ObjectGraph({
 }: Props) {
   // A type added in SQL but missing from LAYOUT still has to appear, or the
   // graph would quietly under-report the model it claims to describe.
-  const positions = useMemo(() => {
+  // The registry grew past the hand-placed cells (logbook, maintenance,
+  // finance, flights: 33 types by Nov 2026), and every extra type used to land
+  // on one of two spots in the bottom row, stacked on top of each other. They
+  // now fill rows of four below the hand-placed graph, and the canvas grows.
+  const { positions, viewH } = useMemo(() => {
     const out: Record<string, { x: number; y: number }> = {}
+    const COLS = [110, 360, 600, 845]
+    // The bottom row's free cells first, then new rows.
+    const free = [{ x: 110, y: 560 }, { x: 360, y: 560 }]
     let spare = 0
     for (const t of types) {
-      // A type with no cell yet takes the next free one in the bottom row.
-      out[t.key] = LAYOUT[t.key] ?? { x: [110, 360][spare++ % 2], y: 560 }
+      if (LAYOUT[t.key]) {
+        out[t.key] = LAYOUT[t.key]
+        continue
+      }
+      const cell = free.shift()
+      if (cell) out[t.key] = cell
+      else {
+        out[t.key] = { x: COLS[spare % 4], y: 720 + Math.floor(spare / 4) * 120 }
+        spare++
+      }
     }
-    return out
+    const lowest = Math.max(560, ...Object.values(out).map((p) => p.y))
+    return { positions: out, viewH: Math.max(VIEW_H, lowest + HH + 36) }
   }, [types])
 
   const edges = useMemo<Edge[]>(() => {
@@ -250,7 +266,7 @@ export default function ObjectGraph({
   return (
     <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
       <svg
-        viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
+        viewBox={`0 0 ${VIEW_W} ${viewH}`}
         className="w-full min-w-[720px] h-auto select-none"
         role="img"
         aria-label="Object graph of the YAM ontology"
@@ -283,7 +299,7 @@ export default function ObjectGraph({
         {/* Clicking the backdrop clears the selection. */}
         <rect
           width={VIEW_W}
-          height={VIEW_H}
+          height={viewH}
           fill="transparent"
           onClick={() => onPin(null)}
         />

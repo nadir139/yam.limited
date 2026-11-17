@@ -92,17 +92,3 @@
   text-decoration: underline; text-decoration-color: hsl(var(--mark));
   text-underline-offset: 4px; text-decoration-thickness: 1.5px;
 }
-
-/* The lines plan draws itself once, like a pen on the sheet. */
-@keyframes draw-line { to { stroke-dashoffset: 0; } }
-:is(.landing, .landing-vars) .draw path,
-:is(.landing, .landing-vars) .draw line,
-:is(.landing, .landing-vars) .draw polyline {
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  animation: draw-line 2.2s cubic-bezier(.4, 0, .2, 1) forwards;
-}
-:is(.landing, .landing-vars) .draw .late { animation-delay: .9s; }
-@media (prefers-reduced-motion: reduce) {
-  :is(.landing, .landing-vars) .draw path, :is(.landing, .landing-vars) .draw line, :is(.landing, .landing-vars) .draw polyline { animation: none; stroke-dashoffset: 0; }
-}

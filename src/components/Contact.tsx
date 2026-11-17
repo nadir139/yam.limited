@@ -218,7 +218,7 @@ const Contact = () => {
               <div>
                 <h4 className="label mb-1">Location</h4>
                 <p className="ink">
-                  Sardinia · Mediterranean and Caribbean yards
+                  Sardinia based · operating worldwide
                 </p>
               </div>
             </div>
