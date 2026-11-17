@@ -9,6 +9,7 @@ import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import { useOutboxSync } from '@/hooks/useOutbox'
 import { useProjectPresence } from '@/lib/query-hooks'
 import { useActiveProject } from '@/contexts/ProjectContext'
+import AgentDock from '@/components/agent/AgentDock'
 
 interface AppShellProps {
   children: React.ReactNode
@@ -102,6 +103,8 @@ export default function AppShell({ children }: AppShellProps) {
           <MobileNav />
         </div>
       )}
+      {/* The agent beside every page (src/components/agent). */}
+      <AgentDock isMobile={isMobile} />
     </div>
   )
 }

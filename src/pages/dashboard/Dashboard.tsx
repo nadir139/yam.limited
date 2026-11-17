@@ -25,6 +25,7 @@ import {
 import { useTranslation } from '@/lib/i18n'
 import type { WorldModelEvent } from '@/lib/types'
 import { homeFor } from '@/components/layout/nav'
+import AgentBrief from '@/components/agent/AgentBrief'
 
 // The phase ladder is per project type and comes from ontology_vocabulary.
 // It used to be this hardcoded marine sequence, which is why a farmhouse was
@@ -195,6 +196,9 @@ export default function Dashboard() {
           </Button>
         )}
       </div>
+
+      {/* The agent's brief for today, before the numbers */}
+      <AgentBrief />
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
