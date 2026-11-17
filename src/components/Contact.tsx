@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Mail, Phone, MapPin, Send, ExternalLink, MessageCircle } from "lucide-react";
+import { Mail, Phone, MapPin, Send, ExternalLink, MessageCircle, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -225,17 +225,15 @@ const Contact = () => {
 
             {/* Digital Logbook Promo */}
             <div className="mt-8 p-6 rounded-xl border border-accent/20 bg-accent/5">
-              <h4 className="font-semibold text-foreground mb-2">Digital Logbook</h4>
+              <h4 className="font-semibold text-foreground mb-2">The logbook, in the same record</h4>
               <p className="text-sm text-muted-foreground mb-4">
-                Streamline your yacht operations with our digital logbook solution.
+                Log days, crew, hours of rest and the Oil Record Book, recorded in the same ontology as the refit.
               </p>
               <a
-                href="https://digital-logbook.com"
-                target="_blank"
-                rel="noopener noreferrer"
+                href="/ontology"
                 className="inline-flex items-center gap-2 text-accent hover:text-accent/80 transition-colors text-sm font-medium"
               >
-                Learn more <ExternalLink className="h-4 w-4" />
+                Explore the ontology <ArrowRight className="h-4 w-4" />
               </a>
             </div>
           </div>

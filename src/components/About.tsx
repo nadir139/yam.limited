@@ -122,9 +122,9 @@ const About = () => {
               {/* Main image container */}
               <div className="relative cta-gradient rounded-2xl p-12 flex flex-col items-center justify-center h-full glow-primary gap-6">
                 <img src={Logo} alt="YAM - Yacht Architectural Management" className="w-32 h-auto object-contain animate-boat-wave" />
-                <a href="https://digital-logbook.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-5 py-2.5 bg-background/10 backdrop-blur-sm border border-primary-foreground/20 rounded-full text-primary-foreground text-sm font-medium hover:bg-background/20 transition-all duration-300 hover:scale-105">
+                <a href="#logbook" className="inline-flex items-center gap-2 px-5 py-2.5 bg-background/10 backdrop-blur-sm border border-primary-foreground/20 rounded-full text-primary-foreground text-sm font-medium hover:bg-background/20 transition-all duration-300 hover:scale-105">
                   <Ship className="w-4 h-4" />
-                  Explore Digital Logbook
+                  Logbook & ontology
                 </a>
                 
                 {/* Floating promo badge */}

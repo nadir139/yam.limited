@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import DigitalLogbook from "@/components/DigitalLogbook";
 
 const capabilities = [
   {
@@ -218,6 +219,9 @@ const RefitIntelligence = () => {
             </div>
           </div>
         </div>
+
+        {/* In service: the logbook, recorded in the same ontology */}
+        <DigitalLogbook isVisible={isVisible} />
 
         {/* CTA */}
         <div

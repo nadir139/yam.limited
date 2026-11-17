@@ -92,9 +92,11 @@ export default function Ontology() {
             One ontology, not a task list
           </h1>
           <p className="mx-auto mb-8 max-w-2xl text-lg text-primary-foreground/80">
-            Every survey finding, change order and owner decision is a typed object
-            with typed links. State does not sit in a spreadsheet waiting to be
-            reconciled — it propagates.
+            Every survey finding, change order and owner decision — and, once she is
+            back in service, every log day, rest hour, reading and Oil Record Book
+            entry — is a typed object with typed links. The refit and the logbook are
+            one record. State does not sit in a spreadsheet waiting to be reconciled —
+            it propagates.
           </p>
           <div className="flex flex-wrap justify-center gap-3">
             <StatPill icon={Database}>
