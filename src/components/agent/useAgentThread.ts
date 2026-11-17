@@ -8,14 +8,12 @@ import {
   loadTurns,
   storageKey,
   type Turn,
-} from '@/pages/agent/AgentConsole'
+} from './thread'
 
 // The dock's conversation. It reads and writes the same sessionStorage thread
 // as the full console (/app/agent), so there is one agent per project, not
 // two: a question asked in the dock is there when you open the console.
 //
-// The console keeps its own copy of this logic for now; folding both onto
-// this hook is a refactor left for later.
 
 export function useAgentThread(projectId: string) {
   const [turns, setTurns] = useState<Turn[]>(() => loadTurns(projectId))
@@ -80,6 +78,7 @@ export function useAgentThread(projectId: string) {
         signal: controller.signal,
         onStep: (step) => setProgress((p) => [...p, step]),
       })
+      if (controller.signal.aborted) return
       setTurns((t) => [
         ...t,
         {

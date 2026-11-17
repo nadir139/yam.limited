@@ -1,10 +1,12 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Sparkles } from 'lucide-react'
+import { toast } from 'sonner'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { useActiveProject } from '@/contexts/ProjectContext'
 import { MOBILE_NAV_HEIGHT } from '@/components/layout/MobileNav'
-import { AGENT_OPEN_EVENT } from './page-context'
+import { AGENT_OPEN_EVENT, openAgent } from './page-context'
+import { lastSeen, markSeen, noticesOf, useAgentNotes, useAgentNotesLive } from './notes'
 
 const AgentDockPanel = lazy(() => import('./AgentDockPanel'))
 
@@ -20,6 +22,31 @@ export default function AgentDock({ isMobile }: { isMobile: boolean }) {
   const [open, setOpen] = useState(false)
   const [initialPrompt, setInitialPrompt] = useState<string | undefined>()
   const hidden = pathname === '/app/agent' || !activeProjectId || hasNoProjects
+  const projectId = activeProjectId ?? ''
+
+  // What the agent noticed since you last opened it: a dot on the button.
+  const { data: notes } = useAgentNotes(projectId)
+  const [seenAt, setSeenAt] = useState(() => lastSeen(projectId))
+  useEffect(() => setSeenAt(lastSeen(projectId)), [projectId])
+  const unseen = noticesOf(notes).filter((n) => n.created_at > seenAt).length
+
+  // A notice written while you are here arrives as it is written.
+  useAgentNotesLive(projectId, (n) => {
+    toast(n.title, {
+      description: n.body.length > 160 ? `${n.body.slice(0, 157)}…` : n.body,
+      icon: <Sparkles size={14} className="text-accent" />,
+      duration: 12_000,
+      action: n.suggestion ? { label: 'Ask', onClick: () => openAgent(n.suggestion ?? undefined) } : undefined,
+    })
+  })
+
+  // Opening the dock counts as having seen what was there.
+  useEffect(() => {
+    if (open && projectId) {
+      markSeen(projectId)
+      setSeenAt(new Date().toISOString())
+    }
+  }, [open, projectId, notes])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -66,6 +93,14 @@ export default function AgentDock({ isMobile }: { isMobile: boolean }) {
             <span className="absolute inset-0 animate-ping rounded-full bg-accent/20 [animation-duration:3s]" />
           </span>
           Ask YAM
+          {unseen > 0 && (
+            <span
+              className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[10px] font-semibold text-accent-foreground"
+              aria-label={`${unseen} new from the agent`}
+            >
+              {unseen}
+            </span>
+          )}
           <kbd className="ml-1 hidden rounded border px-1 font-mono text-[10px] text-muted-foreground md:inline">⌘J</kbd>
         </button>
       )}

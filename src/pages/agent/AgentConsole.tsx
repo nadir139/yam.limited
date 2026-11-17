@@ -1,24 +1,18 @@
-import { useState, useRef, useEffect, Fragment } from 'react'
-import { Sparkles, Send, Wrench, AlertCircle, User, ArrowRight, Trash2, Square } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { Sparkles, Send, Wrench, AlertCircle, User, Trash2, Square } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { callAgent, type AgentStep } from '@/lib/agent-client'
-import { useQueryClient } from '@tanstack/react-query'
 import { useProjectId } from '@/lib/query-hooks'
-import { typeColor } from '@/lib/ontology'
 import ChatObjectPanel from './ChatObjectPanel'
 import AgentScheduleCard from '@/components/gantt/AgentScheduleCard'
+import { CascadeChain, LinkedText } from '@/components/agent/AgentReply'
+import { useAgentThread } from '@/components/agent/useAgentThread'
+import { MAX_PROMPT_CHARS, isAction, prettyTool, type ObjectRef } from '@/components/agent/thread'
 
-/** Cache prefixes an Action could have invalidated, whichever Action it was. */
-export const INVALIDATE_ON_CHANGE = [
-  'defects', 'defect', 'change-orders', 'change-order', 'approvals',
-  'inspections', 'documents', 'work-packages', 'work-package',
-  'project', 'events', 'messages',
-  // Posting a message with a mention creates action items; inviting someone
-  // changes the team and, for them, the project list.
-  'action-items', 'team', 'my-role', 'my-projects', 'dependencies',
-  'parts', 'part-links', 'part-history',
-]
+// The agent at full size. The conversation itself (storage, sending, cache
+// refresh after an Action) lives in useAgentThread and is the same thread the
+// dock beside every page uses; this page adds the trace, inline records and
+// the schedule card.
 
 /** Reading or changing any of these puts the schedule under the reply. */
 const SCHEDULE_TOOLS = new Set([
@@ -29,31 +23,6 @@ const SCHEDULE_TOOLS = new Set([
   'action_set_schedule_baseline',
 ])
 
-type ToolCall = AgentStep
-
-/** An object the agent read, keyed in the response by its human number. */
-export interface ObjectRef {
-  type: string
-  id: string
-  label: string
-}
-
-export interface ChangedRef extends ObjectRef {
-  number: string
-  via: string
-  /** False for the Action's own target, true for what the cascade produced. */
-  cascaded: boolean
-}
-
-export interface Turn {
-  role: 'user' | 'agent'
-  text: string
-  trace?: ToolCall[]
-  index?: Record<string, ObjectRef>
-  changed?: ChangedRef[]
-  isError?: boolean
-}
-
 const SUGGESTIONS = [
   'What needs my attention right now?',
   'Summarise the open NCRs by severity and total cost impact.',
@@ -63,272 +32,29 @@ const SUGGESTIONS = [
   'What changed on this project in the last week?',
 ]
 
-/** How many prior turns to replay. The function bounds this again server-side. */
-export const HISTORY_TURNS = 12
-
-/** The Edge Function refuses longer prompts; say so before sending, not after. */
-export const MAX_PROMPT_CHARS = 2000
-
-/**
- * The conversation survives leaving the page.
- *
- * sessionStorage rather than component state: opening a record used to discard
- * the whole thread, and you came back to a blank console with no way to pick up
- * where you were. Per-tab and cleared when the tab closes, which is the right
- * lifetime for a working conversation.
- */
-//
-// Keyed by project. One key for every project meant switching from the ketch to
-// the property kept the ketch's thread on screen — and replayed it to the agent
-// as history for the property, where its NCR numbers mean nothing.
-export const storageKey = (projectId: string) => `yam.agent.turns.${projectId}`
-
-export function loadTurns(projectId: string): Turn[] {
-  if (!projectId) return []
-  try {
-    const raw = sessionStorage.getItem(storageKey(projectId))
-    const parsed = raw ? JSON.parse(raw) : null
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
-
-/** Actions mutate the world model; reads don't. Only the former need a label. */
-const isAction = (tool: string) => tool.startsWith('action_')
-
-export const prettyTool = (call: ToolCall) => {
-  const base = call.tool.replace(/^action_/, '').replace(/_/g, ' ')
-  // "list objects" five times in a row says nothing; "list objects · defect
-  // record" says what the agent actually looked at.
-  const subject = call.input?.object_type
-  return subject ? `${base} · ${String(subject).replace(/_/g, ' ').toLowerCase()}` : base
-}
-
-/** Object numbers look like NCR-2026-001, WP-MECH-004, APPR-2026-005. */
-const NUMBER_SHAPE = /^[A-Z]{2,6}-[A-Z0-9-]+$/
-const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-
-const chipClass = (type: string) =>
-  `${typeColor(type)} inline-flex items-center whitespace-nowrap rounded ` +
-  `border border-current/30 bg-current/[0.08] px-1.5 py-px align-baseline ` +
-  `font-mono text-[12px] font-semibold`
-
-function ObjectChip({
-  number,
-  target,
-  isOpen,
-  onToggle,
-}: {
-  number: string
-  target: ObjectRef
-  isOpen: boolean
-  onToggle: (number: string, target: ObjectRef) => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onToggle(number, target)}
-      title={target.label}
-      className={`${chipClass(target.type)} cursor-pointer hover:bg-current/[0.18] ${
-        isOpen ? 'ring-1 ring-current' : ''
-      }`}
-    >
-      {number}
-    </button>
-  )
-}
-
-/**
- * The subset of Markdown the agent actually produces: **bold** and `- ` bullets.
- *
- * Rendered rather than stripped, and built as React nodes rather than injected
- * HTML — the reply is model output, so it never becomes markup.
- */
-function renderInline(
-  text: string,
-  key: string,
-  linkify: (chunk: string, key: string) => React.ReactNode,
-): React.ReactNode[] {
-  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
-    part.startsWith('**') && part.endsWith('**') && part.length > 4 ? (
-      <strong key={`${key}-b${i}`}>{linkify(part.slice(2, -2), `${key}-b${i}`)}</strong>
-    ) : (
-      <Fragment key={`${key}-t${i}`}>{linkify(part, `${key}-t${i}`)}</Fragment>
-    ),
-  )
-}
-
-/**
- * Turns object numbers in the reply into links to the record.
- *
- * The agent is told to reference objects by number rather than describe them,
- * and this is what makes that instruction pay off — the reader clicks through
- * instead of reading a paragraph reconstructing what the object is. The index
- * is built from ids the database returned, so a link can never point at
- * something that does not exist.
- */
-export function LinkedText({
-  text,
-  index,
-  openNumbers,
-  onToggle,
-}: {
-  text: string
-  index?: Record<string, ObjectRef>
-  openNumbers: string[]
-  onToggle: (number: string, target: ObjectRef) => void
-}) {
-  const keys = Object.keys(index ?? {}).filter((k) => NUMBER_SHAPE.test(k))
-
-  const linkify = (chunk: string, key: string): React.ReactNode => {
-    if (!index || keys.length === 0) return chunk
-    // Longest first, so CO-2026-0011 is not eaten by CO-2026-001.
-    const pattern = keys.sort((a, b) => b.length - a.length).map(escapeRe).join('|')
-    return chunk.split(new RegExp(`(${pattern})`, 'g')).map((part, i) =>
-      index[part] ? (
-        <ObjectChip
-          key={`${key}-${i}`}
-          number={part}
-          target={index[part]}
-          isOpen={openNumbers.includes(part)}
-          onToggle={onToggle}
-        />
-      ) : (
-        <Fragment key={`${key}-${i}`}>{part}</Fragment>
-      ),
-    )
-  }
-
-  return (
-    <>
-      {text.split('\n').map((line, i) => {
-        const bullet = /^\s*[-*]\s+/.exec(line)
-        const content = bullet ? line.slice(bullet[0].length) : line
-        return (
-          <div key={i} className={bullet ? 'flex gap-2' : undefined}>
-            {bullet && (
-              <span aria-hidden style={{ color: 'hsl(var(--muted-foreground))' }}>
-                •
-              </span>
-            )}
-            <span className="min-w-0">{renderInline(content, `l${i}`, linkify)}</span>
-          </div>
-        )
-      })}
-    </>
-  )
-}
-
-/**
- * The propagation, drawn.
- *
- * When an Action cascades, prose has to spell out that recording one thing
- * created two others. Showing the chain as connected nodes makes the shape
- * legible at a glance — which is the whole argument for a world model over a
- * task list, so it should not be buried in a paragraph.
- */
-export function CascadeChain({
-  changed,
-  openNumbers,
-  onToggle,
-}: {
-  changed: ChangedRef[]
-  openNumbers: string[]
-  onToggle: (number: string, target: ObjectRef) => void
-}) {
-  if (changed.length === 0) return null
-
-  // An arrow means "which created", so it only goes before an object the
-  // cascade produced. Ten work packages filed from one job list are ten
-  // separate records, not a chain of ten — drawing them joined claimed each
-  // one had caused the next.
-  const anyCascade = changed.some((c) => c.cascaded)
-
-  return (
-    <div className="mb-3 rounded-[var(--radius)] border border-accent/30 bg-accent/[0.04] p-3">
-      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-        {anyCascade
-          ? 'Recorded, and what followed'
-          : changed.length === 1
-            ? 'Recorded'
-            : `Recorded · ${changed.length}`}
-      </p>
-      <div className="flex flex-wrap items-center gap-1.5">
-        {changed.map((c, i) => (
-          // Arrow and the node it points at wrap together, so a line break can
-          // never leave an arrow dangling at the end of a row.
-          <span key={c.id} className="inline-flex items-center gap-1.5">
-            {i > 0 && c.cascaded && (
-              <ArrowRight
-                className="h-3.5 w-3.5 flex-shrink-0 text-accent"
-                aria-label="which created"
-              />
-            )}
-            <button
-              type="button"
-              onClick={() => onToggle(c.number, c)}
-              title={c.label}
-              className={`${typeColor(c.type)} inline-flex min-w-0 items-center gap-1.5 ` +
-                'rounded-md border border-current/40 bg-current/[0.1] px-2 py-1 text-xs ' +
-                `hover:bg-current/[0.2] ${openNumbers.includes(c.number) ? 'ring-1 ring-current' : ''}`}
-            >
-              {/* The number must never break across lines — a half-rendered
-                  NCR-2026-\n012 reads as a different object. */}
-              <span className="whitespace-nowrap font-mono font-semibold">{c.number}</span>
-              <span className="max-w-[130px] truncate text-muted-foreground">{c.label}</span>
-            </button>
-          </span>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 export default function AgentConsole() {
   const projectId = useProjectId()
-  const [turns, setTurns] = useState<Turn[]>(() => loadTurns(projectId))
-  const [turnsFor, setTurnsFor] = useState(projectId)
+  const { turns, busy, progress, ask: send, stop, clear } = useAgentThread(projectId)
   const [prompt, setPrompt] = useState('')
-  const [busy, setBusy] = useState(false)
-  // What the agent has done so far on the request in flight, shown live.
-  const [progress, setProgress] = useState<ToolCall[]>([])
-  const abortRef = useRef<AbortController | null>(null)
   // Objects opened inline, keyed by the turn they were opened from, so a panel
   // appears where you clicked rather than somewhere you have to go looking.
   const [openPanels, setOpenPanels] = useState<Record<number, string[]>>({})
-  const qc = useQueryClient()
   const endRef = useRef<HTMLDivElement>(null)
+  // A thread restored from storage (on arrival or on switching project) opens
+  // on its latest message without animating down to it.
   const restored = useRef(turns.length > 0)
+  const [panelsFor, setPanelsFor] = useState(projectId)
 
-  // Switching project swaps in that project's own conversation. Done during
-  // render rather than in an effect, so the old thread never paints under the
-  // new project's name.
-  if (turnsFor !== projectId) {
-    setTurnsFor(projectId)
-    setTurns(loadTurns(projectId))
+  // Switching project swaps in that project's own thread (the hook does that);
+  // panels opened on the old one go with it.
+  if (panelsFor !== projectId) {
+    setPanelsFor(projectId)
     setOpenPanels({})
     restored.current = true
   }
 
-  // Leaving the page stops waiting for the reply. The function finishes what
-  // it started either way; this only stops a dead component updating.
-  useEffect(() => () => abortRef.current?.abort(), [])
-
   useEffect(() => {
-    if (!turnsFor) return
-    try {
-      sessionStorage.setItem(storageKey(turnsFor), JSON.stringify(turns))
-    } catch {
-      // A full storage quota must not take down the conversation.
-    }
-  }, [turns, turnsFor])
-
-  useEffect(() => {
-    // Don't yank a restored conversation to the bottom before it has painted;
-    // only follow along for turns that arrive while you are watching.
     if (restored.current) {
-      // A chat opens on its latest message, without animating down to it.
       restored.current = false
       requestAnimationFrame(() => endRef.current?.scrollIntoView({ block: 'end' }))
       return
@@ -349,90 +75,14 @@ export default function AgentConsole() {
   }
 
   const clearConversation = () => {
-    setTurns([])
+    clear()
     setOpenPanels({})
-    try {
-      sessionStorage.removeItem(storageKey(projectId))
-    } catch {
-      // Storage unavailable; the in-memory thread is already cleared.
-    }
   }
 
-  const ask = async (question: string) => {
-    const text = question.trim()
-    if (!text || busy || !projectId) return
-    if (text.length > MAX_PROMPT_CHARS) return
-
-    // Captured before the optimistic user turn is appended, so what goes up is
-    // exactly the exchange that preceded this question. Error bubbles are
-    // dropped — "could not reach the agent" is not something to reason over.
-    const history = turns
-      .filter((t) => !t.isError)
-      .slice(-HISTORY_TURNS)
-      .map((t) => ({ role: t.role, text: t.text }))
-
-    setTurns((t) => [...t, { role: 'user', text }])
+  const ask = (question: string) => {
+    if (!question.trim() || busy) return
     setPrompt('')
-    setBusy(true)
-    setProgress([])
-    const controller = new AbortController()
-    abortRef.current = controller
-
-    try {
-      // The project is sent, not inferred. The Edge Function verifies
-      // membership before using it, so this decides which project the agent
-      // is working on without deciding whether the caller may.
-      const data = await callAgent({
-        prompt: text,
-        history,
-        projectId,
-        signal: controller.signal,
-        onStep: (step) => setProgress((p) => [...p, step]),
-      })
-      if (controller.signal.aborted) return
-
-      setTurns((t) => [
-        ...t,
-        {
-          role: 'agent',
-          text: data.error ?? data.reply ?? '(no reply)',
-          trace: data.trace,
-          index: data.index,
-          changed: data.changed,
-          isError: Boolean(data.error),
-        },
-      ])
-
-      // An Action ran, so any cached view of the world model may now be stale.
-      // Matched by prefix, which reaches the project-scoped keys underneath.
-      // `changed` only lists numbered objects; a dependency or a part has no
-      // number, so a successful action_* call in the trace counts too.
-      const wrote = data.trace?.some((t) => t.tool.startsWith('action_') && t.ok)
-      if (data.changed?.length || wrote) {
-        for (const key of INVALIDATE_ON_CHANGE) {
-          qc.invalidateQueries({ queryKey: [key] })
-        }
-      }
-    } catch (err) {
-      console.error('Agent request failed', err)
-      // Something may have been written before the failure; refetch so the
-      // lists show it rather than inviting a duplicate.
-      for (const key of INVALIDATE_ON_CHANGE) {
-        qc.invalidateQueries({ queryKey: [key] })
-      }
-      setTurns((t) => [
-        ...t,
-        {
-          role: 'agent',
-          text: err instanceof Error ? err.message : 'Could not reach the agent.',
-          isError: true,
-        },
-      ])
-    } finally {
-      if (abortRef.current === controller) abortRef.current = null
-      setBusy(false)
-      setProgress([])
-    }
+    void send(question)
   }
 
   const tooLong = prompt.trim().length > MAX_PROMPT_CHARS
@@ -649,7 +299,7 @@ export default function AgentConsole() {
                 : 'Reading the world model…'}
               <button
                 type="button"
-                onClick={() => abortRef.current?.abort()}
+                onClick={stop}
                 className="ml-2 inline-flex items-center gap-1 text-xs hover:underline"
               >
                 <Square size={10} />
