@@ -1,3 +1,7 @@
+import { QueryError } from '@/components/QueryError'
+import { firstFailedQuery } from '@/lib/query-error'
+import { DocumentOpenLink } from '@/components/DocumentOpenLink'
+import { hasDocumentFile } from '@/lib/db'
 import { eur, localToday, day } from '@/lib/format'
 import React, { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
@@ -91,7 +95,7 @@ export default function DefectDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
-  const { data: defect, isLoading: defectLoading } = useDefect(id ?? '')
+  const { data: defect, isLoading: defectLoading, error: qErr0, refetch: qRefetch0 } = useDefect(id ?? '')
   const { data: changeOrders = [], isLoading: coLoading } = useChangeOrders()
   const { data: approvals = [], isLoading: approvalsLoading } = useApprovals()
   const { data: allDocs = [] } = useDocuments()
@@ -117,6 +121,10 @@ export default function DefectDetail() {
   // sections below all default to an empty array, so they render as "nothing
   // linked" until their data arrives and fill in when it does.
   const isLoading = defectLoading
+
+  // A failed request shows the error and a retry, not "Loading…" or an empty page.
+  const failed = firstFailedQuery([{ error: qErr0, refetch: qRefetch0 }])
+  if (failed) return <QueryError error={failed.error} onRetry={failed.retry} />
 
   if (isLoading) {
     return <div style={{ padding: '2rem', color: 'hsl(var(--muted-foreground))' }}>Loading...</div>
@@ -369,17 +377,7 @@ export default function DefectDetail() {
                         {doc.doc_number}
                       </span>
                       <span className="flex-1 truncate">{doc.title}</span>
-                      {doc.file_url ? (
-                        <a
-                          href={doc.file_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs hover:underline"
-                          style={{ color: 'hsl(var(--accent))' }}
-                        >
-                          Open
-                        </a>
-                      ) : null}
+                      <DocumentOpenLink doc={doc} />
                     </div>
                   ))}
                 </div>
@@ -424,20 +422,10 @@ export default function DefectDetail() {
                         <div className="text-sm font-medium truncate">{doc.title}</div>
                         <div className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>
                           {doc.doc_number} · {doc.doc_type.replace(/_/g, ' ')} ·{' '}
-                          {doc.file_size ? `${Math.round(doc.file_size / 1024)} KB` : 'No file'}
+                          {doc.file_size ? `${Math.round(doc.file_size / 1024)} KB` : hasDocumentFile(doc) ? 'Link' : 'No file'}
                         </div>
                       </div>
-                      {doc.file_url && (
-                        <a
-                          href={doc.file_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs font-medium hover:underline shrink-0"
-                          style={{ color: 'hsl(var(--accent))' }}
-                        >
-                          Open
-                        </a>
-                      )}
+                      <DocumentOpenLink doc={doc} className="text-xs font-medium hover:underline shrink-0" />
                     </div>
                   ))}
                 </div>

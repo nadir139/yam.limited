@@ -1,3 +1,5 @@
+import { QueryError } from '@/components/QueryError'
+import { firstFailedQuery } from '@/lib/query-error'
 import { day, num } from '@/lib/format'
 import React, { useState } from 'react'
 import { CheckCircle2 } from 'lucide-react'
@@ -26,12 +28,16 @@ const ROLE_LABELS: Record<string, string> = {
 const RESULT_FILTERS: (InspectionResult | 'ALL')[] = ['ALL', 'PENDING', 'PASS', 'CONDITIONAL_PASS', 'FAIL']
 
 export default function InspectionList() {
-  const { data: inspections = [], isLoading: inspLoading } = useInspections()
-  const { data: workPackages = [], isLoading: wpLoading } = useWorkPackages()
+  const { data: inspections = [], isLoading: inspLoading, error: qErr0, refetch: qRefetch0 } = useInspections()
+  const { data: workPackages = [], isLoading: wpLoading, error: qErr1, refetch: qRefetch1 } = useWorkPackages()
   const [search, setSearch] = useState('')
   const [resultFilter, setResultFilter] = useState<string>('ALL')
 
   const isLoading = inspLoading || wpLoading
+
+  // A failed request shows the error and a retry, not "Loading…" or an empty page.
+  const failed = firstFailedQuery([{ error: qErr0, refetch: qRefetch0 }, { error: qErr1, refetch: qRefetch1 }])
+  if (failed) return <QueryError error={failed.error} onRetry={failed.retry} />
 
   if (isLoading) {
     return <div style={{ padding: '2rem', color: 'hsl(var(--muted-foreground))' }}>Loading...</div>

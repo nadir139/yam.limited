@@ -1,0 +1,79 @@
+# Checks every pull request before it can reach main (Vercel deploys main to
+# production). The same checks CLAUDE.md asks for before pushing, plus the tests.
+#
+# No Supabase credentials are needed: scripts/preflight.mjs only warns when
+# VITE_SUPABASE_* are missing, and the build verifier checks the public pages.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install
+        run: npm ci
+
+      # tsconfig.json is a solution file: a bare `tsc --noEmit` checks nothing.
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint (errors fail, warnings do not)
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      # prebuild (preflight + typecheck) and postbuild (verify-build) run too.
+      - name: Build
+        run: npm run build
+
+  edge-functions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      # Type-checks each Edge Function the way Supabase will bundle it.
+      # --node-modules-dir=none: the repo's package.json would otherwise make
+      # Deno look for npm: imports in ./node_modules, which CI does not install.
+      #
+      # revolut is skipped: it is frozen (ROADMAP, Nov 2026) and has known
+      # type-only errors with TypeScript 5.7's Uint8Array generics in its
+      # WebCrypto calls. It runs correctly; fix the types if work resumes.
+      - name: Type-check Edge Functions
+        run: |
+          set -e
+          for f in supabase/functions/*/index.ts; do
+            case "$f" in supabase/functions/revolut/*) echo "skip $f (frozen)"; continue ;; esac
+            echo "::group::$f"
+            deno check --node-modules-dir=none "$f"
+            echo "::endgroup::"
+          done
+
+      - name: Edge Function tests
+        run: deno test --node-modules-dir=none supabase/functions/

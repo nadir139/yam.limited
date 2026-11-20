@@ -1,3 +1,5 @@
+import { QueryError } from '@/components/QueryError'
+import { firstFailedQuery } from '@/lib/query-error'
 import { eur, day } from '@/lib/format'
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -37,7 +39,11 @@ export default function DefectList() {
   const [severityFilter, setSeverityFilter] = useState<string>('ALL')
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
 
-  const { data: defects = [], isLoading } = useDefects()
+  const { data: defects = [], isLoading, error: qErr0, refetch: qRefetch0 } = useDefects()
+
+  // A failed request shows the error and a retry, not "Loading…" or an empty page.
+  const failed = firstFailedQuery([{ error: qErr0, refetch: qRefetch0 }])
+  if (failed) return <QueryError error={failed.error} onRetry={failed.retry} />
 
   if (isLoading) {
     return <div style={{ padding: '2rem', color: 'hsl(var(--muted-foreground))' }}>Loading...</div>

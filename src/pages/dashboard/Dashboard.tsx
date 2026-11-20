@@ -1,3 +1,5 @@
+import { QueryError } from '@/components/QueryError'
+import { firstFailedQuery } from '@/lib/query-error'
 import { at, eur, percent, sinceNow, isOverdue } from '@/lib/format'
 import React, { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
@@ -88,6 +90,10 @@ export default function Dashboard() {
     approvalsQ.isLoading ||
     workPackagesQ.isLoading ||
     eventsQ.isLoading
+
+  // A failed request shows the error and a retry, not "Loading…" or an empty page.
+  const failed = firstFailedQuery([projectQ, defectsQ, approvalsQ, workPackagesQ, eventsQ])
+  if (failed) return <QueryError error={failed.error} onRetry={failed.retry} />
 
   if (isLoading) {
     return (

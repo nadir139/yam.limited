@@ -1,3 +1,5 @@
+import { QueryError } from '@/components/QueryError'
+import { firstFailedQuery } from '@/lib/query-error'
 import { useMemo, useState } from 'react'
 import { UserPlus, AlertCircle, Circle } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -210,7 +212,7 @@ function MemberCard({
 }
 
 export default function TeamView() {
-  const { data: members = [], isLoading } = useTeam()
+  const { data: members = [], isLoading, error: qErr0, refetch: qRefetch0 } = useTeam()
   const { data: matrix = [] } = useActionPermissions()
   const { can } = usePermissions()
   const { user } = useAuth()
@@ -260,6 +262,10 @@ export default function TeamView() {
     }
     return out
   }, [matrix])
+
+  // A failed request shows the error and a retry, not "Loading…" or an empty page.
+  const failed = firstFailedQuery([{ error: qErr0, refetch: qRefetch0 }])
+  if (failed) return <QueryError error={failed.error} onRetry={failed.retry} />
 
   if (isLoading) {
     return (

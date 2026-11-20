@@ -402,13 +402,13 @@ export async function fetchPartConnections(projectId: string, vesselId: string |
 
 /** Where a part is drawn, with the document it is drawn in. */
 export type PartReferenceWithDocument = PartReference & {
-  document: { id: string; title: string; doc_number: string; file_url: string | null } | null
+  document: { id: string; title: string; doc_number: string; file_url: string | null; storage_path: string | null } | null
 }
 
 export async function fetchPartReferences(partId: string): Promise<PartReferenceWithDocument[]> {
   const { data, error } = await supabase
     .from('part_references')
-    .select('*, document:documents(id, title, doc_number, file_url)')
+    .select('*, document:documents(id, title, doc_number, file_url, storage_path)')
     .eq('part_id', partId)
     .order('page')
   if (error) throw error
@@ -1007,23 +1007,53 @@ export async function uploadDocument(
     .upload(path, file, { upsert: false })
   if (storageError) throw new Error(`Storage upload failed: ${storageError.message}`)
 
-  const { data: signedData, error: signedError } = await supabase.storage
-    .from('project-documents')
-    .createSignedUrl(path, 60 * 60 * 24 * 365)
-  if (signedError) throw new Error(`Could not get signed URL: ${signedError.message}`)
-
+  // Store the path, not a signed URL (migration 048). A signed URL is a bearer
+  // link that skips the member-only Storage policy; documentUrl() signs a
+  // short-lived one each time the file is opened instead.
   const { data, error } = await supabase.rpc('action_register_document', {
     p_project_id: projectId,
     p_title: meta.title,
     p_doc_type: meta.docType,
-    p_file_url: signedData.signedUrl,
+    p_storage_path: path,
     p_file_size: file.size,
     p_mime_type: file.type,
     p_linked_object_type: meta.linkedObjectType,
     p_linked_object_id: meta.linkedObjectId,
     p_is_class_document: meta.isClassDocument,
   })
+  if (error) {
+    // The file is uploaded but not registered: remove it so it is not orphaned.
+    await supabase.storage.from('project-documents').remove([path]).catch(() => undefined)
+  }
   return unwrap(data, error, 'Register document') as Document
+}
+
+/** How long an opened document link stays valid. */
+const DOCUMENT_URL_TTL_SECONDS = 10 * 60
+
+/** A document as far as opening it is concerned. */
+export type OpenableDocument = { storage_path?: string | null; file_url?: string | null }
+
+/** True if the document has something to open: an uploaded file or an external link. */
+export function hasDocumentFile(doc: OpenableDocument | null | undefined): boolean {
+  return !!(doc?.storage_path || doc?.file_url)
+}
+
+/**
+ * A URL to open the document now. Uploaded files are signed on demand for ten
+ * minutes, so Storage's member-only policy is checked every time; external
+ * links are returned as they are. Throws if the caller may not read the file.
+ */
+export async function documentUrl(doc: OpenableDocument): Promise<string> {
+  if (doc.storage_path) {
+    const { data, error } = await supabase.storage
+      .from('project-documents')
+      .createSignedUrl(doc.storage_path, DOCUMENT_URL_TTL_SECONDS)
+    if (error || !data?.signedUrl) throw new Error(`Could not open the file: ${error?.message ?? 'no link returned'}`)
+    return data.signedUrl
+  }
+  if (doc.file_url) return doc.file_url
+  throw new Error('This document has no file')
 }
 
 // ─── Planning the work ────────────────────────────────────────────────────────

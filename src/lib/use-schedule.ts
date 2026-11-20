@@ -20,6 +20,8 @@ export interface ProjectSchedule {
   lines: GanttLine[]
   isLoading: boolean
   error: unknown
+  /** Refetch the queries the schedule is built from (after a failed load). */
+  refetch: () => Promise<void>
   /**
    * The whole schedule as it would be with one package re-planned: what a
    * move will do to it, its successors and the finish, before it is saved.
@@ -46,6 +48,10 @@ export function useProjectSchedule(): ProjectSchedule {
   const approvals = useApprovals()
 
   const today = localToday()
+  // Stable across renders (TanStack Query), so safe as memo dependencies.
+  const { refetch: refetchProject } = project
+  const { refetch: refetchWps } = wps
+  const { refetch: refetchDeps } = deps
 
   return useMemo(() => {
     const workPackages = wps.data ?? []
@@ -133,12 +139,15 @@ export function useProjectSchedule(): ProjectSchedule {
       predict,
       isLoading: project.isLoading || wps.isLoading || deps.isLoading,
       error: project.error ?? wps.error ?? deps.error,
+      refetch: async () => {
+        await Promise.all([refetchProject(), refetchWps(), refetchDeps()])
+      },
     }
   }, [
     project.data, project.isLoading, project.error,
     wps.data, wps.isLoading, wps.error,
     deps.data, deps.isLoading, deps.error,
     cos.data, defects.data, inspections.data, approvals.data,
-    today,
+    today, refetchProject, refetchWps, refetchDeps,
   ])
 }

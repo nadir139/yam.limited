@@ -1,3 +1,5 @@
+import { QueryError } from '@/components/QueryError'
+import { firstFailedQuery } from '@/lib/query-error'
 import { formatDistanceToNow } from 'date-fns'
 import { Compass } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -21,7 +23,7 @@ import type { Message } from '@/lib/types'
  * one place, it becomes a list you can read at the end of a job.
  */
 function UnplannedWork() {
-  const { data: messages = [], isLoading } = useUnplannedWork()
+  const { data: messages = [], isLoading, error: qErr0, refetch: qRefetch0 } = useUnplannedWork()
   const { data: workPackages = [] } = useWorkPackages()
   const { data: defects = [] } = useDefects()
   const { data: inspections = [] } = useInspections()
@@ -36,6 +38,10 @@ function UnplannedWork() {
       return inspections.find((i) => i.id === m.linked_object_id)?.inspection_number
     return null
   }
+
+  // A failed request shows the error and a retry, not "Loading…" or an empty page.
+  const failed = firstFailedQuery([{ error: qErr0, refetch: qRefetch0 }])
+  if (failed) return <QueryError error={failed.error} onRetry={failed.retry} />
 
   if (isLoading) {
     return (

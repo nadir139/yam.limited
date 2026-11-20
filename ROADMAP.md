@@ -20,6 +20,25 @@ Next, in order:
    (confirms `RESEND_API_KEY` and the sender domain).
 4. Per-person briefs (today they are per project and audience).
 
+## Focus and freeze (20 Nov 2026)
+
+Live usage on 20 Nov: 4 accounts, 1 active in 30 days, no contact inquiries
+in 60 days. The work now is getting the boat product in front of people, not
+widening it.
+
+**Frozen** (built, kept in the database, hidden or not extended; no new work
+until a paying user asks for it):
+
+- Buildings and aircraft (043–045) — hidden by `VITE_SHOW_ALL_ASSET_KINDS`.
+- Revolut Business API (041) — the Connect card is hidden unless
+  `VITE_SHOW_REVOLUT_API=true` or an account is already connected; CSV import stays.
+- Licensed escrow partner (PARTNER_ESCROW), aircraft cycles, building meters.
+- 3D extras: weight-estimate import, point clouds.
+
+**Focus:** refit owner's-rep work on one boat, end to end, plus the public demo
+(`/demo`). Done 20 Nov: documents by path, signed on demand (048); an error
+with a retry on every list and detail page; CI on pull requests.
+
 ## 0. Do now (no code)
 
 | | What | Why | Effort |
@@ -81,11 +100,11 @@ Next, in order:
 2. **Preview before the agent writes in bulk.** For three or more writes, return a proposed list
    ("10 work packages, these disciplines") with Confirm/Edit, then commit. A wrong guess at
    discipline is cheaper to fix before it is in the audit log.
-3. **Error states on every page.** *Half done:* a page that crashes now shows a retry screen inside the shell instead of a blank app (`ErrorBoundary`). Still open: a failed *query* shows "Loading…" or "Project not found".
+3. ~~**Error states on every page.**~~ Done 20 Nov: `<QueryError>` with retry on list and detail pages. *Earlier:* a page that crashes now shows a retry screen inside the shell instead of a blank app (`ErrorBoundary`). Still open: a failed *query* shows "Loading…" or "Project not found".
    Add one shared `<QueryError retry>` and use it on all list and detail pages.
-4. **Documents: store the path, sign on demand.** `file_url` holds a one-year signed URL. It is a
+4. ~~**Documents: store the path, sign on demand.**~~ Done 20 Nov (migration 048). `file_url` holds a one-year signed URL. It is a
    bearer link that bypasses membership checks, and every document breaks a year after upload.
-5. **CI on pull requests.** typecheck + lint + build + the agent harness from this audit (mock
+5. ~~**CI on pull requests.**~~ Done 20 Nov (`.github/workflows/ci.yml`: typecheck, lint, tests, build, Edge Function checks). Still open: the agent harness. typecheck + lint + build + the agent harness from this audit (mock
    Supabase + mock Anthropic + Playwright). The repo has no tests at all; the only workflow is the
    GitHub Pages deploy being retired.
 6. **Retire GitHub Pages.** Remove `deploy.yml`, `CNAME`, `public/404.html` and the `?redirect=`

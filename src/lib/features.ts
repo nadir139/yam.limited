@@ -24,3 +24,10 @@ export const projectIsShown = (p: Parameters<typeof assetKindOf>[0]) => ENABLED_
 
 /** Whether a project type may be offered when starting a project. */
 export const projectTypeIsShown = (t: ProjectType) => ENABLED_ASSET_KINDS.has(kindForProjectType(t))
+
+// The Revolut Business API connection (migration 041) is frozen with the
+// other non-core work (ROADMAP, Nov 2026): CSV statement import stays, the
+// "Connect Revolut" card is hidden. An account that is already connected
+// keeps its card so it can still be synced or disconnected.
+// To offer it again: VITE_SHOW_REVOLUT_API=true in Vercel, redeploy.
+export const SHOW_REVOLUT_API = import.meta.env.VITE_SHOW_REVOLUT_API === 'true'
