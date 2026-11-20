@@ -13,6 +13,7 @@ Allow: /
 Disallow: /app/
 Disallow: /auth/
 Disallow: /login
+Disallow: /demo
 
 # ─── Assistants, named on purpose ────────────────────────────────────────────
 # These are already covered by the wildcard. They are listed anyway so that
@@ -24,65 +25,76 @@ Allow: /
 Disallow: /app/
 Disallow: /auth/
 Disallow: /login
+Disallow: /demo
 
 User-agent: OAI-SearchBot
 Allow: /
 Disallow: /app/
 Disallow: /auth/
 Disallow: /login
+Disallow: /demo
 
 User-agent: ChatGPT-User
 Allow: /
 Disallow: /app/
 Disallow: /auth/
 Disallow: /login
+Disallow: /demo
 
 User-agent: ClaudeBot
 Allow: /
 Disallow: /app/
 Disallow: /auth/
 Disallow: /login
+Disallow: /demo
 
 User-agent: Claude-User
 Allow: /
 Disallow: /app/
 Disallow: /auth/
 Disallow: /login
+Disallow: /demo
 
 User-agent: Claude-SearchBot
 Allow: /
 Disallow: /app/
 Disallow: /auth/
 Disallow: /login
+Disallow: /demo
 
 User-agent: PerplexityBot
 Allow: /
 Disallow: /app/
 Disallow: /auth/
 Disallow: /login
+Disallow: /demo
 
 User-agent: Perplexity-User
 Allow: /
 Disallow: /app/
 Disallow: /auth/
 Disallow: /login
+Disallow: /demo
 
 User-agent: Google-Extended
 Allow: /
 Disallow: /app/
 Disallow: /auth/
 Disallow: /login
+Disallow: /demo
 
 User-agent: Applebot-Extended
 Allow: /
 Disallow: /app/
 Disallow: /auth/
 Disallow: /login
+Disallow: /demo
 
 User-agent: meta-externalagent
 Allow: /
 Disallow: /app/
 Disallow: /auth/
 Disallow: /login
+Disallow: /demo
 
 Sitemap: https://yam.limited/sitemap.xml

@@ -198,4 +198,6 @@ export interface AuthUser {
   id: string
   email: string
   name: string
+  /** A /demo visitor (app_metadata.yam_demo, set by the service role; migration 049). */
+  isDemo?: boolean
 }

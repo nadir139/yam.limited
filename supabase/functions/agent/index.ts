@@ -535,6 +535,20 @@ Deno.serve(async (req: Request) => {
   }
   const actorEmail = userData.user.email ?? "Unknown";
 
+  // Demo visitors (migration 049) get a small budget of turns: 15 each, 400 a
+  // day across all of them. app_metadata is set by the service role only.
+  if (userData.user.app_metadata?.yam_demo === true) {
+    const { data: allowed, error: turnError } = await supabase.rpc("demo_take_agent_turn");
+    if (turnError || allowed !== true) {
+      if (turnError) console.error("demo_take_agent_turn failed", turnError);
+      return json(
+        { error: "The demo's agent turns are used up. Book a call and we will run it on your own boat." },
+        429,
+        origin,
+      );
+    }
+  }
+
   // Which project this conversation is about.
   //
   // The client sends it, but nothing here trusts that: `projects` is read
