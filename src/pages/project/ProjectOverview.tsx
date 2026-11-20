@@ -1,3 +1,5 @@
+import { QueryError } from '@/components/QueryError'
+import { firstFailedQuery } from '@/lib/query-error'
 import { day, eur, NONE } from '@/lib/format'
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -45,7 +47,7 @@ export default function ProjectOverview() {
   const [editingVessel, setEditingVessel] = useState(false)
   const { can } = usePermissions()
 
-  const { data: project, isLoading: projectLoading } = useProject()
+  const { data: project, isLoading: projectLoading, error: qErr0, refetch: qRefetch0 } = useProject()
   const { data: workPackages = [], isLoading: wpLoading } = useWorkPackages()
   const { data: inspections = [], isLoading: inspLoading } = useInspections()
   const { data: defects = [], isLoading: defectsLoading } = useDefects()
@@ -71,6 +73,10 @@ export default function ProjectOverview() {
   // sections below all default to an empty array, so they render as "nothing
   // linked" until their data arrives and fill in when it does.
   const isLoading = projectLoading
+
+  // A failed request shows the error and a retry, not "Loading…" or an empty page.
+  const failed = firstFailedQuery([{ error: qErr0, refetch: qRefetch0 }])
+  if (failed) return <QueryError error={failed.error} onRetry={failed.retry} />
 
   if (isLoading) {
     return <div style={{ padding: '2rem', color: 'hsl(var(--muted-foreground))' }}>Loading...</div>

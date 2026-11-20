@@ -32,6 +32,7 @@ import { parseRevolutCsv, type ParseResult } from '@/lib/revolut-csv'
 import { CATEGORY_LABEL, suggest, type Candidates, type FinanceCategory, type Suggestion } from '@/lib/finance-match'
 import { receiptUrl, uploadReceipt } from '@/lib/finance-files-client'
 import { RevolutConnection } from '@/components/finance/RevolutConnection'
+import { SHOW_REVOLUT_API } from '@/lib/features'
 import { ASSET_NOUN, assetKindOf } from '@/lib/asset'
 import type { FinanceAccount, FinanceAllocation, FinanceReceipt, FinanceTransaction } from '@/lib/types'
 
@@ -130,7 +131,9 @@ export default function FinancePage() {
         </div>
       </div>
 
-      <RevolutConnection connections={ledger?.connections ?? []} canManage={role === 'OWNER' || role === 'OWNERS_REP'} />
+      {(SHOW_REVOLUT_API || (ledger?.connections ?? []).length > 0) && (
+        <RevolutConnection connections={ledger?.connections ?? []} canManage={role === 'OWNER' || role === 'OWNERS_REP'} />
+      )}
 
       {adding && <AccountForm onDone={() => setAdding(false)} />}
       {importing && <ImportPanel accounts={accounts} onDone={() => setImporting(false)} />}

@@ -1,3 +1,4 @@
+import { QueryError } from '@/components/QueryError'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -43,9 +44,11 @@ export default function PartsImportPage() {
 }
 
 function ImportReviewLoader({ importId }: { importId: string }) {
-  const { data: imp, isLoading, error } = usePartImport(importId)
+  const { data: imp, isLoading, error, refetch } = usePartImport(importId)
   if (isLoading) return <div style={{ padding: '2rem', color: 'hsl(var(--muted-foreground))' }}>Loading…</div>
-  if (error || !imp) {
+  // A failed request is not the same as a missing import: offer a retry.
+  if (error) return <QueryError error={error} onRetry={refetch} title="Could not load this import" />
+  if (!imp) {
     return (
       <div className="p-8 text-sm">
         This import could not be found. <Link to="/app/parts" className="underline">Back to parts</Link>

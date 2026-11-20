@@ -1,3 +1,4 @@
+import { QueryError } from '@/components/QueryError'
 import { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -54,7 +55,7 @@ function Stat({ label, value, tone, hint }: { label: string; value: string; tone
 
 export default function SchedulePage() {
   const navigate = useNavigate()
-  const { schedule, dependencies, markers, lines, isLoading, error, predict } = useProjectSchedule()
+  const { schedule, dependencies, markers, lines, isLoading, error, refetch, predict } = useProjectSchedule()
   const { data: inspections = [] } = useInspections()
   const { data: approvals = [] } = useApprovals()
   const { data: actionItems = [] } = useProjectActionItems()
@@ -241,13 +242,7 @@ export default function SchedulePage() {
   if (isLoading) {
     return <div style={{ padding: '2rem', color: 'hsl(var(--muted-foreground))' }}>Loading…</div>
   }
-  if (error) {
-    return (
-      <div style={{ padding: '2rem', color: 'hsl(var(--destructive))' }}>
-        Could not load the schedule: {error instanceof Error ? error.message : String(error)}
-      </div>
-    )
-  }
+  if (error) return <QueryError error={error} onRetry={refetch} title="Could not load the schedule" />
 
   const finishSlip =
     schedule.forecastFinish !== null && schedule.committedFinish !== null

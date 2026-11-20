@@ -1,3 +1,4 @@
+import { documentUrl, hasDocumentFile } from '@/lib/db'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import PartMaintenancePanel from '@/components/maintenance/PartMaintenancePanel'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -909,17 +910,24 @@ function PartDrawingsPanel({ part }: { part: Part }) {
         <button
           key={r.id}
           type="button"
-          disabled={!r.document?.file_url}
-          onClick={() =>
-            r.document?.file_url &&
-            setViewer({
-              url: r.document.file_url,
-              title: `${r.document.title} · page ${r.page}${r.sheet ? ` · sheet ${r.sheet}` : ''}`,
-              page: r.page,
-              bbox: r.bbox,
-              label: part.name,
-            })
-          }
+          disabled={!hasDocumentFile(r.document)}
+          onClick={async () => {
+            const doc = r.document
+            if (!doc || !hasDocumentFile(doc)) return
+            // Signed for ten minutes at the moment of opening (migration 048).
+            try {
+              const url = await documentUrl(doc)
+              setViewer({
+                url,
+                title: `${doc.title} · page ${r.page}${r.sheet ? ` · sheet ${r.sheet}` : ''}`,
+                page: r.page,
+                bbox: r.bbox,
+                label: part.name,
+              })
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : 'Could not open the file')
+            }
+          }}
           className="flex items-center gap-2 rounded-md border px-3 py-2 text-left text-sm hover:bg-[hsl(var(--muted))]"
           style={{ borderColor: 'hsl(var(--border))' }}
         >

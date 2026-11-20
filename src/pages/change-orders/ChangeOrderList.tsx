@@ -1,3 +1,5 @@
+import { QueryError } from '@/components/QueryError'
+import { firstFailedQuery } from '@/lib/query-error'
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { GitBranch } from 'lucide-react'
@@ -25,11 +27,15 @@ const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
 export default function ChangeOrderList() {
   const navigate = useNavigate()
 
-  const { data: changeOrders = [], isLoading: coLoading } = useChangeOrders()
-  const { data: defects = [], isLoading: defectsLoading } = useDefects()
-  const { data: approvals = [], isLoading: approvalsLoading } = useApprovals()
+  const { data: changeOrders = [], isLoading: coLoading, error: qErr0, refetch: qRefetch0 } = useChangeOrders()
+  const { data: defects = [], isLoading: defectsLoading, error: qErr1, refetch: qRefetch1 } = useDefects()
+  const { data: approvals = [], isLoading: approvalsLoading, error: qErr2, refetch: qRefetch2 } = useApprovals()
 
   const isLoading = coLoading || defectsLoading || approvalsLoading
+
+  // A failed request shows the error and a retry, not "Loading…" or an empty page.
+  const failed = firstFailedQuery([{ error: qErr0, refetch: qRefetch0 }, { error: qErr1, refetch: qRefetch1 }, { error: qErr2, refetch: qRefetch2 }])
+  if (failed) return <QueryError error={failed.error} onRetry={failed.retry} />
 
   if (isLoading) {
     return <div style={{ padding: '2rem', color: 'hsl(var(--muted-foreground))' }}>Loading...</div>

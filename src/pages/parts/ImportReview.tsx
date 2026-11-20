@@ -1,3 +1,4 @@
+import { documentUrl, hasDocumentFile } from '@/lib/db'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -122,13 +123,21 @@ export default function ImportReview({ imp }: { imp: PartImport }) {
       return p
     })
 
-  const open = (ref: ProposalRef, part: ProposalPart) => {
+  const open = async (ref: ProposalRef, part: ProposalPart) => {
     const doc = docById.get(ref.document_id)
-    if (!doc?.file_url) {
+    if (!doc || !hasDocumentFile(doc)) {
       toast.error('That document has no file')
       return
     }
-    setViewer({ url: doc.file_url, title: `${doc.title} · page ${ref.page}${ref.sheet ? ` · sheet ${ref.sheet}` : ''}`, page: ref.page, bbox: ref.bbox, label: part.name })
+    // Signed for ten minutes at the moment of opening (migration 048).
+    let url: string
+    try {
+      url = await documentUrl(doc)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not open the file')
+      return
+    }
+    setViewer({ url, title: `${doc.title} · page ${ref.page}${ref.sheet ? ` · sheet ${ref.sheet}` : ''}`, page: ref.page, bbox: ref.bbox, label: part.name })
   }
 
   const matches = (p: ProposalPart) => {

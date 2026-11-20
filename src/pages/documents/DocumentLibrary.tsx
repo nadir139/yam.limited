@@ -1,3 +1,7 @@
+import { QueryError } from '@/components/QueryError'
+import { firstFailedQuery } from '@/lib/query-error'
+import { DocumentOpenLink } from '@/components/DocumentOpenLink'
+import { hasDocumentFile } from '@/lib/db'
 import React, { useState } from 'react'
 import { Download, ExternalLink, CheckCircle2 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
@@ -61,7 +65,11 @@ export default function DocumentLibrary() {
   const [typeFilter, setTypeFilter] = useState<string>('ALL')
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
 
-  const { data: docs = [], isLoading } = useDocuments()
+  const { data: docs = [], isLoading, error: qErr0, refetch: qRefetch0 } = useDocuments()
+
+  // A failed request shows the error and a retry, not "Loading…" or an empty page.
+  const failed = firstFailedQuery([{ error: qErr0, refetch: qRefetch0 }])
+  if (failed) return <QueryError error={failed.error} onRetry={failed.retry} />
 
   if (isLoading) {
     return <div style={{ padding: '2rem', color: 'hsl(var(--muted-foreground))' }}>Loading...</div>
@@ -178,18 +186,11 @@ export default function DocumentLibrary() {
                     {formatBytes(doc.file_size)}
                   </TableCell>
                   <TableCell>
-                    {doc.file_url ? (
-                      <a
-                        href={doc.file_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-xs hover:underline"
-                        style={{ color: 'hsl(var(--accent))' }}
-                        onClick={(e) => e.stopPropagation()}
-                      >
+                    {hasDocumentFile(doc) ? (
+                      <DocumentOpenLink doc={doc} className="flex items-center gap-1 text-xs hover:underline">
                         <Download size={12} />
                         Open
-                      </a>
+                      </DocumentOpenLink>
                     ) : (
                       <span className="text-xs" style={{ color: 'hsl(var(--muted-foreground))' }}>—</span>
                     )}

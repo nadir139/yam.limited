@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.18"
   }
   public: {
     Tables: {
@@ -122,6 +122,72 @@ export type Database = {
           role?: Database["public"]["Enums"]["user_role"]
         }
         Relationships: []
+      }
+      agent_notes: {
+        Row: {
+          audience: string
+          body: string
+          created_at: string
+          dedupe_key: string | null
+          id: string
+          kind: string
+          object_id: string | null
+          object_number: string | null
+          object_type: Database["public"]["Enums"]["object_type"] | null
+          project_id: string
+          refs: Json
+          source_event_id: string | null
+          suggestion: string | null
+          title: string
+        }
+        Insert: {
+          audience?: string
+          body: string
+          created_at?: string
+          dedupe_key?: string | null
+          id?: string
+          kind: string
+          object_id?: string | null
+          object_number?: string | null
+          object_type?: Database["public"]["Enums"]["object_type"] | null
+          project_id: string
+          refs?: Json
+          source_event_id?: string | null
+          suggestion?: string | null
+          title: string
+        }
+        Update: {
+          audience?: string
+          body?: string
+          created_at?: string
+          dedupe_key?: string | null
+          id?: string
+          kind?: string
+          object_id?: string | null
+          object_number?: string | null
+          object_type?: Database["public"]["Enums"]["object_type"] | null
+          project_id?: string
+          refs?: Json
+          source_event_id?: string | null
+          suggestion?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_notes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_notes_source_event_id_fkey"
+            columns: ["source_event_id"]
+            isOneToOne: false
+            referencedRelation: "world_model_events"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       aircraft_flights: {
         Row: {
@@ -615,6 +681,7 @@ export type Database = {
           project_id: string
           revision: string
           status: Database["public"]["Enums"]["document_status"]
+          storage_path: string | null
           title: string
           uploaded_by: string
           uploaded_date: string
@@ -633,6 +700,7 @@ export type Database = {
           project_id: string
           revision?: string
           status?: Database["public"]["Enums"]["document_status"]
+          storage_path?: string | null
           title: string
           uploaded_by: string
           uploaded_date?: string
@@ -651,6 +719,7 @@ export type Database = {
           project_id?: string
           revision?: string
           status?: Database["public"]["Enums"]["document_status"]
+          storage_path?: string | null
           title?: string
           uploaded_by?: string
           uploaded_date?: string
@@ -2456,6 +2525,7 @@ export type Database = {
       }
       project_members: {
         Row: {
+          agent_brief_email: boolean
           company: string | null
           created_at: string | null
           email: string
@@ -2474,6 +2544,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          agent_brief_email?: boolean
           company?: string | null
           created_at?: string | null
           email: string
@@ -2492,6 +2563,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          agent_brief_email?: boolean
           company?: string | null
           created_at?: string | null
           email?: string
@@ -3659,12 +3731,13 @@ export type Database = {
         Args: {
           p_doc_type: string
           p_file_size?: number
-          p_file_url: string
+          p_file_url?: string
           p_is_class_document?: boolean
           p_linked_object_id?: string
           p_linked_object_type?: string
           p_mime_type?: string
           p_project_id?: string
+          p_storage_path?: string
           p_title: string
         }
         Returns: Json
@@ -3928,6 +4001,8 @@ export type Database = {
         Args: { p_project_id: string; p_reason: string; p_record_id: string }
         Returns: Json
       }
+      agent_watch_call: { Args: { p_payload: Json }; Returns: undefined }
+      agent_watch_secret: { Args: never; Returns: string }
       aircraft_rerecord_hours: {
         Args: {
           p_from: string
@@ -4415,6 +4490,10 @@ export type Database = {
           status: string
           title: string
         }[]
+      }
+      set_agent_brief_email: {
+        Args: { p_on: boolean; p_project_id: string }
+        Returns: boolean
       }
       space_is_on_project: {
         Args: {

@@ -1,3 +1,5 @@
+import { QueryError } from '@/components/QueryError'
+import { firstFailedQuery } from '@/lib/query-error'
 import { eur, day } from '@/lib/format'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, AlertTriangle, CheckCircle2 } from 'lucide-react'
@@ -42,11 +44,15 @@ export default function ChangeOrderDetail() {
 
   // Read from the already-cached lists rather than adding a per-object fetch —
   // the change-order set is small and almost always in cache from the queue.
-  const { data: changeOrders = [], isLoading } = useChangeOrders()
+  const { data: changeOrders = [], isLoading, error: qErr0, refetch: qRefetch0 } = useChangeOrders()
   const { data: defects = [] } = useDefects()
   const { data: approvals = [] } = useApprovals()
 
   const co = changeOrders.find((c) => c.id === id)
+
+  // A failed request shows the error and a retry, not "Loading…" or an empty page.
+  const failed = firstFailedQuery([{ error: qErr0, refetch: qRefetch0 }])
+  if (failed) return <QueryError error={failed.error} onRetry={failed.retry} />
 
   if (isLoading) {
     return (

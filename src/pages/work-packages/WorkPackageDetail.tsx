@@ -1,3 +1,5 @@
+import { QueryError } from '@/components/QueryError'
+import { firstFailedQuery } from '@/lib/query-error'
 import { day, eur, percentLabel, percentValue } from '@/lib/format'
 import React from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
@@ -54,7 +56,7 @@ export default function WorkPackageDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
-  const { data: wp, isLoading: wpLoading } = useWorkPackage(id ?? '')
+  const { data: wp, isLoading: wpLoading, error: qErr0, refetch: qRefetch0 } = useWorkPackage(id ?? '')
   // The same dates the schedule shows: when the work really starts and
   // finishes, not the plan's dates side by side with them.
   const { schedule } = useProjectSchedule()
@@ -70,6 +72,10 @@ export default function WorkPackageDetail() {
   // sections below all default to an empty array, so they render as "nothing
   // linked" until their data arrives and fill in when it does.
   const isLoading = wpLoading
+
+  // A failed request shows the error and a retry, not "Loading…" or an empty page.
+  const failed = firstFailedQuery([{ error: qErr0, refetch: qRefetch0 }])
+  if (failed) return <QueryError error={failed.error} onRetry={failed.retry} />
 
   if (isLoading) {
     return <div style={{ padding: '2rem', color: 'hsl(var(--muted-foreground))' }}>Loading...</div>

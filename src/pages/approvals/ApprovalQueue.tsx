@@ -1,3 +1,5 @@
+import { QueryError } from '@/components/QueryError'
+import { firstFailedQuery } from '@/lib/query-error'
 import { eur, day, isOverdue, parseDay } from '@/lib/format'
 import React, { useState } from 'react'
 import { endOfDay, formatDistanceToNow } from 'date-fns'
@@ -40,8 +42,8 @@ function DeadlineDisplay({ deadline }: { deadline: string | null }) {
 }
 
 export default function ApprovalQueue() {
-  const { data: approvals = [], isLoading: approvalsLoading } = useApprovals()
-  const { data: changeOrders = [], isLoading: coLoading } = useChangeOrders()
+  const { data: approvals = [], isLoading: approvalsLoading, error: qErr0, refetch: qRefetch0 } = useApprovals()
+  const { data: changeOrders = [], isLoading: coLoading, error: qErr1, refetch: qRefetch1 } = useChangeOrders()
   const updateApproval = useDecideApproval()
   const { can, role } = usePermissions()
   const mayDecide = can('action_decide_approval')
@@ -53,6 +55,10 @@ export default function ApprovalQueue() {
   const [toast, setToast] = useState<string | null>(null)
 
   const isLoading = approvalsLoading || coLoading
+
+  // A failed request shows the error and a retry, not "Loading…" or an empty page.
+  const failed = firstFailedQuery([{ error: qErr0, refetch: qRefetch0 }, { error: qErr1, refetch: qRefetch1 }])
+  if (failed) return <QueryError error={failed.error} onRetry={failed.retry} />
 
   if (isLoading) {
     return <div style={{ padding: '2rem', color: 'hsl(var(--muted-foreground))' }}>Loading...</div>

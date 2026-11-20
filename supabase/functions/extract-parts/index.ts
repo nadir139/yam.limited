@@ -232,27 +232,36 @@ Deno.serve(async (req: Request) => {
   // Read through the caller's own JWT: RLS is the membership check.
   const { data: docs, error: docsError } = await supabase
     .from("documents")
-    .select("id, title, file_url, mime_type, project_id")
+    .select("id, title, file_url, storage_path, mime_type, project_id")
     .eq("project_id", projectId)
     .in("id", documentIds);
   if (docsError) return json({ error: docsError.message }, 500, origin);
   const ordered = documentIds.map((id) => docs?.find((d) => d.id === id)).filter(Boolean) as Array<{
-    id: string; title: string; file_url: string | null; mime_type: string | null;
+    id: string; title: string; file_url: string | null; storage_path: string | null; mime_type: string | null;
   }>;
   if (ordered.length !== documentIds.length) {
     return json({ error: "One of those documents is not on this project." }, 404, origin);
   }
   for (const d of ordered) {
-    if (!d.file_url) return json({ error: `"${d.title}" has no file.` }, 400, origin);
+    if (!d.storage_path && !d.file_url) return json({ error: `"${d.title}" has no file.` }, 400, origin);
     if (d.mime_type && d.mime_type !== "application/pdf") {
       return json({ error: `"${d.title}" is not a PDF. Only PDFs can be read for parts.` }, 400, origin);
     }
   }
 
-  async function fetchPdf(d: { title: string; file_url: string | null }): Promise<Uint8Array> {
-    const res = await fetch(d.file_url!);
-    if (!res.ok) throw new Error(`Could not download "${d.title}" (${res.status}).`);
-    const bytes = new Uint8Array(await res.arrayBuffer());
+  async function fetchPdf(d: { title: string; file_url: string | null; storage_path: string | null }): Promise<Uint8Array> {
+    let bytes: Uint8Array;
+    if (d.storage_path) {
+      // Uploaded files (migration 048): downloaded through the caller's JWT, so
+      // the member-only Storage policy is the check, as it is in the app.
+      const { data, error } = await supabase.storage.from("project-documents").download(d.storage_path);
+      if (error || !data) throw new Error(`Could not download "${d.title}" (${error?.message ?? "no data"}).`);
+      bytes = new Uint8Array(await data.arrayBuffer());
+    } else {
+      const res = await fetch(d.file_url!);
+      if (!res.ok) throw new Error(`Could not download "${d.title}" (${res.status}).`);
+      bytes = new Uint8Array(await res.arrayBuffer());
+    }
     if (bytes.byteLength > MAX_DOCUMENT_BYTES) throw new Error(`"${d.title}" is larger than 30 MB.`);
     return bytes;
   }
