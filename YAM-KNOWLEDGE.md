@@ -1,7 +1,7 @@
 # YAM — Maritime Intelligence Platform
 ## Knowledge Base · Session Log · Development Roadmap
 
-> Last updated: 17 November 2026 (sections 50–57)  
+> Last updated: 20 November 2026 (sections 50–59)  
 > Primary repo: `nadir139/yam.limited` (deployed by Vercel from `main`; GitHub Pages is being retired -- see section 12)  
 > Live URL: `yam.limited`  
 > App URL: `yam.limited/app/dashboard`  
@@ -2800,3 +2800,75 @@ the fold on a phone.
   transaction: logging 17 Nov succeeded and was signed by name; nothing was
   left behind.
 
+
+## 58. Trust fixes and the freeze (20 Nov 2026, PR #72, migration 048)
+
+Live usage on 20 Nov: 4 accounts, 1 active in 30 days, no contact inquiries in
+60 days. The work moved from widening the product to putting it in front of
+people. See ROADMAP "Focus and freeze".
+
+- **Documents store their path (048).** `documents.storage_path` replaces the
+  one-year signed URL in `file_url`. `documentUrl()` (src/lib/db.ts) signs a
+  10-minute URL when a file is opened; `DocumentOpenLink` opens the tab first
+  and points it at the URL once signed (otherwise Safari blocks it as a
+  pop-up). `action_register_document` takes `p_storage_path`, refuses signed
+  links, and checks the path is in the project's folder (also a CHECK
+  constraint). `extract-parts` (v2) downloads by path through the caller's JWT.
+  The four existing rows were converted; old signed URLs stay valid until they
+  expire, because a signed URL cannot be revoked.
+- **Failed queries show an error.** `<QueryError>` + `firstFailedQuery()`
+  (src/lib/query-error.ts) on list and detail pages, dashboard, schedule and
+  parts import. Logbook, finance and model pages still use their own states.
+- **CI** (`.github/workflows/ci.yml`): typecheck, lint, vitest, build, then
+  `deno check` / `deno test` on the Edge Functions with
+  `--node-modules-dir=none` (the root package.json otherwise makes Deno look in
+  ./node_modules). `revolut` is skipped: frozen, with type-only Uint8Array
+  errors under TS 5.7.
+- **Freeze.** Buildings and aircraft stay hidden (§50). The Revolut Connect
+  card is hidden unless `VITE_SHOW_REVOLUT_API=true` or a connection exists.
+
+## 59. The public demo: every visitor gets their own boat (migration 049)
+
+`yam.limited/demo` → "Open the demo" → the visitor is in the app as the owner's
+rep on **S/Y Tessera**, a fictional 32 m sloop five weeks into a refit, with
+12 work packages, 7 inspections, 5 NCRs, 5 change orders, 4 approvals (two
+waiting), dependencies, parts, messages and two agent notes. Dates are relative
+to the day of the visit, so the demo is always "live". Everything is fictional
+(names, yard, companies use example.com and "(fictional)").
+
+How it works:
+
+- `demo-session` Edge Function (public, verify_jwt off): purges up to 5
+  expired sandboxes (Storage files, `demo_purge`, the auth user), creates a
+  user `visitor-<16 hex>@demo.yam.limited` with `app_metadata.yam_demo = true`
+  (only the service role can set it), calls `demo_create_sandbox`, and returns
+  a `generateLink` magic-link token hash. `src/pages/Demo.tsx` exchanges it
+  with `verifyOtp({ type: 'magiclink' })`. No email is ever sent.
+- The page waits for a click, and robots.txt disallows `/demo`: crawlers that
+  run JavaScript would otherwise create a sandbox per visit.
+- The visitor has full OWNERS_REP rights on their own sandbox, so the real
+  cascade runs (verified: raising a HIGH NCR with a cost created CO + approval).
+- Guards (`is_demo_user()` reads the JWT): `require_permission` refuses invites,
+  role changes, new projects, logbook, vessel/asset changes, 3D uploads, finance
+  and payment release for demo users; `action_create_project` and
+  `action_open_*` got `assert_not_demo()` as their first line.
+- Cost: `demo_take_agent_turn()` (called by the agent function, v21) allows 15
+  turns per visitor and 400 a day in total; `demo_create_sandbox` allows 60 new
+  sandboxes an hour; seeding sets `yam.demo_seed` so agent-watch does not fire;
+  the 05:30 morning brief now runs per project and skips sandboxes.
+- In the app: `AuthUser.isDemo`, a `DemoBanner` above the top bar, no "new
+  project" in the switcher, and an "ended, start a new one" screen once purged.
+
+Verified on the live database: seed (1 visible project, 12 WPs, 23 events),
+visitor reads through RLS, invite and create-project refused, live cascade,
+purge leaves no rows; the deployed function returned a token that
+`/auth/v1/verify` turned into a session with `yam_demo: true`; the agent
+answered on the demo boat and returned 429 at the cap. Test data removed.
+
+Known limits:
+
+- A demo visitor can still upload a file into their sandbox folder (the
+  Storage insert policy is member-based and cannot be changed from SQL). It is
+  removed with the sandbox. To block it, add `and not public.is_demo_user()` to
+  the `auth_upload` policy in the dashboard (Storage → Policies).
+- Expired sandboxes are purged when the next visitor arrives, not on a timer.

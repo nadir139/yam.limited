@@ -21,6 +21,7 @@ const Ontology = lazy(() => import("./pages/Ontology"));
 const Sardinia = lazy(() => import("./pages/Sardinia"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Login = lazy(() => import("./pages/auth/Login"));
+const Demo = lazy(() => import("./pages/Demo"));
 const AuthCallback = lazy(() => import("./pages/auth/AuthCallback"));
 const Dashboard = lazy(() => import("./pages/dashboard/Dashboard"));
 const ProjectOverview = lazy(() => import("./pages/project/ProjectOverview"));
@@ -95,6 +96,7 @@ const App = () => (
                 <Route path="/ontology" element={<Ontology />} />
                 <Route path="/sardinia" element={<Sardinia />} />
                 <Route path="/login" element={<Login />} />
+                <Route path="/demo" element={<Demo />} />
                 <Route path="/auth/callback" element={<AuthCallback />} />
                 <Route path="/app" element={<Navigate to="/app/dashboard" replace />} />
                 <Route path="/app/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

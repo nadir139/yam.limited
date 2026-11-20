@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
+import DemoBanner from './DemoBanner'
 import MobileNav, { MOBILE_NAV_HEIGHT } from './MobileNav'
 import { NoProjects } from './ProjectSwitcher'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
@@ -70,6 +71,7 @@ export default function AppShell({ children }: AppShellProps) {
 
       <div className="app-shell-column" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
         <div className="contents print:hidden">
+          <DemoBanner />
           <Topbar onMenuClick={() => setSidebarOpen(true)} />
         </div>
         <main

@@ -35,9 +35,14 @@ until a paying user asks for it):
 - Licensed escrow partner (PARTNER_ESCROW), aircraft cycles, building meters.
 - 3D extras: weight-estimate import, point clouds.
 
-**Focus:** refit owner's-rep work on one boat, end to end, plus the public demo
-(`/demo`). Done 20 Nov: documents by path, signed on demand (048); an error
-with a retry on every list and detail page; CI on pull requests.
+**Focus:** refit owner's-rep work on one boat, end to end, plus the public demo.
+Done 20 Nov: documents by path, signed on demand (048); an error with a retry
+on every list and detail page; CI on pull requests; **`/demo`**, a private
+fictional refit per visitor (049, YAM-KNOWLEDGE §59).
+
+Next: send the demo link to 10 owner's reps and captains a week; add PostHog
+funnels (landing → /demo → first NCR → contact); block demo uploads in the
+Storage policy (dashboard).
 
 ## 0. Do now (no code)
 

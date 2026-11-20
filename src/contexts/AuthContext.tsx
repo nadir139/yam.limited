@@ -81,7 +81,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser((prev) =>
         prev?.id === authUser.id
           ? prev
-          : { id: authUser.id, email, name: email.split('@')[0] || 'User' },
+          : {
+              id: authUser.id,
+              email,
+              name: email.split('@')[0] || 'User',
+              isDemo: authUser.app_metadata?.yam_demo === true,
+            },
       )
       setIsLoading(false)
 

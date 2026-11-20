@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useActiveProject } from '@/contexts/ProjectContext'
+import { useAuth } from '@/contexts/AuthContext'
 import { useTranslation } from '@/lib/i18n'
 import CreateProjectForm from '@/components/actions/CreateProjectForm'
 import { homeFor, pathFits } from './nav'
@@ -53,6 +54,9 @@ function describe(p: ProjectWithVessel, t: (k: string) => string) {
 }
 
 export default function ProjectSwitcher() {
+  // Demo visitors have one sandbox; starting projects is refused server-side
+  // (migration 049), so the menu does not offer it.
+  const isDemo = useAuth().user?.isDemo === true
   const { projects, activeProject, setActiveProjectId, isLoading } = useActiveProject()
   const { t } = useTranslation()
   const [creating, setCreating] = useState(false)
@@ -143,11 +147,15 @@ export default function ProjectSwitcher() {
               </DropdownMenuItem>
             )
           })}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setCreating(true)} className="gap-2">
-            <Plus size={14} />
-            {t('project.create')}
-          </DropdownMenuItem>
+          {!isDemo && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setCreating(true)} className="gap-2">
+                <Plus size={14} />
+                {t('project.create')}
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -167,6 +175,30 @@ export default function ProjectSwitcher() {
 export function NoProjects() {
   const { t } = useTranslation()
   const [creating, setCreating] = useState(false)
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+
+  // A demo visitor whose 24 hours are over: the sandbox has been purged.
+  if (user?.isDemo) {
+    return (
+      <div className="mx-auto flex max-w-md flex-col items-center gap-3 py-20 text-center">
+        <h1 className="text-lg font-semibold">This demo has ended</h1>
+        <p className="text-sm" style={{ color: 'hsl(var(--muted-foreground))' }}>
+          Demo boats are kept for 24 hours. Start a fresh one, or talk to us about your own boat.
+        </p>
+        <Button
+          className="mt-2"
+          onClick={async () => {
+            await logout()
+            navigate('/demo', { replace: true })
+          }}
+        >
+          Start a new demo
+        </Button>
+      </div>
+    )
+  }
+
   return (
     <div className="mx-auto flex max-w-md flex-col items-center gap-3 py-20 text-center">
       <h1 className="text-lg font-semibold">{t('project.emptyTitle')}</h1>

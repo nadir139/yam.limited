@@ -666,6 +666,36 @@ export type Database = {
           },
         ]
       }
+      demo_sessions: {
+        Row: {
+          agent_turns: number
+          created_at: string
+          email: string
+          expires_at: string
+          project_id: string
+          user_id: string
+          vessel_id: string
+        }
+        Insert: {
+          agent_turns?: number
+          created_at?: string
+          email: string
+          expires_at?: string
+          project_id: string
+          user_id: string
+          vessel_id: string
+        }
+        Update: {
+          agent_turns?: number
+          created_at?: string
+          email?: string
+          expires_at?: string
+          project_id?: string
+          user_id?: string
+          vessel_id?: string
+        }
+        Relationships: []
+      }
       documents: {
         Row: {
           created_at: string | null
@@ -4022,6 +4052,7 @@ export type Database = {
         Args: { p_cost: number }
         Returns: Database["public"]["Enums"]["approval_tier"]
       }
+      assert_not_demo: { Args: { p_what?: string }; Returns: undefined }
       asset_details_spec: { Args: { p_kind: string }; Returns: Json }
       can_keep_crew_record: {
         Args: { p_crew_id: string; p_project_id: string }
@@ -4054,6 +4085,12 @@ export type Database = {
         Args: { p_project_id: string }
         Returns: Database["public"]["Enums"]["user_role"]
       }
+      demo_create_sandbox: {
+        Args: { p_email: string; p_user_id: string }
+        Returns: string
+      }
+      demo_purge: { Args: { p_user_id: string }; Returns: undefined }
+      demo_take_agent_turn: { Args: never; Returns: boolean }
       discipline_abbrev: {
         Args: { p_discipline: Database["public"]["Enums"]["discipline"] }
         Returns: string
@@ -4269,6 +4306,7 @@ export type Database = {
         Args: { f: Database["public"]["Tables"]["aircraft_flights"]["Row"] }
         Returns: number
       }
+      is_demo_user: { Args: never; Returns: boolean }
       is_project_member: { Args: { p_project_id: string }; Returns: boolean }
       log_alongside: {
         Args: {

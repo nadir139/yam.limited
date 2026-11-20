@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 
 // The first screen: one sentence that says what YAM is, who it works for and
@@ -23,9 +24,11 @@ const Hero = () => (
             <button type="button" onClick={() => scrollTo("#contact")} className="btn-ink">
               Talk about your boat <ArrowRight className="h-4 w-4" />
             </button>
-            <button type="button" onClick={() => scrollTo("#graph")} className="btn-line">
-              See the record
-            </button>
+            {/* A private, fictional refit to try without signing up (/demo, migration 049).
+                It took the place of "See the record"; the record is still in the nav. */}
+            <Link to="/demo" className="btn-line">
+              Try the live demo
+            </Link>
           </div>
           <p className="label">Sardinia based · operating worldwide</p>
         </div>
